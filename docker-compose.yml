@@ -1,1 +1,89 @@
+version: '3.8'
 
+# QUIRK AI Kiosk - Local Development Stack
+# Usage: docker-compose up --build
+
+services:
+  # Frontend Kiosk UI - React Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: quirk-kiosk-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api/v1
+      - REACT_APP_KIOSK_ID=DEV-KIOSK-001
+      - REACT_APP_DEALERSHIP=Quirk Chevrolet
+    volumes:
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+    depends_on:
+      - backend
+    networks:
+      - quirk-network
+    restart: unless-stopped
+
+  # Backend API Gateway - FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: quirk-kiosk-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - HOST=0.0.0.0
+      - PORT=8000
+      - USE_MOCK_DATA=false
+      - ENABLE_ANALYTICS=true
+      - AI_SERVICE_URL=http://ai_service:8001
+      - PBS_API_KEY=mock-pbs-key-dev
+      - CRM_API_KEY=mock-crm-key-dev
+    volumes:
+      - ./backend/app:/app/app:ro
+      - ./backend/data:/app/data:ro
+    depends_on:
+      - ai_service
+    networks:
+      - quirk-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # AI Recommendation Service - ML Engine
+  ai_service:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
+    container_name: quirk-kiosk-ai
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+    volumes:
+      - ./ai_service/predictor:/app/predictor:ro
+      - ./ai_service/models:/app/models:ro
+    networks:
+      - quirk-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  quirk-network:
+    driver: bridge
+    name: quirk-ai-network
+
+volumes:
+  frontend-modules:
