@@ -1,1 +1,4 @@
 
+# This directory holds trained ML model artifacts
+# Models are tracked via Git LFS for version control
+# Placeholder file to ensure directory is tracked by Git
