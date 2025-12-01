@@ -14,11 +14,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     
     # CORS
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-    ]
+        CORS_ORIGINS: List[str] = ["*"]
+
     
     # External API Keys (for production)
     PBS_API_KEY: str = "mock-pbs-key-dev"
