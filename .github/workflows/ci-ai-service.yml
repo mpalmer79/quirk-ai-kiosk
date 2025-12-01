@@ -56,6 +56,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 🔧 Set up Docker Buildx
+        # Required for cache-from/cache-to with type=gha (GitHub Actions cache backend)
+        uses: docker/setup-buildx-action@v3
+
       - name: 🏗️ Extract Metadata for Docker
         # Set image tags based on branch/commit hash
         id: meta
