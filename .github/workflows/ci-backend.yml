@@ -1,1 +1,78 @@
+name: CI/CD - Backend API Gateway
 
+on:
+  # Triggers the workflow on push or pull request events for the backend directory
+  push:
+    branches:
+      - main
+      - development
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+  pull_request:
+    branches:
+      - main
+      - development
+    paths:
+      - 'backend/**'
+
+jobs:
+  build_and_push_backend:
+    runs-on: ubuntu-latest
+    
+    # Define environment variables for the job
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}/backend
+
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 📦 Install Dependencies & Run Tests (Backend Gateway)
+        run: |
+          cd backend
+          python -m venv venv
+          source venv/bin/activate
+          # Use 'requirements.txt' from the backend directory
+          pip install -r requirements.txt
+          # Placeholder: Run FastAPI unit tests (e.g., for routing and services)
+          # pip install pytest
+          # python -m pytest tests/
+        # Fail the build if any tests fail
+        # continue-on-error: false 
+
+      - name: ⚙️ Log in to GitHub Container Registry
+        # Use GitHub's built-in token for authentication
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏗️ Extract Metadata for Docker
+        # Set image tags based on branch/commit hash
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,suffix=,enable=true,priority=100
+            type=raw,value=${{ github.ref_name }} # e.g., main or development
+
+      - name: 🐳 Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          # Context is the 'backend' subdirectory where the Dockerfile is located
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Use cache for faster builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
