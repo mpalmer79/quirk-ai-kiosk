@@ -307,3 +307,23 @@ const styles = {
     padding: '64px 24px',
     background: '#1a1a1a',
     borderRadius: '16px',
+    border: '1px solid #2a2a2a',
+  },
+  emptyText: {
+    fontSize: '1.125rem',
+    color: '#a0a0a0',
+    marginBottom: '16px',
+  },
+  clearButton: {
+    padding: '12px 24px',
+    background: '#242424',
+    border: '1px solid #2a2a2a',
+    borderRadius: '12px',
+    color: '#ffffff',
+    fontSize: '1rem',
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+};
+
+export default HomePage;
