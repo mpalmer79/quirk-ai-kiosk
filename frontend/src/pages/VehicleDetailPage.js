@@ -16,11 +16,12 @@ function VehicleDetailPage() {
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [leadFormType, setLeadFormType] = useState('general');
 
-  useEffect(() => {
-    if (id) {
-      loadVehicle();
-    }
-  }, [id]);
+ useEffect(() => {
+  if (id) {
+    loadVehicle();
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [id]);
 
   const loadVehicle = async () => {
     try {
