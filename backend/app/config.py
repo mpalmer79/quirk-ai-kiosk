@@ -14,8 +14,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     
     # CORS
-        CORS_ORIGINS: List[str] = ["*"]
-
+    CORS_ORIGINS: List[str] = ["*"]
     
     # External API Keys (for production)
     PBS_API_KEY: str = "mock-pbs-key-dev"
