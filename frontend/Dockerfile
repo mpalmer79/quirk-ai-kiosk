@@ -1,10 +1,9 @@
-# QUIRK AI Kiosk - Frontend React Application
-FROM node:20-alpine
+# QUIRK AI Kiosk - Frontend React Application (Production)
+FROM node:20-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Install dependencies first for better caching
+# Install dependencies
 COPY package.json ./
 RUN npm install
 
@@ -12,14 +11,29 @@ RUN npm install
 COPY . .
 
 # Build arguments for environment
-ARG REACT_APP_API_URL=http://localhost:8000/api/v1
+ARG REACT_APP_API_URL
 ARG REACT_APP_KIOSK_ID=KIOSK-001
+ARG REACT_APP_DEALERSHIP=Quirk Chevrolet
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 ENV REACT_APP_KIOSK_ID=$REACT_APP_KIOSK_ID
+ENV REACT_APP_DEALERSHIP=$REACT_APP_DEALERSHIP
 
-# Expose port
+# Build the production app
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install serve to run the static files
+RUN npm install -g serve
+
+# Copy built files from builder stage
+COPY --from=builder /app/build ./build
+
+# Expose port (Railway uses PORT env var)
 EXPOSE 3000
 
-# Start development server (for development)
-# For production, use: npm run build && serve -s build -l 3000
-CMD ["npm", "start"]
+# Start the production server
+CMD ["sh", "-c", "serve -s build -l ${PORT:-3000}"]
