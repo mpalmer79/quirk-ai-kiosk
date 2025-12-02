@@ -1,139 +1,99 @@
 import React, { useState, useEffect } from 'react';
+import api from './api';
 
 const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [sortBy, setSortBy] = useState('recommended');
 
   useEffect(() => {
     const fetchVehicles = async () => {
       setLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 800));
+      setError(null);
       
-      // Mock inventory - replace with actual API call
-      const mockVehicles = [
-        {
-          id: 1,
-          stockNumber: '24789',
-          year: 2025,
-          make: 'Chevrolet',
-          model: 'Silverado 1500',
-          trim: 'LT Crew Cab 4WD',
-          exteriorColor: 'Summit White',
-          msrp: 52995,
-          salePrice: 47495,
-          monthlyLease: 398,
-          monthlyFinance: 612,
-          status: 'In Stock',
-          matchScore: 98,
-          features: ['Trailering Pkg', 'Heated Seats', '13.4" Screen'],
-          gradient: 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
-        },
-        {
-          id: 2,
-          stockNumber: '24801',
-          year: 2025,
-          make: 'Chevrolet',
-          model: 'Silverado 1500',
-          trim: 'RST Crew Cab 4WD',
-          exteriorColor: 'Black',
-          msrp: 58495,
-          salePrice: 53995,
-          monthlyLease: 449,
-          monthlyFinance: 698,
-          status: 'In Stock',
-          matchScore: 95,
-          features: ['Z71 Off-Road', 'Bose Audio', 'Sunroof'],
-          gradient: 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
-        },
-        {
-          id: 3,
-          stockNumber: '24756',
-          year: 2025,
-          make: 'Chevrolet',
-          model: 'Tahoe',
-          trim: 'LT 4WD',
-          exteriorColor: 'Empire Beige',
-          msrp: 63995,
-          salePrice: 59995,
-          monthlyLease: 549,
-          monthlyFinance: 798,
-          status: 'In Stock',
-          matchScore: 92,
-          features: ['3rd Row', 'Max Trailering', 'Leather'],
-          gradient: 'linear-gradient(135deg, #d4b896 0%, #a78b6c 100%)',
-        },
-        {
-          id: 4,
-          stockNumber: '24812',
-          year: 2025,
-          make: 'Chevrolet',
-          model: 'Equinox',
-          trim: 'RS AWD',
-          exteriorColor: 'Radiant Red',
-          msrp: 36495,
-          salePrice: 33995,
-          monthlyLease: 299,
-          monthlyFinance: 448,
-          status: 'In Stock',
-          matchScore: 88,
-          features: ['Sport Appearance', 'Panoramic Roof', 'Safety Pkg'],
-          gradient: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-        },
-        {
-          id: 5,
-          stockNumber: '24834',
-          year: 2025,
-          make: 'Chevrolet',
-          model: 'Corvette',
-          trim: 'Stingray 3LT',
-          exteriorColor: 'Torch Red',
-          msrp: 79995,
-          salePrice: 79995,
-          monthlyLease: 899,
-          monthlyFinance: 1198,
-          status: 'In Stock',
-          matchScore: 85,
-          features: ['Z51 Performance', 'Magnetic Ride', 'Carbon Fiber'],
-          gradient: 'linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%)',
-        },
-        {
-          id: 6,
-          stockNumber: '24867',
-          year: 2025,
-          make: 'Chevrolet',
-          model: 'Trailblazer',
-          trim: 'ACTIV AWD',
-          exteriorColor: 'Sterling Gray',
-          msrp: 29495,
-          salePrice: 27495,
-          monthlyLease: 259,
-          monthlyFinance: 398,
-          status: 'In Transit',
-          matchScore: 82,
-          features: ['AWD', 'Roof Rails', 'Sport Interior'],
-          gradient: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-        },
-      ];
-      
-      setVehicles(mockVehicles);
-      setLoading(false);
+      try {
+        let result;
+        
+        // If we have quiz answers, use preference-based search
+        if (customerData.quizAnswers && Object.keys(customerData.quizAnswers).length > 0) {
+          result = await api.searchByPreferences({
+            primary_use: customerData.quizAnswers.primaryUse,
+            passengers: customerData.quizAnswers.passengers,
+            mileage: customerData.quizAnswers.mileage,
+            payment_type: customerData.quizAnswers.paymentType,
+            monthly_payment: customerData.quizAnswers.monthlyPayment,
+            down_payment: customerData.quizAnswers.downPayment,
+            features: customerData.quizAnswers.features,
+            timeline: customerData.quizAnswers.timeline,
+          });
+        } else {
+          // Use filter-based search
+          const filters = {};
+          
+          if (customerData.selectedModel) {
+            filters.model = customerData.selectedModel;
+          }
+          
+          if (customerData.budgetRange) {
+            // Convert monthly payment to rough vehicle price
+            filters.min_price = customerData.budgetRange.min * 60;
+            filters.max_price = customerData.budgetRange.max * 80;
+          }
+          
+          if (customerData.preferences?.drivetrain) {
+            filters.drivetrain = customerData.preferences.drivetrain;
+          }
+          
+          if (customerData.preferences?.cabType) {
+            filters.cab_type = customerData.preferences.cabType;
+          }
+          
+          filters.sort_by = sortBy;
+          
+          result = await api.getInventory(filters);
+        }
+        
+        setVehicles(result.vehicles || result || []);
+      } catch (err) {
+        console.error('Failed to fetch vehicles:', err);
+        setError('Unable to load inventory. Please try again.');
+        setVehicles([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchVehicles();
-  }, [customerData]);
+  }, [customerData, sortBy]);
 
   const handleVehicleSelect = (vehicle) => {
     updateCustomerData({ selectedVehicle: vehicle });
     navigateTo('vehicleDetail');
   };
 
+  // Generate gradient based on color
+  const getGradient = (color) => {
+    const colorMap = {
+      'white': 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
+      'black': 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+      'red': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+      'blue': 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+      'silver': 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
+      'gray': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+      'beige': 'linear-gradient(135deg, #d4b896 0%, #a78b6c 100%)',
+    };
+    const lowerColor = (color || '').toLowerCase();
+    return Object.entries(colorMap).find(([key]) => lowerColor.includes(key))?.[1] 
+      || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
+  };
+
   const sortedVehicles = [...vehicles].sort((a, b) => {
     switch (sortBy) {
-      case 'priceLow': return a.salePrice - b.salePrice;
-      case 'priceHigh': return b.salePrice - a.salePrice;
-      case 'newest': return b.year - a.year;
-      default: return b.matchScore - a.matchScore;
+      case 'priceLow': return (a.salePrice || 0) - (b.salePrice || 0);
+      case 'priceHigh': return (b.salePrice || 0) - (a.salePrice || 0);
+      case 'newest': return (b.year || 0) - (a.year || 0);
+      default: return (b.matchScore || 50) - (a.matchScore || 50);
     }
   });
 
@@ -143,6 +103,18 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
         <div style={styles.loadingSpinner} />
         <p style={styles.loadingText}>Finding your perfect matches...</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.errorContainer}>
+        <div style={styles.errorIcon}>⚠️</div>
+        <p style={styles.errorText}>{error}</p>
+        <button style={styles.retryButton} onClick={() => window.location.reload()}>
+          Try Again
+        </button>
       </div>
     );
   }
@@ -173,75 +145,89 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
       </div>
 
       {/* Vehicle Grid */}
-      <div style={styles.vehicleGrid}>
-        {sortedVehicles.map((vehicle) => (
-          <div 
-            key={vehicle.id}
-            style={styles.vehicleCard}
-            onClick={() => handleVehicleSelect(vehicle)}
-          >
-            {/* Match Score */}
-            <div style={styles.matchBadge}>
-              <span style={styles.matchScore}>{vehicle.matchScore}%</span>
-              <span style={styles.matchLabel}>Match</span>
-            </div>
-
-            {/* Vehicle Image */}
-            <div style={{ ...styles.vehicleImage, background: vehicle.gradient }}>
-              <span style={styles.vehicleInitial}>{vehicle.model.charAt(0)}</span>
-              <div style={styles.statusBadge}>
-                <span style={{
-                  ...styles.statusDot,
-                  background: vehicle.status === 'In Stock' ? '#4ade80' : '#fbbf24',
-                }} />
-                {vehicle.status}
-              </div>
-            </div>
-
-            {/* Vehicle Info */}
-            <div style={styles.vehicleInfo}>
-              <div style={styles.vehicleHeader}>
-                <div>
-                  <h3 style={styles.vehicleName}>{vehicle.year} {vehicle.model}</h3>
-                  <p style={styles.vehicleTrim}>{vehicle.trim}</p>
+      {sortedVehicles.length > 0 ? (
+        <div style={styles.vehicleGrid}>
+          {sortedVehicles.map((vehicle, index) => (
+            <div 
+              key={vehicle.id || vehicle.stockNumber || index}
+              style={styles.vehicleCard}
+              onClick={() => handleVehicleSelect(vehicle)}
+            >
+              {/* Match Score */}
+              {vehicle.matchScore && (
+                <div style={styles.matchBadge}>
+                  <span style={styles.matchScore}>{vehicle.matchScore}%</span>
+                  <span style={styles.matchLabel}>Match</span>
                 </div>
-                <span style={styles.stockNumber}>STK# {vehicle.stockNumber}</span>
-              </div>
+              )}
 
-              <div style={styles.vehicleColor}>
-                <div style={{ ...styles.colorSwatch, background: vehicle.gradient }} />
-                {vehicle.exteriorColor}
-              </div>
-
-              {/* Features */}
-              <div style={styles.featureTags}>
-                {vehicle.features.map((feature, idx) => (
-                  <span key={idx} style={styles.featureTag}>{feature}</span>
-                ))}
-              </div>
-
-              {/* Pricing */}
-              <div style={styles.pricingSection}>
-                <div style={styles.priceColumn}>
-                  <span style={styles.priceLabel}>Your Price</span>
-                  <span style={styles.priceValue}>${vehicle.salePrice.toLocaleString()}</span>
-                </div>
-                <div style={styles.paymentColumn}>
-                  <span style={styles.priceLabel}>Est. Lease</span>
-                  <span style={styles.paymentValue}>${vehicle.monthlyLease}/mo</span>
+              {/* Vehicle Image */}
+              <div style={{ ...styles.vehicleImage, background: getGradient(vehicle.exteriorColor) }}>
+                <span style={styles.vehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
+                <div style={styles.statusBadge}>
+                  <span style={{
+                    ...styles.statusDot,
+                    background: vehicle.status === 'In Stock' ? '#4ade80' : '#fbbf24',
+                  }} />
+                  {vehicle.status || 'In Stock'}
                 </div>
               </div>
 
-              <button style={styles.viewDetailsButton}>
-                View Details
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-              </button>
+              {/* Vehicle Info */}
+              <div style={styles.vehicleInfo}>
+                <div style={styles.vehicleHeader}>
+                  <div>
+                    <h3 style={styles.vehicleName}>{vehicle.year} {vehicle.model}</h3>
+                    <p style={styles.vehicleTrim}>{vehicle.trim}</p>
+                  </div>
+                  <span style={styles.stockNumber}>STK# {vehicle.stockNumber}</span>
+                </div>
+
+                <div style={styles.vehicleColor}>
+                  <div style={{ ...styles.colorSwatch, background: getGradient(vehicle.exteriorColor) }} />
+                  {vehicle.exteriorColor}
+                </div>
+
+                {/* Features */}
+                {vehicle.features && vehicle.features.length > 0 && (
+                  <div style={styles.featureTags}>
+                    {vehicle.features.slice(0, 3).map((feature, idx) => (
+                      <span key={idx} style={styles.featureTag}>{feature}</span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Pricing */}
+                <div style={styles.pricingSection}>
+                  <div style={styles.priceColumn}>
+                    <span style={styles.priceLabel}>Your Price</span>
+                    <span style={styles.priceValue}>${(vehicle.salePrice || 0).toLocaleString()}</span>
+                  </div>
+                  <div style={styles.paymentColumn}>
+                    <span style={styles.priceLabel}>Est. Payment</span>
+                    <span style={styles.paymentValue}>
+                      ${Math.round((vehicle.salePrice || 40000) / 72)}/mo
+                    </span>
+                  </div>
+                </div>
+
+                <button style={styles.viewDetailsButton}>
+                  View Details
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div style={styles.noResults}>
+          <div style={styles.noResultsIcon}>🔍</div>
+          <h3 style={styles.noResultsTitle}>No vehicles match your criteria</h3>
+          <p style={styles.noResultsText}>Try adjusting your filters or preferences</p>
+        </div>
+      )}
 
       {/* Refine Search */}
       <div style={styles.refineSection}>
@@ -279,6 +265,31 @@ const styles = {
   loadingText: {
     fontSize: '18px',
     color: 'rgba(255,255,255,0.6)',
+  },
+  errorContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+  },
+  errorIcon: {
+    fontSize: '48px',
+  },
+  errorText: {
+    fontSize: '18px',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  retryButton: {
+    padding: '12px 24px',
+    background: '#1B7340',
+    border: 'none',
+    borderRadius: '8px',
+    color: '#ffffff',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
   },
   header: {
     display: 'flex',
@@ -487,6 +498,28 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
+  },
+  noResults: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '60px 20px',
+    textAlign: 'center',
+  },
+  noResultsIcon: {
+    fontSize: '48px',
+    marginBottom: '16px',
+  },
+  noResultsTitle: {
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#ffffff',
+    margin: '0 0 8px 0',
+  },
+  noResultsText: {
+    fontSize: '16px',
+    color: 'rgba(255,255,255,0.5)',
   },
   refineSection: {
     display: 'flex',
