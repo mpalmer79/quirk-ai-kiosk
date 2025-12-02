@@ -11,6 +11,8 @@ function Screensaver({ onTouch }) {
       exit={{ opacity: 0 }}
     >
       <div style={styles.background}>
+        <div style={styles.backgroundImage} />
+        <div style={styles.overlay} />
         <div style={styles.gradient1} />
         <div style={styles.gradient2} />
       </div>
@@ -65,7 +67,19 @@ const styles = {
   background: {
     position: 'absolute',
     inset: 0,
-    background: '#0a0a0a',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    inset: 0,
+    backgroundImage: 'url(/showroom.jpg)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  },
+  overlay: {
+    position: 'absolute',
+    inset: 0,
+    background: 'rgba(0, 0, 0, 0.6)',
   },
   gradient1: {
     position: 'absolute',
@@ -73,7 +87,7 @@ const styles = {
     left: '-50%',
     width: '200%',
     height: '200%',
-    background: 'radial-gradient(circle at 30% 30%, rgba(26, 71, 42, 0.4) 0%, transparent 50%)',
+    background: 'radial-gradient(circle at 30% 30%, rgba(26, 71, 42, 0.3) 0%, transparent 50%)',
     animation: 'rotate 20s linear infinite',
   },
   gradient2: {
@@ -82,7 +96,7 @@ const styles = {
     left: '-50%',
     width: '200%',
     height: '200%',
-    background: 'radial-gradient(circle at 70% 70%, rgba(201, 162, 39, 0.2) 0%, transparent 50%)',
+    background: 'radial-gradient(circle at 70% 70%, rgba(201, 162, 39, 0.15) 0%, transparent 50%)',
     animation: 'rotate 25s linear infinite reverse',
   },
   content: {
@@ -104,6 +118,7 @@ const styles = {
     fontSize: '4rem',
     fontWeight: 800,
     color: '#ffffff',
+    textShadow: '2px 2px 8px rgba(0,0,0,0.5)',
   },
   logoAI: {
     fontSize: '4rem',
@@ -112,6 +127,7 @@ const styles = {
     background: '#ffffff',
     padding: '4px 16px',
     borderRadius: '12px',
+    boxShadow: '2px 2px 12px rgba(0,0,0,0.3)',
   },
   headline: {
     fontSize: '3rem',
@@ -119,17 +135,20 @@ const styles = {
     color: '#ffffff',
     marginBottom: '16px',
     maxWidth: '600px',
+    textShadow: '2px 2px 8px rgba(0,0,0,0.5)',
   },
   subheadline: {
     fontSize: '1.25rem',
-    color: '#a0a0a0',
+    color: '#e0e0e0',
     marginBottom: '48px',
     maxWidth: '500px',
+    textShadow: '1px 1px 4px rgba(0,0,0,0.5)',
   },
   cta: {
     fontSize: '1.5rem',
     color: '#c9a227',
     fontWeight: 500,
+    textShadow: '1px 1px 4px rgba(0,0,0,0.5)',
   },
   footer: {
     position: 'absolute',
@@ -137,15 +156,16 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    color: '#666666',
+    color: '#888888',
     fontSize: '1rem',
+    textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
   },
   dealership: {
     fontWeight: 600,
-    color: '#a0a0a0',
+    color: '#c0c0c0',
   },
   divider: {
-    color: '#444444',
+    color: '#666666',
   },
   tagline: {
     fontStyle: 'italic',
