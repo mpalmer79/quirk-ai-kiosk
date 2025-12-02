@@ -1,15 +1,15 @@
 import React, { useState, useCallback, useEffect } from 'react';
 
-// Import all customer journey components
-import WelcomeScreen from './WelcomeScreen';
-import StockLookup from './StockLookup';
-import ModelBudgetSelector from './ModelBudgetSelector';
-import GuidedQuiz from './GuidedQuiz';
-import InventoryResults from './InventoryResults';
-import VehicleDetail from './VehicleDetail';
-import PaymentCalculator from './PaymentCalculator';
-import TradeInEstimator from './TradeInEstimator';
-import CustomerHandoff from './CustomerHandoff';
+// Import all customer journey components (using actual filenames)
+import WelcomeScreen from './Welcomescreen';
+import StockLookup from './Stocklookup';
+import ModelBudgetSelector from './Modelbudgetselector';
+import GuidedQuiz from './Guidedquiz';
+import InventoryResults from './Inventoryresults';
+import VehicleDetail from './Vehicledetail';
+import PaymentCalculator from './Paymentcalculator';
+import TradeInEstimator from './TradeInestimator';
+import CustomerHandoff from './Customerhandoff';
 
 // Main Kiosk Application - Customer Journey Controller
 const KioskApp = () => {
