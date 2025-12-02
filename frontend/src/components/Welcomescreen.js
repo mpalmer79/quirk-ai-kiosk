@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from 'react';
+import { inventoryAPI } from '../services/api';
 
 const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [hoveredPath, setHoveredPath] = useState(null);
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
     setIsVisible(true);
+    loadStats();
   }, []);
+
+  const loadStats = async () => {
+    try {
+      const response = await inventoryAPI.getStats();
+      setStats(response.data);
+    } catch (err) {
+      console.error('Error loading stats:', err);
+    }
+  };
 
   const handlePathSelect = (path) => {
     updateCustomerData({ path });
@@ -16,6 +28,11 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
       guidedQuiz: 'guidedQuiz',
     };
     navigateTo(routes[path]);
+  };
+
+  const handleBrowseAll = () => {
+    updateCustomerData({ path: 'browse' });
+    navigateTo('inventory');
   };
 
   const paths = [
@@ -137,42 +154,46 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
         ))}
       </div>
 
-      {/* Stats Bar */}
+      {/* Stats Bar - Dynamic from API */}
       <div style={{
         ...styles.statsBar,
         opacity: isVisible ? 1 : 0,
         transition: 'all 0.6s ease 0.4s',
       }}>
         <div style={styles.statItem}>
-          <span style={styles.statNumber}>227</span>
+          <span style={styles.statNumber}>{stats?.total || '---'}</span>
           <span style={styles.statLabel}>Vehicles In Stock</span>
         </div>
         <div style={styles.statDivider} />
         <div style={styles.statItem}>
-          <span style={styles.statNumber}>104</span>
+          <span style={styles.statNumber}>{stats?.byBodyStyle?.SUV || '---'}</span>
           <span style={styles.statLabel}>SUVs</span>
         </div>
         <div style={styles.statDivider} />
         <div style={styles.statItem}>
-          <span style={styles.statNumber}>87</span>
+          <span style={styles.statNumber}>{stats?.byBodyStyle?.Truck || '---'}</span>
           <span style={styles.statLabel}>Trucks</span>
         </div>
         <div style={styles.statDivider} />
         <div style={styles.statItem}>
-          <span style={styles.statNumber}>$22K</span>
+          <span style={styles.statNumber}>
+            {stats?.priceRange?.min ? `$${Math.round(stats.priceRange.min / 1000)}K` : '---'}
+          </span>
           <span style={styles.statLabel}>Starting At</span>
         </div>
       </div>
 
-      {/* Touch Prompt */}
-      <div style={{
-        ...styles.touchPrompt,
-        opacity: isVisible ? 1 : 0,
-        animation: 'pulse 2s infinite',
-      }}>
-        <span style={styles.touchIcon}>👆</span>
-        <span>Touch anywhere to begin</span>
-      </div>
+      {/* Just Browsing Link */}
+      <button
+        style={{
+          ...styles.browseLink,
+          opacity: isVisible ? 1 : 0,
+          transition: 'all 0.6s ease 0.5s',
+        }}
+        onClick={handleBrowseAll}
+      >
+        Just browsing? View all {stats?.total || ''} vehicles →
+      </button>
 
       <style>{`
         @keyframes pulse {
@@ -252,7 +273,7 @@ const styles = {
   pathsContainer: {
     display: 'flex',
     gap: '24px',
-    marginBottom: '48px',
+    marginBottom: '40px',
     flexWrap: 'wrap',
     justifyContent: 'center',
     maxWidth: '1200px',
@@ -318,7 +339,7 @@ const styles = {
     background: 'rgba(255,255,255,0.05)',
     borderRadius: '16px',
     border: '1px solid rgba(255,255,255,0.1)',
-    marginBottom: '32px',
+    marginBottom: '24px',
   },
   statItem: {
     display: 'flex',
@@ -343,15 +364,16 @@ const styles = {
     height: '40px',
     background: 'rgba(255,255,255,0.1)',
   },
-  touchPrompt: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
+  browseLink: {
+    background: 'none',
+    border: 'none',
+    color: 'rgba(255,255,255,0.6)',
     fontSize: '16px',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  touchIcon: {
-    fontSize: '20px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    padding: '12px 24px',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
   },
 };
 
