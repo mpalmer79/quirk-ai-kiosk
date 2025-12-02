@@ -1,7 +1,4 @@
-"""
-Inventory Router - Handles vehicle inventory endpoints
-Reads from PBS DMS Excel export
-"""
+
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
 from pydantic import BaseModel
