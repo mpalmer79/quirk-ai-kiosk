@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { inventoryAPI } from '../services/api';
+import api from './api';
 
 const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
   const [vehicles, setVehicles] = useState([]);
@@ -13,35 +13,50 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
       setError(null);
       
       try {
-        let response;
+        let data;
         
-        // If we have quiz answers, use preference-based search
-        if (customerData.quizAnswers && Object.keys(customerData.quizAnswers).length > 0) {
-          // Quiz-based search would go here (when backend supports it)
-          // For now, fall back to regular inventory call
-          response = await inventoryAPI.getAll({});
-        } else {
-          // Use filter-based search
-          const params = {};
-          
-          if (customerData.selectedModel) {
-            params.make = 'Chevrolet'; // Default make
-          }
-          
-          if (customerData.budgetRange) {
-            // Convert monthly payment to rough vehicle price
-            params.min_price = customerData.budgetRange.min * 60;
-            params.max_price = customerData.budgetRange.max * 80;
-          }
-          
-          if (customerData.preferences?.bodyStyle) {
-            params.body_style = customerData.preferences.bodyStyle;
-          }
-          
-          response = await inventoryAPI.getAll(params);
+        // Build filter params based on customer selections
+        const params = {};
+        
+        if (customerData.selectedModel) {
+          params.model = customerData.selectedModel;
         }
         
-        setVehicles(response.data?.vehicles || []);
+        if (customerData.budgetRange) {
+          // Convert monthly payment to rough vehicle price
+          params.minPrice = customerData.budgetRange.min * 60;
+          params.maxPrice = customerData.budgetRange.max * 80;
+        }
+        
+        if (customerData.selectedCab) {
+          params.cabType = customerData.selectedCab;
+        }
+        
+        if (customerData.preferences?.bodyStyle) {
+          params.bodyType = customerData.preferences.bodyStyle;
+        }
+        
+        data = await api.getInventory(params);
+        
+        // Handle different response formats
+        let vehicleList = data?.vehicles || data || [];
+        
+        // Filter by color preferences if provided
+        if (customerData.colorPreferences?.length > 0) {
+          const colorPrefs = customerData.colorPreferences.map(c => c.toLowerCase());
+          vehicleList = vehicleList.sort((a, b) => {
+            const aColor = (a.exteriorColor || '').toLowerCase();
+            const bColor = (b.exteriorColor || '').toLowerCase();
+            const aMatch = colorPrefs.findIndex(c => aColor.includes(c));
+            const bMatch = colorPrefs.findIndex(c => bColor.includes(c));
+            if (aMatch === -1 && bMatch === -1) return 0;
+            if (aMatch === -1) return 1;
+            if (bMatch === -1) return -1;
+            return aMatch - bMatch;
+          });
+        }
+        
+        setVehicles(vehicleList);
       } catch (err) {
         console.error('Failed to fetch vehicles:', err);
         setError('Unable to load inventory. Please try again.');
