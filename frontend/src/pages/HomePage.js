@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import VehicleCard from '../components/VehicleCard';
 import FilterModal from '../components/FilterModal';
-import { inventoryAPI } from '../services/api';
+import api from '../components/api';
 
 function HomePage() {
   const [vehicles, setVehicles] = useState([]);
@@ -22,13 +22,13 @@ function HomePage() {
       setLoading(true);
       
       const params = {};
-      if (appliedFilters.bodyStyle) params.body_style = appliedFilters.bodyStyle;
-      if (appliedFilters.fuelType) params.fuel_type = appliedFilters.fuelType;
-      if (appliedFilters.minPrice) params.min_price = appliedFilters.minPrice;
-      if (appliedFilters.maxPrice) params.max_price = appliedFilters.maxPrice;
+      if (appliedFilters.bodyStyle) params.bodyType = appliedFilters.bodyStyle;
+      if (appliedFilters.fuelType) params.fuelType = appliedFilters.fuelType;
+      if (appliedFilters.minPrice) params.minPrice = appliedFilters.minPrice;
+      if (appliedFilters.maxPrice) params.maxPrice = appliedFilters.maxPrice;
 
-      const response = await inventoryAPI.getAll(params);
-      setVehicles(response.data.vehicles || []);
+      const data = await api.getInventory(params);
+      setVehicles(data?.vehicles || data || []);
       setError(null);
     } catch (err) {
       console.error('Error loading inventory:', err);
@@ -40,8 +40,8 @@ function HomePage() {
 
   const loadStats = async () => {
     try {
-      const response = await inventoryAPI.getStats();
-      setStats(response.data);
+      const data = await api.getInventoryStats();
+      setStats(data);
     } catch (err) {
       console.error('Error loading stats:', err);
     }
