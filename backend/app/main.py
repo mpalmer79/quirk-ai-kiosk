@@ -8,8 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
 
-# Import routes
-from app.kiosk_routes import router as kiosk_router
+# Import routers - the original working routers
+from app.routers import inventory, recommendations, leads, analytics
 
 # Lifespan handler for startup/shutdown
 @asynccontextmanager
@@ -37,7 +37,8 @@ origins = [
     "https://quirk-ai-kiosk.railway.app",
     "https://quirk-ai-kiosk.netlify.app",
     "https://quirk-ai-kiosk.vercel.app",
-    # Add your production domains here
+    "https://quirk-frontend-production.up.railway.app",
+    "https://quirk-backend-production.up.railway.app",
 ]
 
 # Allow all origins in development
@@ -52,8 +53,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(kiosk_router)
+# Include routers with /api/v1 prefix (this is what the frontend expects)
+app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["inventory"])
+app.include_router(recommendations.router, prefix="/api/v1/recommendations", tags=["recommendations"])
+app.include_router(leads.router, prefix="/api/v1/leads", tags=["leads"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 
 # Root endpoint
 @app.get("/")
@@ -65,6 +69,16 @@ async def root():
         "version": "1.0.0"
     }
 
+# Health check at /api/health
+@app.get("/api/health")
+async def health_check():
+    from datetime import datetime
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "service": "quirk-kiosk-api"
+    }
+
 # Run with uvicorn
 if __name__ == "__main__":
     import uvicorn
@@ -73,7 +87,7 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     
     uvicorn.run(
-        "main:app",
+        "app.main:app",
         host=host,
         port=port,
         reload=os.getenv("ENVIRONMENT", "development") == "development"
