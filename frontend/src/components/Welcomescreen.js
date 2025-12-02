@@ -4,6 +4,7 @@ import api from './api';
 const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [hoveredPath, setHoveredPath] = useState(null);
+  const [hoveredStat, setHoveredStat] = useState(null);
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
@@ -31,7 +32,32 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
   };
 
   const handleBrowseAll = () => {
-    updateCustomerData({ path: 'browse' });
+    updateCustomerData({ path: 'browse', filterType: null, sortBy: null });
+    navigateTo('inventory');
+  };
+
+  // Handle stat clicks - each navigates to inventory with different filters
+  const handleStatClick = (statType) => {
+    switch (statType) {
+      case 'total':
+        // Show all vehicles
+        updateCustomerData({ path: 'browse', filterType: null, sortBy: null });
+        break;
+      case 'suv':
+        // Filter to SUVs only
+        updateCustomerData({ path: 'browse', filterType: 'SUV', bodyStyleFilter: 'SUV' });
+        break;
+      case 'truck':
+        // Filter to Trucks only
+        updateCustomerData({ path: 'browse', filterType: 'Truck', bodyStyleFilter: 'Truck' });
+        break;
+      case 'price':
+        // Show all sorted by price ascending
+        updateCustomerData({ path: 'browse', filterType: null, sortBy: 'priceLow' });
+        break;
+      default:
+        updateCustomerData({ path: 'browse' });
+    }
     navigateTo('inventory');
   };
 
@@ -94,10 +120,16 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
       }}>
         <div style={styles.greeting}>
           <div style={styles.aiAvatar}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10A10 10 0 0 1 2 12 10 10 0 0 1 12 2z"/>
-              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-              <path d="M9 9h.01M15 9h.01"/>
+            {/* Fixed Smiley Face - proper eyes and smile */}
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
+              {/* Face circle */}
+              <circle cx="12" cy="12" r="10" />
+              {/* Left eye - filled circle */}
+              <circle cx="9" cy="10" r="1.5" fill="#ffffff" stroke="none" />
+              {/* Right eye - filled circle */}
+              <circle cx="15" cy="10" r="1.5" fill="#ffffff" stroke="none" />
+              {/* Smile */}
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round" />
             </svg>
           </div>
           <h1 style={styles.heroTitle}>
@@ -155,33 +187,79 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
         ))}
       </div>
 
-      {/* Stats Bar - Dynamic from API */}
+      {/* Stats Bar - Clickable Stats */}
       <div style={{
         ...styles.statsBar,
         opacity: isVisible ? 1 : 0,
         transition: 'all 0.6s ease 0.4s',
       }}>
-        <div style={styles.statItem}>
+        {/* Total Vehicles */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'total' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('total')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('total')}
+        >
           <span style={styles.statNumber}>{stats?.total || '---'}</span>
           <span style={styles.statLabel}>Vehicles In Stock</span>
-        </div>
+        </button>
+
         <div style={styles.statDivider} />
-        <div style={styles.statItem}>
+
+        {/* SUVs */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'suv' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('suv')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('suv')}
+        >
           <span style={styles.statNumber}>{stats?.byBodyStyle?.SUV || '---'}</span>
           <span style={styles.statLabel}>SUVs</span>
-        </div>
+        </button>
+
         <div style={styles.statDivider} />
-        <div style={styles.statItem}>
+
+        {/* Trucks */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'truck' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('truck')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('truck')}
+        >
           <span style={styles.statNumber}>{stats?.byBodyStyle?.Truck || '---'}</span>
           <span style={styles.statLabel}>Trucks</span>
-        </div>
+        </button>
+
         <div style={styles.statDivider} />
-        <div style={styles.statItem}>
+
+        {/* Starting Price */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'price' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('price')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('price')}
+        >
           <span style={styles.statNumber}>
             {stats?.priceRange?.min ? `$${Math.round(stats.priceRange.min / 1000)}K` : '---'}
           </span>
           <span style={styles.statLabel}>Starting At</span>
-        </div>
+        </button>
       </div>
 
       {/* Just Browsing Link */}
@@ -355,8 +433,8 @@ const styles = {
   statsBar: {
     display: 'flex',
     alignItems: 'center',
-    gap: '32px',
-    padding: '24px 48px',
+    gap: '8px',
+    padding: '16px 24px',
     background: 'rgba(0,0,0,0.7)',
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
@@ -371,6 +449,18 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '4px',
+  },
+  statButton: {
+    background: 'transparent',
+    border: 'none',
+    padding: '12px 24px',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  statButtonHover: {
+    background: 'rgba(74, 222, 128, 0.15)',
+    transform: 'scale(1.05)',
   },
   statNumber: {
     fontSize: '32px',
