@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
+import api from './api';
 
 const CustomerHandoff = ({ navigateTo, updateCustomerData, customerData }) => {
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [error, setError] = useState(null);
   const [waitTime, setWaitTime] = useState(null);
+  const [leadId, setLeadId] = useState(null);
 
   const vehicle = customerData.selectedVehicle;
   const payment = customerData.paymentPreference;
@@ -21,30 +24,74 @@ const CustomerHandoff = ({ navigateTo, updateCustomerData, customerData }) => {
   const handlePhoneChange = (e) => {
     const formatted = formatPhone(e.target.value);
     setPhone(formatted);
+    setError(null);
   };
 
   const handleSubmit = async () => {
-    if (phone.replace(/\D/g, '').length < 10) return;
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      setError('Please enter a valid phone number');
+      return;
+    }
     
     setIsSubmitting(true);
+    setError(null);
     
-    // Simulate API call to notify sales team
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock wait time (2-5 minutes)
-    const estimatedWait = Math.floor(Math.random() * 4) + 2;
-    setWaitTime(estimatedWait);
-    
-    updateCustomerData({
-      contactInfo: {
-        phone: phone.replace(/\D/g, ''),
-        name,
-        submittedAt: new Date().toISOString(),
-      },
-    });
-    
-    setIsSubmitting(false);
-    setIsComplete(true);
+    try {
+      // Submit lead to backend
+      const result = await api.submitLead({
+        phone: phoneDigits,
+        name: name || null,
+        vehicle: vehicle ? {
+          stockNumber: vehicle.stockNumber,
+          year: vehicle.year,
+          make: vehicle.make,
+          model: vehicle.model,
+          trim: vehicle.trim,
+          salePrice: vehicle.salePrice,
+        } : null,
+        payment_preference: payment ? {
+          type: payment.type,
+          monthly: payment.monthly,
+          term: payment.term,
+          downPayment: payment.downPayment,
+        } : null,
+        trade_in: tradeIn ? {
+          year: tradeIn.year,
+          make: tradeIn.make,
+          model: tradeIn.model,
+          estimatedValue: tradeIn.estimatedValue,
+        } : null,
+        quiz_answers: customerData.quizAnswers || null,
+      });
+      
+      setLeadId(result.leadId);
+      setWaitTime(result.estimatedWait || 3);
+      
+      updateCustomerData({
+        contactInfo: {
+          phone: phoneDigits,
+          name,
+          submittedAt: new Date().toISOString(),
+          leadId: result.leadId,
+        },
+      });
+      
+      // Log analytics
+      api.logAnalytics('lead_submitted', {
+        leadId: result.leadId,
+        hasVehicle: !!vehicle,
+        hasPayment: !!payment,
+        hasTradeIn: !!tradeIn,
+      });
+      
+      setIsComplete(true);
+    } catch (err) {
+      console.error('Failed to submit lead:', err);
+      setError('Unable to submit. Please try again or speak with a team member.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isComplete) {
@@ -136,6 +183,13 @@ const CustomerHandoff = ({ navigateTo, updateCustomerData, customerData }) => {
             </div>
           </div>
 
+          {/* Reference Number */}
+          {leadId && (
+            <div style={styles.refNumber}>
+              Reference: {leadId}
+            </div>
+          )}
+
           {/* Actions */}
           <div style={styles.successActions}>
             <button 
@@ -148,7 +202,7 @@ const CustomerHandoff = ({ navigateTo, updateCustomerData, customerData }) => {
 
           {/* Confirmation Text */}
           <p style={styles.confirmationText}>
-            📱 We'll also text {phone} with your appointment details
+            📱 We'll text {phone} with your appointment details
           </p>
         </div>
 
@@ -182,8 +236,11 @@ const CustomerHandoff = ({ navigateTo, updateCustomerData, customerData }) => {
         {/* Quick Summary */}
         {vehicle && (
           <div style={styles.vehicleSummary}>
-            <div style={{ ...styles.vehicleThumb, background: vehicle.gradient || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)' }}>
-              <span style={styles.vehicleInitial}>{vehicle.model?.charAt(0)}</span>
+            <div style={{ 
+              ...styles.vehicleThumb, 
+              background: vehicle.gradient || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)' 
+            }}>
+              <span style={styles.vehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
             </div>
             <div style={styles.vehicleInfo}>
               <span style={styles.vehicleName}>
@@ -225,6 +282,10 @@ const CustomerHandoff = ({ navigateTo, updateCustomerData, customerData }) => {
               maxLength={14}
             />
           </div>
+
+          {error && (
+            <div style={styles.errorMessage}>{error}</div>
+          )}
 
           <button
             style={{
@@ -402,6 +463,14 @@ const styles = {
     textAlign: 'center',
     letterSpacing: '2px',
   },
+  errorMessage: {
+    padding: '12px 16px',
+    background: 'rgba(220, 38, 38, 0.2)',
+    borderRadius: '8px',
+    color: '#fca5a5',
+    fontSize: '14px',
+    textAlign: 'center',
+  },
   submitButton: {
     display: 'flex',
     alignItems: 'center',
@@ -537,7 +606,7 @@ const styles = {
     padding: '20px',
     background: 'rgba(255,255,255,0.03)',
     borderRadius: '12px',
-    marginBottom: '24px',
+    marginBottom: '16px',
     textAlign: 'left',
   },
   expectTitle: {
@@ -571,6 +640,11 @@ const styles = {
   stepText: {
     fontSize: '14px',
     color: 'rgba(255,255,255,0.7)',
+  },
+  refNumber: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: '16px',
   },
   successActions: {
     width: '100%',
