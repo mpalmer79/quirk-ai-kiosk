@@ -82,8 +82,9 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
 
   return (
     <div style={styles.container}>
-      {/* Background Effects */}
-      <div style={styles.backgroundGlow} />
+      {/* Background Image */}
+      <div style={styles.backgroundImage} />
+      <div style={styles.backgroundOverlay} />
       
       {/* Hero Section */}
       <div style={{
@@ -125,8 +126,8 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
             key={path.id}
             style={{
               ...styles.pathCard,
-              background: hoveredPath === path.id ? path.gradient : 'rgba(255,255,255,0.05)',
-              borderColor: hoveredPath === path.id ? 'transparent' : 'rgba(255,255,255,0.1)',
+              background: hoveredPath === path.id ? path.gradient : 'rgba(0,0,0,0.7)',
+              borderColor: hoveredPath === path.id ? 'transparent' : 'rgba(255,255,255,0.2)',
               transform: hoveredPath === path.id ? 'scale(1.02) translateY(-4px)' : 'scale(1)',
               transitionDelay: `${index * 0.1}s`,
             }}
@@ -217,20 +218,33 @@ const styles = {
     position: 'relative',
     overflow: 'hidden',
   },
-  backgroundGlow: {
+  backgroundImage: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: '800px',
-    height: '800px',
-    background: 'radial-gradient(circle, rgba(27,115,64,0.15) 0%, transparent 60%)',
-    pointerEvents: 'none',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundImage: 'url(/showroom.jpg)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    zIndex: 0,
+  },
+  backgroundOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.75) 50%, rgba(0,0,0,0.85) 100%)',
+    zIndex: 1,
   },
   heroSection: {
     textAlign: 'center',
     marginBottom: '48px',
     transition: 'all 0.6s ease',
+    position: 'relative',
+    zIndex: 2,
   },
   greeting: {
     display: 'flex',
@@ -254,6 +268,7 @@ const styles = {
     fontWeight: '600',
     color: '#ffffff',
     margin: 0,
+    textShadow: '0 2px 4px rgba(0,0,0,0.5)',
   },
   highlight: {
     color: '#4ade80',
@@ -264,11 +279,13 @@ const styles = {
     color: '#ffffff',
     margin: '0 0 16px 0',
     letterSpacing: '-1px',
+    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
   },
   heroText: {
     fontSize: '20px',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.9)',
     margin: 0,
+    textShadow: '0 1px 3px rgba(0,0,0,0.5)',
   },
   pathsContainer: {
     display: 'flex',
@@ -277,6 +294,8 @@ const styles = {
     flexWrap: 'wrap',
     justifyContent: 'center',
     maxWidth: '1200px',
+    position: 'relative',
+    zIndex: 2,
   },
   pathCard: {
     flex: '1 1 320px',
@@ -284,7 +303,9 @@ const styles = {
     minHeight: '280px',
     padding: '32px',
     borderRadius: '20px',
-    border: '1px solid rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -336,10 +357,14 @@ const styles = {
     alignItems: 'center',
     gap: '32px',
     padding: '24px 48px',
-    background: 'rgba(255,255,255,0.05)',
+    background: 'rgba(0,0,0,0.7)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
     borderRadius: '16px',
     border: '1px solid rgba(255,255,255,0.1)',
     marginBottom: '24px',
+    position: 'relative',
+    zIndex: 2,
   },
   statItem: {
     display: 'flex',
@@ -365,15 +390,19 @@ const styles = {
     background: 'rgba(255,255,255,0.1)',
   },
   browseLink: {
-    background: 'none',
-    border: 'none',
-    color: 'rgba(255,255,255,0.6)',
+    background: 'rgba(0,0,0,0.5)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: 'rgba(255,255,255,0.8)',
     fontSize: '16px',
     fontWeight: '500',
     cursor: 'pointer',
     padding: '12px 24px',
     borderRadius: '8px',
     transition: 'all 0.2s ease',
+    position: 'relative',
+    zIndex: 2,
+    backdropFilter: 'blur(5px)',
+    WebkitBackdropFilter: 'blur(5px)',
   },
 };
 
