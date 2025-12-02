@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import api from './api';
+import { inventoryAPI } from '../services/api';
 
 const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
   const [stockNumber, setStockNumber] = useState('');
@@ -19,7 +19,6 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
       setStockNumber(prev => prev.slice(0, -1));
       setError(null);
     } else if (stockNumber.length < 8) {
-      // Limit to 8 digits after M
       setStockNumber(prev => prev + key);
       setError(null);
     }
@@ -34,12 +33,11 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
     setIsSearching(true);
     setError(null);
 
-    // Full stock number with M prefix
     const fullStockNumber = STOCK_PREFIX + stockNumber;
 
     try {
-      // Call API to find vehicle by stock number
-      const vehicle = await api.getVehicleByStock(fullStockNumber);
+      const response = await inventoryAPI.getByStock(fullStockNumber);
+      const vehicle = response.data;
       
       if (vehicle) {
         setSearchResult(vehicle);
@@ -93,9 +91,7 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
             <span style={styles.inputValue}>
               {stockNumber || <span style={styles.placeholder}>Enter numbers</span>}
             </span>
-            {stockNumber && (
-              <span style={styles.cursor}>|</span>
-            )}
+            {stockNumber && <span style={styles.cursor}>|</span>}
           </div>
           
           <p style={styles.inputHint}>
