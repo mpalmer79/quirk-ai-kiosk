@@ -6,7 +6,6 @@ import { inventoryAPI, recommendationsAPI } from '../services/api';
 import VehicleCard from '../components/VehicleCard';
 import LeadForm from '../components/LeadForm';
 
-// Model-aware fallback images using reliable Wikimedia Commons URLs
 const FALLBACK_IMAGES = {
   corvette: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/2020_Chevrolet_Corvette_C8_rearview_cropped.jpg/800px-2020_Chevrolet_Corvette_C8_rearview_cropped.jpg',
   camaro: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/2019_Chevrolet_Camaro_2SS%2C_front_9.30.19.jpg/800px-2019_Chevrolet_Camaro_2SS%2C_front_9.30.19.jpg',
@@ -22,30 +21,26 @@ const FALLBACK_IMAGES = {
   malibu: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/2019_Chevrolet_Malibu_RS%2C_front_11.3.19.jpg/800px-2019_Chevrolet_Malibu_RS%2C_front_11.3.19.jpg',
   bolt: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/2017_Chevrolet_Bolt_EV_Premier_in_Kinetic_Blue_Metallic%2C_front_left.jpg/800px-2017_Chevrolet_Bolt_EV_Premier_in_Kinetic_Blue_Metallic%2C_front_left.jpg',
   express: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Chevrolet_Express_%28facelift%29.jpg/800px-Chevrolet_Express_%28facelift%29.jpg',
-  default: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg/800px-2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg',
+  default: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg/800px-2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg'
 };
 
-// Get the correct fallback image based on vehicle model
 function getFallbackImage(model) {
   if (!model) return FALLBACK_IMAGES.default;
-  
-  const modelLower = model.toLowerCase();
-  
-  if (modelLower.includes('corvette')) return FALLBACK_IMAGES.corvette;
-  if (modelLower.includes('camaro')) return FALLBACK_IMAGES.camaro;
-  if (modelLower.includes('silverado')) return FALLBACK_IMAGES.silverado;
-  if (modelLower.includes('colorado')) return FALLBACK_IMAGES.colorado;
-  if (modelLower.includes('tahoe')) return FALLBACK_IMAGES.tahoe;
-  if (modelLower.includes('suburban')) return FALLBACK_IMAGES.suburban;
-  if (modelLower.includes('traverse')) return FALLBACK_IMAGES.traverse;
-  if (modelLower.includes('equinox')) return FALLBACK_IMAGES.equinox;
-  if (modelLower.includes('trailblazer')) return FALLBACK_IMAGES.trailblazer;
-  if (modelLower.includes('trax')) return FALLBACK_IMAGES.trax;
-  if (modelLower.includes('blazer')) return FALLBACK_IMAGES.blazer;
-  if (modelLower.includes('malibu')) return FALLBACK_IMAGES.malibu;
-  if (modelLower.includes('bolt')) return FALLBACK_IMAGES.bolt;
-  if (modelLower.includes('express')) return FALLBACK_IMAGES.express;
-  
+  var m = model.toLowerCase();
+  if (m.indexOf('corvette') >= 0) return FALLBACK_IMAGES.corvette;
+  if (m.indexOf('camaro') >= 0) return FALLBACK_IMAGES.camaro;
+  if (m.indexOf('silverado') >= 0) return FALLBACK_IMAGES.silverado;
+  if (m.indexOf('colorado') >= 0) return FALLBACK_IMAGES.colorado;
+  if (m.indexOf('tahoe') >= 0) return FALLBACK_IMAGES.tahoe;
+  if (m.indexOf('suburban') >= 0) return FALLBACK_IMAGES.suburban;
+  if (m.indexOf('traverse') >= 0) return FALLBACK_IMAGES.traverse;
+  if (m.indexOf('equinox') >= 0) return FALLBACK_IMAGES.equinox;
+  if (m.indexOf('trailblazer') >= 0) return FALLBACK_IMAGES.trailblazer;
+  if (m.indexOf('trax') >= 0) return FALLBACK_IMAGES.trax;
+  if (m.indexOf('blazer') >= 0) return FALLBACK_IMAGES.blazer;
+  if (m.indexOf('malibu') >= 0) return FALLBACK_IMAGES.malibu;
+  if (m.indexOf('bolt') >= 0) return FALLBACK_IMAGES.bolt;
+  if (m.indexOf('express') >= 0) return FALLBACK_IMAGES.express;
   return FALLBACK_IMAGES.default;
 }
 
@@ -59,17 +54,17 @@ function VehicleDetailPage() {
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [leadFormType, setLeadFormType] = useState('general');
 
- useEffect(() => {
-  if (id) {
-    loadVehicle();
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [id]);
+  useEffect(function() {
+    if (id) {
+      loadVehicle();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
-  const loadVehicle = async () => {
+  var loadVehicle = async function() {
     try {
       setLoading(true);
-      const response = await inventoryAPI.getById(id);
+      var response = await inventoryAPI.getById(id);
       setVehicle(response.data);
       trackVehicleView(id);
       loadRecommendations(id);
@@ -82,24 +77,23 @@ function VehicleDetailPage() {
     }
   };
 
-  const loadRecommendations = async (vehicleId) => {
+  var loadRecommendations = async function(vehicleId) {
     try {
-      const response = await recommendationsAPI.getForVehicle(vehicleId, 4);
+      var response = await recommendationsAPI.getForVehicle(vehicleId, 4);
       setRecommendations(response.data.recommendations || []);
     } catch (err) {
       console.error('Error loading recommendations:', err);
     }
   };
 
-  const openLeadForm = (type) => {
+  var openLeadForm = function(type) {
     setLeadFormType(type);
     setShowLeadForm(true);
   };
 
-  // Handle image error with model-aware fallback
-  const handleImageError = (e) => {
+  var handleImageError = function(e) {
     if (!vehicle) return;
-    const fallbackUrl = getFallbackImage(vehicle.model);
+    var fallbackUrl = getFallbackImage(vehicle.model);
     if (e.target.src !== fallbackUrl) {
       e.target.src = fallbackUrl;
     }
@@ -125,7 +119,8 @@ function VehicleDetailPage() {
     );
   }
 
-  const savings = vehicle.msrp ? vehicle.msrp - vehicle.price : 0;
+  var savings = vehicle.msrp ? vehicle.msrp - vehicle.price : 0;
+  var vehicleAlt = vehicle.year + ' ' + vehicle.make + ' ' + vehicle.model;
 
   return (
     <motion.div
@@ -134,12 +129,11 @@ function VehicleDetailPage() {
       animate={{ opacity: 1 }}
     >
       <div style={styles.mainContent}>
-        {/* Gallery Section */}
         <div style={styles.gallerySection}>
           <div style={styles.mainImage}>
             <img
               src={vehicle.imageUrl}
-              alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+              alt={vehicleAlt}
               style={styles.image}
               onError={handleImageError}
             />
@@ -151,7 +145,6 @@ function VehicleDetailPage() {
           </div>
         </div>
 
-        {/* Info Section */}
         <div style={styles.infoSection}>
           <div style={styles.header}>
             <span style={styles.year}>{vehicle.year}</span>
@@ -178,7 +171,6 @@ function VehicleDetailPage() {
             {vehicle.status}
           </div>
 
-          {/* Specs Grid */}
           <div style={styles.specsGrid}>
             <div style={styles.specItem}>
               <span style={styles.specLabel}>Engine</span>
@@ -220,62 +212,59 @@ function VehicleDetailPage() {
             )}
           </div>
 
-          {/* Features */}
           {vehicle.features && vehicle.features.length > 0 && (
             <div style={styles.featuresSection}>
               <h3 style={styles.featuresTitle}>Key Features</h3>
               <div style={styles.featuresList}>
-                {vehicle.features.map((feature, index) => (
-                  <span key={index} style={styles.featureTag}>
-                    {feature}
-                  </span>
-                ))}
+                {vehicle.features.map(function(feature, index) {
+                  return (
+                    <span key={index} style={styles.featureTag}>
+                      {feature}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* VIN */}
           <div style={styles.vinSection}>
             <span style={styles.vinLabel}>VIN:</span>
             <span style={styles.vinValue}>{vehicle.vin}</span>
           </div>
 
-          {/* CTA Buttons */}
           <div style={styles.ctaSection}>
             <button
               style={styles.primaryButton}
-              onClick={() => openLeadForm('test-drive')}
+              onClick={function() { openLeadForm('test-drive'); }}
             >
-              🚗 Schedule Test Drive
+              Schedule Test Drive
             </button>
             <button
               style={styles.secondaryButton}
-              onClick={() => openLeadForm('info')}
+              onClick={function() { openLeadForm('info'); }}
             >
-              📋 Request More Info
+              Request More Info
             </button>
           </div>
         </div>
       </div>
 
-      {/* Recommendations */}
       {recommendations.length > 0 && (
         <section style={styles.recommendationsSection}>
           <h2 style={styles.recommendationsTitle}>
             You Might Also Like
           </h2>
           <div style={styles.recommendationsGrid}>
-            {recommendations.map((rec) => (
-              <VehicleCard key={rec.id} vehicle={rec} />
-            ))}
+            {recommendations.map(function(rec) {
+              return <VehicleCard key={rec.id} vehicle={rec} />;
+            })}
           </div>
         </section>
       )}
 
-      {/* Lead Form Modal */}
       <LeadForm
         isOpen={showLeadForm}
-        onClose={() => setShowLeadForm(false)}
+        onClose={function() { setShowLeadForm(false); }}
         vehicle={vehicle}
         formType={leadFormType}
       />
@@ -285,14 +274,14 @@ function VehicleDetailPage() {
 
 const styles = {
   container: {
-    paddingBottom: '48px',
+    paddingBottom: '48px'
   },
   loadingContainer: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: '400px',
+    minHeight: '400px'
   },
   spinner: {
     width: '48px',
@@ -300,33 +289,33 @@ const styles = {
     border: '3px solid #2a2a2a',
     borderTopColor: '#1a472a',
     borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
+    animation: 'spin 1s linear infinite'
   },
   loadingText: {
     marginTop: '16px',
-    color: '#a0a0a0',
+    color: '#a0a0a0'
   },
   errorContainer: {
     textAlign: 'center',
-    padding: '64px 24px',
+    padding: '64px 24px'
   },
   errorTitle: {
     fontSize: '1.5rem',
     fontWeight: 700,
     color: '#ffffff',
-    marginBottom: '12px',
+    marginBottom: '12px'
   },
   errorText: {
-    color: '#a0a0a0',
+    color: '#a0a0a0'
   },
   mainContent: {
     display: 'grid',
     gridTemplateColumns: '1fr 450px',
     gap: '32px',
-    marginBottom: '48px',
+    marginBottom: '48px'
   },
   gallerySection: {
-    width: '100%',
+    width: '100%'
   },
   mainImage: {
     position: 'relative',
@@ -334,12 +323,12 @@ const styles = {
     height: '450px',
     borderRadius: '16px',
     overflow: 'hidden',
-    background: '#141414',
+    background: '#141414'
   },
   image: {
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
+    objectFit: 'cover'
   },
   savingsBadge: {
     position: 'absolute',
@@ -350,55 +339,55 @@ const styles = {
     padding: '10px 20px',
     borderRadius: '12px',
     fontSize: '1.125rem',
-    fontWeight: 700,
+    fontWeight: 700
   },
   infoSection: {
     background: '#1a1a1a',
     borderRadius: '16px',
     padding: '24px',
-    border: '1px solid #2a2a2a',
+    border: '1px solid #2a2a2a'
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '8px',
+    marginBottom: '8px'
   },
   year: {
     fontSize: '1rem',
     fontWeight: 600,
-    color: '#c9a227',
+    color: '#c9a227'
   },
   stockNumber: {
     fontSize: '0.875rem',
-    color: '#666666',
+    color: '#666666'
   },
   title: {
     fontSize: '1.75rem',
     fontWeight: 700,
     color: '#ffffff',
-    marginBottom: '4px',
+    marginBottom: '4px'
   },
   trim: {
     fontSize: '1.125rem',
     color: '#a0a0a0',
-    marginBottom: '16px',
+    marginBottom: '16px'
   },
   priceSection: {
     display: 'flex',
     alignItems: 'baseline',
     gap: '12px',
-    marginBottom: '12px',
+    marginBottom: '12px'
   },
   price: {
     fontSize: '2rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: '#ffffff'
   },
   msrp: {
     fontSize: '1rem',
     color: '#666666',
-    textDecoration: 'line-through',
+    textDecoration: 'line-through'
   },
   statusBadge: {
     display: 'inline-block',
@@ -408,49 +397,49 @@ const styles = {
     borderRadius: '8px',
     fontSize: '0.875rem',
     fontWeight: 600,
-    marginBottom: '24px',
+    marginBottom: '24px'
   },
   specsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
     gap: '16px',
-    marginBottom: '24px',
+    marginBottom: '24px'
   },
   specItem: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
+    gap: '4px'
   },
   specLabel: {
     fontSize: '0.75rem',
     color: '#666666',
-    textTransform: 'uppercase',
+    textTransform: 'uppercase'
   },
   specValue: {
     fontSize: '1rem',
     fontWeight: 500,
-    color: '#ffffff',
+    color: '#ffffff'
   },
   featuresSection: {
-    marginBottom: '24px',
+    marginBottom: '24px'
   },
   featuresTitle: {
     fontSize: '1rem',
     fontWeight: 600,
     color: '#a0a0a0',
-    marginBottom: '12px',
+    marginBottom: '12px'
   },
   featuresList: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '8px',
+    gap: '8px'
   },
   featureTag: {
     background: '#242424',
     padding: '8px 14px',
     borderRadius: '8px',
     fontSize: '0.875rem',
-    color: '#a0a0a0',
+    color: '#a0a0a0'
   },
   vinSection: {
     display: 'flex',
@@ -458,21 +447,21 @@ const styles = {
     padding: '12px 16px',
     background: '#141414',
     borderRadius: '8px',
-    marginBottom: '24px',
+    marginBottom: '24px'
   },
   vinLabel: {
     fontSize: '0.875rem',
-    color: '#666666',
+    color: '#666666'
   },
   vinValue: {
     fontSize: '0.875rem',
     color: '#a0a0a0',
-    fontFamily: 'monospace',
+    fontFamily: 'monospace'
   },
   ctaSection: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '12px'
   },
   primaryButton: {
     width: '100%',
@@ -487,7 +476,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px',
+    gap: '8px'
   },
   secondaryButton: {
     width: '100%',
@@ -502,22 +491,22 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px',
+    gap: '8px'
   },
   recommendationsSection: {
-    marginTop: '48px',
+    marginTop: '48px'
   },
   recommendationsTitle: {
     fontSize: '1.5rem',
     fontWeight: 600,
     color: '#ffffff',
-    marginBottom: '24px',
+    marginBottom: '24px'
   },
   recommendationsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: '24px',
-  },
+    gap: '24px'
+  }
 };
 
 export default VehicleDetailPage;
