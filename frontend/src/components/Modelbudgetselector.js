@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { inventoryAPI } from '../services/api';
+import api from './api';
 
 // GM Official Color Library by Model (2025 Model Year)
 const GM_COLORS = {
@@ -195,8 +195,8 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
     const checkInventory = async () => {
       if (selectedModel) {
         try {
-          const response = await inventoryAPI.getAll({ model: selectedModel.name });
-          setInventoryCount(response.data?.vehicles?.length || 0);
+          const data = await api.getInventory({ model: selectedModel.name });
+          setInventoryCount(data?.vehicles?.length || data?.length || 0);
         } catch (err) {
           console.error('Error checking inventory:', err);
         }
