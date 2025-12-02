@@ -428,69 +428,136 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
     );
   };
 
-  // Step 5: Budget Selection
-  const renderBudgetSelection = () => (
-    <div style={styles.stepContainer}>
-      <button style={styles.backButton} onClick={handleBack}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M19 12H5M12 19l-7-7 7-7"/>
-        </svg>
-        Back
-      </button>
-      <div style={styles.stepHeader}>
-        <span style={styles.modelBadge}>{selectedModel.name} {selectedCab && `• ${selectedCab}`}</span>
-        <h1 style={styles.stepTitle}>💰 Monthly Budget</h1>
-        <p style={styles.stepSubtitle}>What monthly payment range works for you?</p>
-      </div>
-      <div style={styles.formSection}>
-        <div style={styles.budgetDisplay}>
-          <span style={styles.budgetValue}>${budgetRange.min}</span>
-          <span style={styles.budgetSeparator}>to</span>
-          <span style={styles.budgetValue}>${budgetRange.max}</span>
-          <span style={styles.budgetLabel}>/month</span>
-        </div>
-        <div style={styles.sliderGroup}>
-          <label style={styles.sliderLabel}>Minimum: ${budgetRange.min}/mo</label>
-          <input type="range" min="200" max="2000" step="50" value={budgetRange.min}
-            onChange={(e) => {
-              const val = parseInt(e.target.value);
-              setBudgetRange(prev => ({ ...prev, min: val, max: Math.max(val + 100, prev.max) }));
-            }}
-            style={styles.slider}
-          />
-        </div>
-        <div style={styles.sliderGroup}>
-          <label style={styles.sliderLabel}>Maximum: ${budgetRange.max}/mo</label>
-          <input type="range" min="300" max="2500" step="50" value={budgetRange.max}
-            onChange={(e) => {
-              const val = parseInt(e.target.value);
-              setBudgetRange(prev => ({ ...prev, max: val, min: Math.min(val - 100, prev.min) }));
-            }}
-            style={styles.slider}
-          />
-        </div>
-        <div style={styles.downPaymentSection}>
-          <label style={styles.inputLabel}>Down Payment</label>
-          <div style={styles.downPaymentOptions}>
-            {[0, 2000, 3000, 5000, 10000].map((amount) => (
-              <button key={amount}
-                style={{...styles.optionButton, ...(downPayment === amount ? styles.optionButtonActive : {})}}
-                onClick={() => setDownPayment(amount)}
-              >
-                ${amount.toLocaleString()}
-              </button>
-            ))}
-          </div>
-        </div>
-        <button style={styles.continueButton} onClick={() => setStep(6)}>
-          Continue
+  // Step 5: Budget Selection with Buying Power Calculation
+  const renderBudgetSelection = () => {
+    const APR = 0.07; // 7% APR
+    const monthlyRate = APR / 12;
+    
+    // Calculate loan amount from monthly payment using amortization formula
+    // L = P * [(1 - (1 + r)^-n) / r]
+    const calculateLoanAmount = (payment, months) => {
+      if (monthlyRate === 0) return payment * months;
+      return payment * ((1 - Math.pow(1 + monthlyRate, -months)) / monthlyRate);
+    };
+    
+    // Determine term based on estimated loan amount (use max payment for calculation)
+    const estimatedLoan = calculateLoanAmount(budgetRange.max, 84);
+    const term = estimatedLoan > 20000 ? 84 : 72;
+    
+    // Calculate buying power using max payment
+    const loanAmount = calculateLoanAmount(budgetRange.max, term);
+    const totalBuyingPower = loanAmount + downPayment;
+    
+    return (
+      <div style={styles.stepContainer}>
+        <button style={styles.backButton} onClick={handleBack}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M5 12h14M12 5l7 7-7 7"/>
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
+          Back
         </button>
+        <div style={styles.stepHeader}>
+          <span style={styles.modelBadge}>{selectedModel.name} {selectedCab && `• ${selectedCab}`}</span>
+          <h1 style={styles.stepTitle}>💰 Monthly Budget</h1>
+          <p style={styles.stepSubtitle}>What monthly payment range works for you?</p>
+        </div>
+        <div style={styles.formSection}>
+          <div style={styles.budgetDisplay}>
+            <span style={styles.budgetValue}>${budgetRange.min.toLocaleString()}</span>
+            <span style={styles.budgetSeparator}>to</span>
+            <span style={styles.budgetValue}>${budgetRange.max.toLocaleString()}</span>
+            <span style={styles.budgetLabel}>/month</span>
+          </div>
+          <div style={styles.sliderGroup}>
+            <label style={styles.sliderLabel}>Minimum: ${budgetRange.min.toLocaleString()}/mo</label>
+            <input type="range" min="200" max="2000" step="50" value={budgetRange.min}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                setBudgetRange(prev => ({ ...prev, min: val, max: Math.max(val + 100, prev.max) }));
+              }}
+              style={styles.slider}
+            />
+          </div>
+          <div style={styles.sliderGroup}>
+            <label style={styles.sliderLabel}>Maximum: ${budgetRange.max.toLocaleString()}/mo</label>
+            <input type="range" min="300" max="2500" step="50" value={budgetRange.max}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                setBudgetRange(prev => ({ ...prev, max: val, min: Math.min(val - 100, prev.min) }));
+              }}
+              style={styles.slider}
+            />
+          </div>
+          <div style={styles.downPaymentSection}>
+            <label style={styles.inputLabel}>Down Payment</label>
+            <div style={styles.downPaymentOptions}>
+              {[0, 2000, 3000, 5000, 10000].map((amount) => (
+                <button key={amount}
+                  style={{...styles.optionButton, ...(downPayment === amount ? styles.optionButtonActive : {})}}
+                  onClick={() => setDownPayment(amount)}
+                >
+                  ${amount.toLocaleString()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Buying Power Breakdown */}
+          <div style={styles.buyingPowerSection}>
+            <p style={styles.buyingPowerIntro}>
+              Here's the straight-up math on what that budget really buys today.
+            </p>
+            
+            <div style={styles.buyingPowerCard}>
+              <h4 style={styles.buyingPowerTitle}>📊 Your Buying Power</h4>
+              <ul style={styles.buyingPowerList}>
+                <li>Down payment: <strong>${downPayment.toLocaleString()}</strong></li>
+                <li>Monthly payment: <strong>${budgetRange.max.toLocaleString()}</strong></li>
+                <li>Term: <strong>{term} months</strong></li>
+                <li>APR: <strong>7%</strong></li>
+              </ul>
+              
+              <p style={styles.buyingPowerText}>
+                Using standard auto-loan amortization, your <strong>loan amount</strong> (what the payment supports) comes out to:
+              </p>
+              
+              <div style={styles.buyingPowerResult}>
+                <span>👍 Approximately:</span>
+                <strong>${Math.round(loanAmount).toLocaleString()} financed</strong>
+              </div>
+              
+              <p style={styles.buyingPowerText}>
+                Add your ${downPayment.toLocaleString()} down payment:
+              </p>
+              
+              <div style={styles.buyingPowerTotal}>
+                <span>🚗 Estimated max vehicle sale price:</span>
+                <strong>~${Math.round(totalBuyingPower).toLocaleString()}</strong>
+              </div>
+            </div>
+
+            <div style={styles.mathBreakdown}>
+              <h4 style={styles.mathTitle}>📋 How it breaks down</h4>
+              <ul style={styles.mathList}>
+                <li>Monthly rate = {(APR * 100).toFixed(0)}% / 12 = {(monthlyRate * 100).toFixed(4)}%</li>
+                <li>Payment factor over {term} months gives you ~${Math.round(loanAmount / 1000)}k in borrowing power.</li>
+                <li>Total buying power = loan amount + down payment.</li>
+              </ul>
+            </div>
+          </div>
+
+          <button style={styles.continueButton} onClick={() => setStep(6)}>
+            Continue
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </button>
+          
+          <p style={styles.disclaimer}>Taxes and Dealer fees separate.</p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Step 6: Trade-In Qualification
   const renderTradeInQualification = () => (
@@ -980,6 +1047,96 @@ const styles = {
   },
   progressDotComplete: {
     background: '#4ade80',
+  },
+  // Buying Power styles
+  buyingPowerSection: {
+    marginTop: '28px',
+    padding: '20px',
+    background: 'rgba(0,0,0,0.3)',
+    borderRadius: '12px',
+    marginBottom: '24px',
+  },
+  buyingPowerIntro: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: '16px',
+  },
+  buyingPowerCard: {
+    padding: '20px',
+    background: 'rgba(255,255,255,0.05)',
+    borderRadius: '10px',
+    marginBottom: '16px',
+  },
+  buyingPowerTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  buyingPowerList: {
+    listStyle: 'disc',
+    paddingLeft: '20px',
+    marginBottom: '16px',
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: '14px',
+    lineHeight: '1.8',
+  },
+  buyingPowerText: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: '12px',
+  },
+  buyingPowerResult: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    padding: '12px 16px',
+    background: 'rgba(74, 222, 128, 0.1)',
+    borderRadius: '8px',
+    marginBottom: '16px',
+    fontSize: '15px',
+    color: '#4ade80',
+  },
+  buyingPowerTotal: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    padding: '12px 16px',
+    background: 'rgba(37, 99, 235, 0.15)',
+    borderRadius: '8px',
+    fontSize: '16px',
+    color: '#60a5fa',
+  },
+  mathBreakdown: {
+    padding: '16px',
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: '10px',
+  },
+  mathTitle: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  mathList: {
+    listStyle: 'disc',
+    paddingLeft: '20px',
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: '13px',
+    lineHeight: '1.8',
+  },
+  disclaimer: {
+    marginTop: '16px',
+    textAlign: 'center',
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.4)',
+    fontStyle: 'italic',
   },
 };
 
