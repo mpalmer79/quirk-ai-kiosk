@@ -10,6 +10,74 @@ import VehicleDetail from './Vehicledetail';
 import PaymentCalculator from './Paymentcalculator';
 import TradeInEstimator from './TradeInestimator';
 import CustomerHandoff from './Customerhandoff';
+import ErrorBoundary from './Errorboundary';
+
+// Screen-level error boundary with recovery option
+const ScreenErrorBoundary = ({ children, onReset, screenName }) => {
+  return (
+    <ErrorBoundary
+      fallback={
+        <div style={screenErrorStyles.container}>
+          <div style={screenErrorStyles.icon}>⚠️</div>
+          <h2 style={screenErrorStyles.title}>This screen encountered an error</h2>
+          <p style={screenErrorStyles.text}>
+            We had trouble loading {screenName || 'this screen'}. 
+            Let's get you back on track.
+          </p>
+          <div style={screenErrorStyles.buttons}>
+            <button style={screenErrorStyles.primaryBtn} onClick={onReset}>
+              Return to Start
+            </button>
+          </div>
+        </div>
+      }
+    >
+      {children}
+    </ErrorBoundary>
+  );
+};
+
+const screenErrorStyles = {
+  container: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '40px',
+    textAlign: 'center',
+  },
+  icon: {
+    fontSize: '64px',
+    marginBottom: '20px',
+  },
+  title: {
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: '12px',
+  },
+  text: {
+    fontSize: '16px',
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: '28px',
+    maxWidth: '400px',
+  },
+  buttons: {
+    display: 'flex',
+    gap: '16px',
+  },
+  primaryBtn: {
+    padding: '14px 32px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    borderRadius: '12px',
+    color: '#ffffff',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+};
 
 // Main Kiosk Application - Customer Journey Controller
 const KioskApp = () => {
@@ -125,7 +193,9 @@ const KioskApp = () => {
         opacity: isTransitioning ? 0 : 1,
         transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)',
       }}>
-        <CurrentScreenComponent {...screenProps} />
+        <ScreenErrorBoundary onReset={resetJourney} screenName={currentScreen}>
+          <CurrentScreenComponent {...screenProps} />
+        </ScreenErrorBoundary>
       </main>
 
       {/* Footer */}
