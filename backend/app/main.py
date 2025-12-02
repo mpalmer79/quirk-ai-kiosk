@@ -1,77 +1,80 @@
 """
-QUIRK AI Kiosk - Backend API Gateway
-Main application entry point
+Quirk AI Kiosk - FastAPI Main Application
+Entry point for the kiosk backend API
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import os
 
-from app.routers import inventory, recommendations, leads, analytics
-from app.config import settings
+# Import routes
+from kiosk_routes import router as kiosk_router
 
-
+# Lifespan handler for startup/shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifecycle management"""
     # Startup
-    print(f"🚀 QUIRK AI Kiosk Backend starting on {settings.HOST}:{settings.PORT}")
-    print(f"📊 Environment: {settings.ENVIRONMENT}")
+    print("🚀 Quirk AI Kiosk API starting...")
     yield
     # Shutdown
-    print("👋 QUIRK AI Kiosk Backend shutting down")
+    print("👋 Quirk AI Kiosk API shutting down...")
 
-
+# Create FastAPI app
 app = FastAPI(
-    title="QUIRK AI Kiosk API",
-    description="Backend API Gateway for the QUIRK AI Kiosk system",
+    title="Quirk AI Kiosk API",
+    description="Backend API for Quirk AI Kiosk customer journey",
     version="1.0.0",
-    lifespan=lifespan,
-    docs_url="/docs" if settings.ENVIRONMENT == "development" else None,
-    redoc_url="/redoc" if settings.ENVIRONMENT == "development" else None,
+    lifespan=lifespan
 )
 
 # CORS configuration
+origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "https://quirk-ai-kiosk.railway.app",
+    "https://quirk-ai-kiosk.netlify.app",
+    "https://quirk-ai-kiosk.vercel.app",
+    # Add your production domains here
+]
+
+# Allow all origins in development
+if os.getenv("ENVIRONMENT", "development") == "development":
+    origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include routers
-app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventory"])
-app.include_router(recommendations.router, prefix="/api/v1/recommendations", tags=["AI Recommendations"])
-app.include_router(leads.router, prefix="/api/v1/leads", tags=["CRM Leads"])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
+app.include_router(kiosk_router)
 
-
+# Root endpoint
 @app.get("/")
 async def root():
-    """Root endpoint - API info"""
     return {
-        "name": "QUIRK AI Kiosk API",
-        "version": "1.0.0",
-        "status": "operational",
-        "docs": "/docs" if settings.ENVIRONMENT == "development" else "disabled",
+        "service": "Quirk AI Kiosk API",
+        "status": "running",
+        "docs": "/docs",
+        "version": "1.0.0"
     }
 
-
-@app.get("/api/v1/health")
-async def health_check():
-    """Health check endpoint for monitoring"""
-    return {
-        "status": "healthy",
-        "service": "quirk-ai-kiosk-backend",
-        "version": "1.0.0",
-    }
-
-
+# Run with uvicorn
 if __name__ == "__main__":
     import uvicorn
+    
+    port = int(os.getenv("PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+    
     uvicorn.run(
-        "app.main:app",
-        host=settings.HOST,
-        port=settings.PORT,
-        reload=settings.ENVIRONMENT == "development",
+        "main:app",
+        host=host,
+        port=port,
+        reload=os.getenv("ENVIRONMENT", "development") == "development"
     )
