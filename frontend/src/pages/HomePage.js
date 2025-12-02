@@ -6,7 +6,6 @@ import { inventoryAPI } from '../services/api';
 
 function HomePage() {
   const [vehicles, setVehicles] = useState([]);
-  const [featured, setFeatured] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -30,7 +29,6 @@ function HomePage() {
 
       const response = await inventoryAPI.getAll(params);
       setVehicles(response.data.vehicles || []);
-      setFeatured(response.data.featured || []);
       setError(null);
     } catch (err) {
       console.error('Error loading inventory:', err);
@@ -84,22 +82,6 @@ function HomePage() {
             <span style={styles.statLabel}>Starting At</span>
           </div>
         </div>
-      )}
-
-      {/* Featured Section */}
-      {featured.length > 0 && !hasActiveFilters && (
-        <section style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>✨ Featured Vehicles</h2>
-          </div>
-          <div style={styles.featuredScroll}>
-            {featured.map((vehicle) => (
-              <div key={vehicle.id} style={styles.featuredCard}>
-                <VehicleCard vehicle={vehicle} />
-              </div>
-            ))}
-          </div>
-        </section>
       )}
 
       {/* All Inventory */}
@@ -257,17 +239,6 @@ const styles = {
     color: '#22c55e',
     fontSize: '1.5rem',
     lineHeight: 1,
-  },
-  featuredScroll: {
-    display: 'flex',
-    gap: '20px',
-    overflowX: 'auto',
-    paddingBottom: '12px',
-    scrollSnapType: 'x mandatory',
-  },
-  featuredCard: {
-    flex: '0 0 340px',
-    scrollSnapAlign: 'start',
   },
   vehicleGrid: {
     display: 'grid',
