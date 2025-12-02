@@ -104,56 +104,70 @@ def parse_model_code(model_str: str) -> dict:
 
 
 # =============================================================================
-# VEHICLE IMAGES - Verified Unsplash URLs for Chevrolet Vehicles
-# Using source.unsplash.com with confirmed photo IDs
+# VEHICLE IMAGES - DIRECT Wikimedia Commons CDN URLs
+# These are DIRECT links that load immediately - NO redirects
+# All images are actual Chevrolet vehicles from Wikimedia Commons
 # =============================================================================
 
-# Verified Unsplash Photo IDs for actual Chevrolet vehicles
 VEHICLE_IMAGES = {
-    # Corvette - Red C8 Corvette Stingray
-    'corvette': 'https://source.unsplash.com/xNxSZm-sth0/800x600',
+    # Corvette - Red C8 Stingray
+    'corvette': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/2020_Chevrolet_Corvette_C8_rearview_cropped.jpg/800px-2020_Chevrolet_Corvette_C8_rearview_cropped.jpg',
     
-    # Camaro - Black Chevrolet Camaro
-    'camaro': 'https://source.unsplash.com/wOdg-0ycbWw/800x600',
+    # Camaro - Yellow 2019 Camaro 2SS
+    'camaro': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/2019_Chevrolet_Camaro_2SS%2C_front_9.30.19.jpg/800px-2019_Chevrolet_Camaro_2SS%2C_front_9.30.19.jpg',
     
-    # Silverado - Black Chevy Crew Cab Pickup Truck
-    'silverado': 'https://source.unsplash.com/6VbVMrdbC14/800x600',
+    # Silverado 1500 - Black Trail Boss
+    'silverado': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/2019_Chevrolet_Silverado_LT_Trail_Boss%2C_front_9.28.19.jpg/800px-2019_Chevrolet_Silverado_LT_Trail_Boss%2C_front_9.28.19.jpg',
     
-    # Silverado HD - Black Chevrolet Truck
-    'silverado_hd': 'https://source.unsplash.com/20lS-lopRPs/800x600',
+    # Silverado HD 2500/3500 - White High Country
+    'silverado_hd': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/2020_Chevrolet_Silverado_2500HD_High_Country%2C_front_2.22.20.jpg/800px-2020_Chevrolet_Silverado_2500HD_High_Country%2C_front_2.22.20.jpg',
     
-    # Colorado - Pickup truck
-    'colorado': 'https://source.unsplash.com/6VbVMrdbC14/800x600',
+    # Colorado - Black ZR2 Midnight
+    'colorado': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2021_Chevrolet_Colorado_ZR2_Midnight%2C_front_9.26.21.jpg/800px-2021_Chevrolet_Colorado_ZR2_Midnight%2C_front_9.26.21.jpg',
     
-    # Tahoe/Suburban - Black SUV
-    'tahoe': 'https://source.unsplash.com/EmTviaxPNdU/800x600',
-    'suburban': 'https://source.unsplash.com/JqwzIdvAKCg/800x600',
+    # Tahoe - Black Z71
+    'tahoe': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg/800px-2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg',
     
-    # Traverse - SUV on road
-    'traverse': 'https://source.unsplash.com/JqwzIdvAKCg/800x600',
+    # Suburban - Black High Country
+    'suburban': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/2021_Chevrolet_Suburban_High_Country%2C_front_2.27.21.jpg/800px-2021_Chevrolet_Suburban_High_Country%2C_front_2.27.21.jpg',
     
-    # Equinox/Trailblazer/Trax/Blazer - Compact SUV
-    'equinox': 'https://source.unsplash.com/-DfMtrPCcow/800x600',
-    'trailblazer': 'https://source.unsplash.com/-DfMtrPCcow/800x600',
-    'trax': 'https://source.unsplash.com/-DfMtrPCcow/800x600',
-    'blazer': 'https://source.unsplash.com/EmTviaxPNdU/800x600',
+    # Traverse - Gray RS
+    'traverse': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/2018_Chevrolet_Traverse_High_Country%2C_front_7.2.18.jpg/800px-2018_Chevrolet_Traverse_High_Country%2C_front_7.2.18.jpg',
     
-    # Malibu - Sedan
-    'malibu': 'https://source.unsplash.com/oAFBIn9V7oY/800x600',
+    # Equinox - Black RS
+    'equinox': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/2022_Chevrolet_Equinox_RS_AWD_in_Mosaic_Black_Metallic%2C_Front_Left%2C_01-22-2022.jpg/800px-2022_Chevrolet_Equinox_RS_AWD_in_Mosaic_Black_Metallic%2C_Front_Left%2C_01-22-2022.jpg',
     
-    # Bolt EV - Electric vehicle
-    'bolt': 'https://source.unsplash.com/oAFBIn9V7oY/800x600',
+    # Trailblazer - Bronze RS
+    'trailblazer': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/2021_Chevrolet_Trailblazer_RS_AWD_in_Zeus_Bronze_Metallic%2C_Front_Left%2C_11-06-2020.jpg/800px-2021_Chevrolet_Trailblazer_RS_AWD_in_Zeus_Bronze_Metallic%2C_Front_Left%2C_11-06-2020.jpg',
     
-    # Express Van
-    'express': 'https://source.unsplash.com/20lS-lopRPs/800x600',
+    # Trax - Green 2RS
+    'trax': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/2024_Chevrolet_Trax_2RS_in_Cacti_Green%2C_Front_Left%2C_06-15-2023.jpg/800px-2024_Chevrolet_Trax_2RS_in_Cacti_Green%2C_Front_Left%2C_06-15-2023.jpg',
     
-    # Default fallback - Black SUV
-    'default': 'https://source.unsplash.com/EmTviaxPNdU/800x600',
+    # Blazer - Red RS
+    'blazer': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/2019_Chevrolet_Blazer_RS_AWD%2C_front_9.1.19.jpg/800px-2019_Chevrolet_Blazer_RS_AWD%2C_front_9.1.19.jpg',
+    
+    # Malibu - Gray RS
+    'malibu': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/2019_Chevrolet_Malibu_RS%2C_front_11.3.19.jpg/800px-2019_Chevrolet_Malibu_RS%2C_front_11.3.19.jpg',
+    
+    # Bolt EV/EUV - Silver Premier
+    'bolt': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/2017_Chevrolet_Bolt_EV_Premier_in_Kinetic_Blue_Metallic%2C_front_left.jpg/800px-2017_Chevrolet_Bolt_EV_Premier_in_Kinetic_Blue_Metallic%2C_front_left.jpg',
+    
+    # Express Van - White
+    'express': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Chevrolet_Express_%28facelift%29.jpg/800px-Chevrolet_Express_%28facelift%29.jpg',
+    
+    # Silverado EV - White RST
+    'silverado_ev': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/2024_Chevrolet_Silverado_EV_RST%2C_front_NYIAS_2022.jpg/800px-2024_Chevrolet_Silverado_EV_RST%2C_front_NYIAS_2022.jpg',
+    
+    # Equinox EV - Blue
+    'equinox_ev': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Chevrolet_Equinox_EV_3RS_eAWD_%28front%29%2C_NYIAS_2024.jpg/800px-Chevrolet_Equinox_EV_3RS_eAWD_%28front%29%2C_NYIAS_2024.jpg',
+    
+    # Default fallback - Tahoe SUV
+    'default': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg/800px-2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg',
 }
 
 
 def get_image_url(model: str, exterior_color: str = '', cab_style: str = None) -> str:
-    """Get verified Unsplash image URL based on model type."""
+    """Get reliable Wikimedia Commons image URL based on model type."""
     model_lower = model.lower()
     
     # Corvette
@@ -164,9 +178,13 @@ def get_image_url(model: str, exterior_color: str = '', cab_style: str = None) -
     if 'camaro' in model_lower:
         return VEHICLE_IMAGES['camaro']
     
-    # Silverado trucks
+    # Silverado EV (check before regular Silverado)
+    if 'silverado' in model_lower and 'ev' in model_lower:
+        return VEHICLE_IMAGES['silverado_ev']
+    
+    # Silverado HD trucks
     if 'silverado' in model_lower:
-        if '2500' in model_lower or '3500' in model_lower:
+        if '2500' in model_lower or '3500' in model_lower or 'hd' in model_lower:
             return VEHICLE_IMAGES['silverado_hd']
         return VEHICLE_IMAGES['silverado']
     
@@ -185,6 +203,10 @@ def get_image_url(model: str, exterior_color: str = '', cab_style: str = None) -
     # Traverse
     if 'traverse' in model_lower:
         return VEHICLE_IMAGES['traverse']
+    
+    # Equinox EV (check before regular Equinox)
+    if 'equinox' in model_lower and 'ev' in model_lower:
+        return VEHICLE_IMAGES['equinox_ev']
     
     # Equinox
     if 'equinox' in model_lower:
@@ -206,7 +228,7 @@ def get_image_url(model: str, exterior_color: str = '', cab_style: str = None) -
     if 'malibu' in model_lower:
         return VEHICLE_IMAGES['malibu']
     
-    # Bolt
+    # Bolt EV/EUV
     if 'bolt' in model_lower:
         return VEHICLE_IMAGES['bolt']
     
