@@ -1,16 +1,20 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
 
+// Wikimedia Commons fallback images for each model
 const FALLBACK_IMAGES = {
-  corvette: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/2020_Chevrolet_Corvette_C8_rearview_cropped.jpg/800px-2020_Chevrolet_Corvette_C8_rearview_cropped.jpg',
-  camaro: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/2019_Chevrolet_Camaro_2SS%2C_front_9.30.19.jpg/800px-2019_Chevrolet_Camaro_2SS%2C_front_9.30.19.jpg',
-  silverado: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/2019_Chevrolet_Silverado_LT_Trail_Boss%2C_front_9.28.19.jpg/800px-2019_Chevrolet_Silverado_LT_Trail_Boss%2C_front_9.28.19.jpg',
-  silverado_hd: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/2020_Chevrolet_Silverado_2500HD_High_Country%2C_front_2.22.20.jpg/800px-2020_Chevrolet_Silverado_2500HD_High_Country%2C_front_2.22.20.jpg',
-  colorado: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2021_Chevrolet_Colorado_ZR2_Midnight%2C_front_9.26.21.jpg/800px-2021_Chevrolet_Colorado_ZR2_Midnight%2C_front_9.26.21.jpg',
+  corvette: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/2020_Chevrolet_Corvette_C8_in_Torch_Red%2C_front_left.jpg/800px-2020_Chevrolet_Corvette_C8_in_Torch_Red%2C_front_left.jpg',
+  camaro: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/2019_Chevrolet_Camaro_2SS%2C_front_6.28.19.jpg/800px-2019_Chevrolet_Camaro_2SS%2C_front_6.28.19.jpg',
+  silverado: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/2019_Chevrolet_Silverado_1500_High_Country_Deluxe%2C_front_7.4.19.jpg/800px-2019_Chevrolet_Silverado_1500_High_Country_Deluxe%2C_front_7.4.19.jpg',
+  'silverado 1500': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/2019_Chevrolet_Silverado_1500_High_Country_Deluxe%2C_front_7.4.19.jpg/800px-2019_Chevrolet_Silverado_1500_High_Country_Deluxe%2C_front_7.4.19.jpg',
+  'silverado 2500': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/2020_Chevrolet_Silverado_2500HD_LTZ_Z71%2C_front_12.14.19.jpg/800px-2020_Chevrolet_Silverado_2500HD_LTZ_Z71%2C_front_12.14.19.jpg',
+  'silverado 2500hd': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/2020_Chevrolet_Silverado_2500HD_LTZ_Z71%2C_front_12.14.19.jpg/800px-2020_Chevrolet_Silverado_2500HD_LTZ_Z71%2C_front_12.14.19.jpg',
+  'silverado 3500': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/2020_Chevrolet_Silverado_2500HD_LTZ_Z71%2C_front_12.14.19.jpg/800px-2020_Chevrolet_Silverado_2500HD_LTZ_Z71%2C_front_12.14.19.jpg',
+  'silverado 3500hd': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/2020_Chevrolet_Silverado_2500HD_LTZ_Z71%2C_front_12.14.19.jpg/800px-2020_Chevrolet_Silverado_2500HD_LTZ_Z71%2C_front_12.14.19.jpg',
+  colorado: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/2021_Chevrolet_Colorado_Z71_Crew_Cab%2C_front_3.16.21.jpg/800px-2021_Chevrolet_Colorado_Z71_Crew_Cab%2C_front_3.16.21.jpg',
   tahoe: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg/800px-2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg',
-  suburban: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/2021_Chevrolet_Suburban_High_Country%2C_front_2.27.21.jpg/800px-2021_Chevrolet_Suburban_High_Country%2C_front_2.27.21.jpg',
-  traverse: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/2018_Chevrolet_Traverse_High_Country%2C_front_7.2.18.jpg/800px-2018_Chevrolet_Traverse_High_Country%2C_front_7.2.18.jpg',
-  equinox: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/2022_Chevrolet_Equinox_RS_AWD_in_Mosaic_Black_Metallic%2C_Front_Left%2C_01-22-2022.jpg/800px-2022_Chevrolet_Equinox_RS_AWD_in_Mosaic_Black_Metallic%2C_Front_Left%2C_01-22-2022.jpg',
+  suburban: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/2021_Chevrolet_Suburban_High_Country%2C_front_1.5.21.jpg/800px-2021_Chevrolet_Suburban_High_Country%2C_front_1.5.21.jpg',
+  traverse: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/2018_Chevrolet_Traverse_High_Country_3.6L_front_3.16.18.jpg/800px-2018_Chevrolet_Traverse_High_Country_3.6L_front_3.16.18.jpg',
+  equinox: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/2022_Chevrolet_Equinox_RS_AWD_in_Midnight_Blue_Metallic%2C_Front_Left%2C_11-20-2021.jpg/800px-2022_Chevrolet_Equinox_RS_AWD_in_Midnight_Blue_Metallic%2C_Front_Left%2C_11-20-2021.jpg',
   trailblazer: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/2021_Chevrolet_Trailblazer_RS_AWD_in_Zeus_Bronze_Metallic%2C_Front_Left%2C_11-06-2020.jpg/800px-2021_Chevrolet_Trailblazer_RS_AWD_in_Zeus_Bronze_Metallic%2C_Front_Left%2C_11-06-2020.jpg',
   trax: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/2024_Chevrolet_Trax_2RS_in_Cacti_Green%2C_Front_Left%2C_06-15-2023.jpg/800px-2024_Chevrolet_Trax_2RS_in_Cacti_Green%2C_Front_Left%2C_06-15-2023.jpg',
   blazer: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/2019_Chevrolet_Blazer_RS_AWD%2C_front_9.1.19.jpg/800px-2019_Chevrolet_Blazer_RS_AWD%2C_front_9.1.19.jpg',
@@ -20,12 +24,17 @@ const FALLBACK_IMAGES = {
   default: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg/800px-2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg'
 };
 
+// Get fallback image based on model name
 function getFallbackImage(model) {
   if (!model) return FALLBACK_IMAGES.default;
+  
   const m = model.toLowerCase();
+  
+  // Check specific models first (more specific to less specific)
+  if (m.includes('silverado 2500') || m.includes('silverado2500')) return FALLBACK_IMAGES['silverado 2500hd'];
+  if (m.includes('silverado 3500') || m.includes('silverado3500')) return FALLBACK_IMAGES['silverado 3500hd'];
   if (m.includes('corvette')) return FALLBACK_IMAGES.corvette;
   if (m.includes('camaro')) return FALLBACK_IMAGES.camaro;
-  if (m.includes('silverado') && (m.includes('2500') || m.includes('3500'))) return FALLBACK_IMAGES.silverado_hd;
   if (m.includes('silverado')) return FALLBACK_IMAGES.silverado;
   if (m.includes('colorado')) return FALLBACK_IMAGES.colorado;
   if (m.includes('tahoe')) return FALLBACK_IMAGES.tahoe;
@@ -38,179 +47,111 @@ function getFallbackImage(model) {
   if (m.includes('malibu')) return FALLBACK_IMAGES.malibu;
   if (m.includes('bolt')) return FALLBACK_IMAGES.bolt;
   if (m.includes('express')) return FALLBACK_IMAGES.express;
+  
   return FALLBACK_IMAGES.default;
 }
 
-function VehicleCard({ vehicle }) {
-  const navigate = useNavigate();
-
-  const handleClick = () => {
-    navigate(`/vehicle/${vehicle.id}`);
-  };
-
-  const handleImageError = (e) => {
-    const fallbackUrl = getFallbackImage(vehicle.model);
-    if (e.target.src !== fallbackUrl) {
-      e.target.src = fallbackUrl;
+const VehicleCard = ({ vehicle, onClick }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageSrc, setImageSrc] = useState(vehicle.imageUrl || getFallbackImage(vehicle.model));
+  
+  const handleImageError = () => {
+    if (!imageError) {
+      setImageError(true);
+      setImageSrc(getFallbackImage(vehicle.model));
     }
   };
 
-  const savings = vehicle.msrp ? vehicle.msrp - vehicle.price : 0;
+  const savings = vehicle.msrp && vehicle.price ? vehicle.msrp - vehicle.price : 0;
+  
+  const formatPrice = (price) => {
+    if (!price) return 'Call for Price';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(price);
+  };
+
+  const formatSavings = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
 
   return (
-    <div style={styles.card} onClick={handleClick}>
-      <div style={styles.imageContainer}>
+    <div
+      className="bg-zinc-900 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-emerald-500 transition-all duration-200 flex-shrink-0 w-72"
+      onClick={() => onClick && onClick(vehicle)}
+    >
+      {/* Image Container */}
+      <div className="relative h-44 bg-zinc-800">
         <img
-          src={vehicle.imageUrl}
+          src={imageSrc}
           alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-          style={styles.image}
+          className="w-full h-full object-cover"
           onError={handleImageError}
+          loading="lazy"
         />
-        {savings > 500 && (
-          <div style={styles.savingsBadge}>
-            Save ${savings.toLocaleString()}
-          </div>
+        
+        {/* Savings Badge */}
+        {savings > 0 && (
+          <span className="absolute top-2 left-2 bg-emerald-600 text-white text-xs font-bold px-2 py-1 rounded">
+            Save {formatSavings(savings)}
+          </span>
         )}
-        <div style={styles.statusBadge}>{vehicle.status}</div>
+        
+        {/* Stock Badge */}
+        <span className="absolute top-2 right-2 bg-zinc-800/90 text-white text-xs font-medium px-2 py-1 rounded border border-zinc-600">
+          In Stock
+        </span>
       </div>
 
-      <div style={styles.content}>
-        <div style={styles.header}>
-          <span style={styles.year}>{vehicle.year}</span>
-          <span style={styles.bodyStyle}>{vehicle.bodyStyle}</span>
+      {/* Content */}
+      <div className="p-4">
+        {/* Year and Body Type */}
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-emerald-500 font-semibold text-sm">{vehicle.year}</span>
+          <span className="text-zinc-500 text-xs uppercase tracking-wide">
+            {vehicle.bodyType || vehicle.body || ''}
+          </span>
         </div>
-
-        <h3 style={styles.title}>
+        
+        {/* Make and Model */}
+        <h3 className="text-white font-bold text-lg leading-tight mb-1">
           {vehicle.make} {vehicle.model}
         </h3>
-        <p style={styles.trim}>{vehicle.trim}</p>
-
-        <div style={styles.specs}>
-          <span style={styles.spec}>{vehicle.drivetrain}</span>
-          <span style={styles.specDot}>•</span>
-          <span style={styles.spec}>{vehicle.fuelType}</span>
-          {vehicle.cabStyle && (
-            <>
-              <span style={styles.specDot}>•</span>
-              <span style={styles.spec}>{vehicle.cabStyle}</span>
-            </>
-          )}
+        
+        {/* Trim */}
+        {vehicle.trim && (
+          <p className="text-zinc-400 text-sm mb-2">{vehicle.trim}</p>
+        )}
+        
+        {/* Drivetrain and Fuel */}
+        <div className="flex items-center gap-2 text-zinc-500 text-xs mb-3">
+          {vehicle.drivetrain && <span>{vehicle.drivetrain}</span>}
+          {vehicle.drivetrain && vehicle.fuelType && <span>•</span>}
+          {vehicle.fuelType && <span>{vehicle.fuelType}</span>}
         </div>
-
-        <div style={styles.priceRow}>
-          <span style={styles.price}>${vehicle.price.toLocaleString()}</span>
+        
+        {/* Pricing */}
+        <div className="flex items-baseline gap-2">
+          <span className="text-white font-bold text-xl">
+            {formatPrice(vehicle.price)}
+          </span>
           {vehicle.msrp && vehicle.msrp > vehicle.price && (
-            <span style={styles.msrp}>MSRP ${vehicle.msrp.toLocaleString()}</span>
+            <span className="text-zinc-500 text-sm line-through">
+              MSRP {formatPrice(vehicle.msrp)}
+            </span>
           )}
         </div>
       </div>
     </div>
   );
-}
-
-const styles = {
-  card: {
-    background: '#1a1a1a',
-    borderRadius: '16px',
-    overflow: 'hidden',
-    border: '1px solid #2a2a2a',
-    cursor: 'pointer',
-    transition: 'transform 0.2s, border-color 0.2s',
-  },
-  imageContainer: {
-    position: 'relative',
-    width: '100%',
-    height: '200px',
-    overflow: 'hidden',
-    background: '#141414',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-  },
-  savingsBadge: {
-    position: 'absolute',
-    top: '12px',
-    left: '12px',
-    background: '#22c55e',
-    color: '#ffffff',
-    padding: '6px 12px',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-  },
-  statusBadge: {
-    position: 'absolute',
-    top: '12px',
-    right: '12px',
-    background: 'rgba(26, 71, 42, 0.9)',
-    color: '#ffffff',
-    padding: '6px 12px',
-    borderRadius: '8px',
-    fontSize: '0.75rem',
-    fontWeight: 600,
-  },
-  content: {
-    padding: '16px',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '8px',
-  },
-  year: {
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    color: '#c9a227',
-  },
-  bodyStyle: {
-    fontSize: '0.75rem',
-    color: '#666666',
-    textTransform: 'uppercase',
-  },
-  title: {
-    fontSize: '1.25rem',
-    fontWeight: 700,
-    color: '#ffffff',
-    marginBottom: '4px',
-  },
-  trim: {
-    fontSize: '0.875rem',
-    color: '#a0a0a0',
-    marginBottom: '12px',
-  },
-  specs: {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '6px',
-    marginBottom: '16px',
-  },
-  spec: {
-    fontSize: '0.75rem',
-    color: '#666666',
-  },
-  specDot: {
-    fontSize: '0.75rem',
-    color: '#444444',
-  },
-  priceRow: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '12px',
-  },
-  price: {
-    fontSize: '1.5rem',
-    fontWeight: 700,
-    color: '#ffffff',
-  },
-  msrp: {
-    fontSize: '0.875rem',
-    color: '#666666',
-    textDecoration: 'line-through',
-  },
 };
 
 export default VehicleCard;
