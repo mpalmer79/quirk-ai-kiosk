@@ -110,7 +110,7 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
         </h2>
         
         <p style={styles.heroText}>
-          How can I help you find your perfect vehicle today?
+          How can I help you find the right vehicle for you today?
         </p>
       </div>
 
