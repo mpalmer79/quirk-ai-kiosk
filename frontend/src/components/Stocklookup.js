@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import api from './api';
 
 const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
   const [stockNumber, setStockNumber] = useState('');
@@ -29,40 +30,17 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
     setIsSearching(true);
     setError(null);
 
-    // Simulated API call - replace with actual inventory API
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call API to find vehicle by stock number
+      const vehicle = await api.getVehicleByStock(stockNumber);
       
-      // Mock result - in production, call your inventory API
-      const mockVehicle = {
-        stockNumber: stockNumber,
-        year: 2025,
-        make: 'Chevrolet',
-        model: 'Silverado 1500',
-        trim: 'LT Crew Cab 4WD',
-        vin: '1GCUDDED5RZ' + stockNumber.padStart(6, '0'),
-        exteriorColor: 'Summit White',
-        interiorColor: 'Jet Black',
-        engine: '5.3L V8',
-        transmission: '10-Speed Automatic',
-        drivetrain: '4WD',
-        msrp: 52995,
-        salePrice: 47495,
-        status: 'In Stock',
-        mileage: 12,
-        features: ['Trailering Package', 'Heated Seats', '13.4" Touchscreen', 'Apple CarPlay'],
-      };
-
-      // Randomly simulate not found for demo
-      if (stockNumber.startsWith('999')) {
-        setError('Vehicle not found. Please check the stock number and try again.');
-        setSearchResult(null);
-      } else {
-        setSearchResult(mockVehicle);
-        updateCustomerData({ selectedVehicle: mockVehicle });
+      if (vehicle) {
+        setSearchResult(vehicle);
+        updateCustomerData({ selectedVehicle: vehicle });
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError('Vehicle not found. Please check the stock number and try again.');
+      setSearchResult(null);
     } finally {
       setIsSearching(false);
     }
@@ -82,6 +60,21 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
     ['7', '8', '9'],
     ['clear', '0', 'backspace'],
   ];
+
+  // Generate gradient based on color
+  const getGradient = (color) => {
+    const colorMap = {
+      'white': 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
+      'black': 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+      'red': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+      'blue': 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+      'silver': 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
+      'gray': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+    };
+    const lowerColor = (color || '').toLowerCase();
+    return Object.entries(colorMap).find(([key]) => lowerColor.includes(key))?.[1] 
+      || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
+  };
 
   return (
     <div style={styles.container}>
@@ -129,7 +122,7 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
             <div style={styles.resultHeader}>
               <div style={styles.statusBadge}>
                 <span style={styles.statusDot} />
-                {searchResult.status}
+                {searchResult.status || 'In Stock'}
               </div>
               <span style={styles.stockLabel}>STK# {searchResult.stockNumber}</span>
             </div>
@@ -161,15 +154,17 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
             <div style={styles.priceSection}>
               <div style={styles.priceRow}>
                 <span style={styles.msrpLabel}>MSRP</span>
-                <span style={styles.msrpValue}>${searchResult.msrp.toLocaleString()}</span>
+                <span style={styles.msrpValue}>${(searchResult.msrp || 0).toLocaleString()}</span>
               </div>
               <div style={styles.priceRow}>
                 <span style={styles.salePriceLabel}>Your Price</span>
-                <span style={styles.salePriceValue}>${searchResult.salePrice.toLocaleString()}</span>
+                <span style={styles.salePriceValue}>${(searchResult.salePrice || 0).toLocaleString()}</span>
               </div>
-              <div style={styles.savings}>
-                You Save ${(searchResult.msrp - searchResult.salePrice).toLocaleString()}
-              </div>
+              {searchResult.msrp && searchResult.salePrice && searchResult.msrp > searchResult.salePrice && (
+                <div style={styles.savings}>
+                  You Save ${(searchResult.msrp - searchResult.salePrice).toLocaleString()}
+                </div>
+              )}
             </div>
 
             <div style={styles.resultActions}>
