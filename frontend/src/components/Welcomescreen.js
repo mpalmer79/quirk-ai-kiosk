@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { inventoryAPI } from '../services/api';
+import api from './api';
 
 const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -13,8 +13,8 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
 
   const loadStats = async () => {
     try {
-      const response = await inventoryAPI.getStats();
-      setStats(response.data);
+      const data = await api.getInventoryStats();
+      setStats(data);
     } catch (err) {
       console.error('Error loading stats:', err);
     }
