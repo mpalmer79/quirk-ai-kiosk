@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from './api';
+import { inventoryAPI } from '../services/api';
 
 const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
   const [vehicles, setVehicles] = useState([]);
@@ -13,48 +13,35 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
       setError(null);
       
       try {
-        let result;
+        let response;
         
         // If we have quiz answers, use preference-based search
         if (customerData.quizAnswers && Object.keys(customerData.quizAnswers).length > 0) {
-          result = await api.searchByPreferences({
-            primary_use: customerData.quizAnswers.primaryUse,
-            passengers: customerData.quizAnswers.passengers,
-            mileage: customerData.quizAnswers.mileage,
-            payment_type: customerData.quizAnswers.paymentType,
-            monthly_payment: customerData.quizAnswers.monthlyPayment,
-            down_payment: customerData.quizAnswers.downPayment,
-            features: customerData.quizAnswers.features,
-            timeline: customerData.quizAnswers.timeline,
-          });
+          // Quiz-based search would go here (when backend supports it)
+          // For now, fall back to regular inventory call
+          response = await inventoryAPI.getAll({});
         } else {
           // Use filter-based search
-          const filters = {};
+          const params = {};
           
           if (customerData.selectedModel) {
-            filters.model = customerData.selectedModel;
+            params.make = 'Chevrolet'; // Default make
           }
           
           if (customerData.budgetRange) {
             // Convert monthly payment to rough vehicle price
-            filters.min_price = customerData.budgetRange.min * 60;
-            filters.max_price = customerData.budgetRange.max * 80;
+            params.min_price = customerData.budgetRange.min * 60;
+            params.max_price = customerData.budgetRange.max * 80;
           }
           
-          if (customerData.preferences?.drivetrain) {
-            filters.drivetrain = customerData.preferences.drivetrain;
+          if (customerData.preferences?.bodyStyle) {
+            params.body_style = customerData.preferences.bodyStyle;
           }
           
-          if (customerData.preferences?.cabType) {
-            filters.cab_type = customerData.preferences.cabType;
-          }
-          
-          filters.sort_by = sortBy;
-          
-          result = await api.getInventory(filters);
+          response = await inventoryAPI.getAll(params);
         }
         
-        setVehicles(result.vehicles || result || []);
+        setVehicles(response.data?.vehicles || []);
       } catch (err) {
         console.error('Failed to fetch vehicles:', err);
         setError('Unable to load inventory. Please try again.');
@@ -82,6 +69,8 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
       'silver': 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
       'gray': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
       'beige': 'linear-gradient(135deg, #d4b896 0%, #a78b6c 100%)',
+      'cypress': 'linear-gradient(135deg, #4a5568 0%, #2d3748 100%)',
+      'polar': 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)',
     };
     const lowerColor = (color || '').toLowerCase();
     return Object.entries(colorMap).find(([key]) => lowerColor.includes(key))?.[1] 
@@ -90,18 +79,28 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
 
   const sortedVehicles = [...vehicles].sort((a, b) => {
     switch (sortBy) {
-      case 'priceLow': return (a.salePrice || 0) - (b.salePrice || 0);
-      case 'priceHigh': return (b.salePrice || 0) - (a.salePrice || 0);
+      case 'priceLow': return (a.price || 0) - (b.price || 0);
+      case 'priceHigh': return (b.price || 0) - (a.price || 0);
       case 'newest': return (b.year || 0) - (a.year || 0);
       default: return (b.matchScore || 50) - (a.matchScore || 50);
     }
   });
 
+  // Get the appropriate title based on path
+  const getTitle = () => {
+    if (customerData.path === 'browse') return 'All Inventory';
+    if (customerData.quizAnswers && Object.keys(customerData.quizAnswers).length > 0) {
+      return 'Recommended For You';
+    }
+    if (customerData.selectedModel) return `${customerData.selectedModel} Inventory`;
+    return 'All Inventory';
+  };
+
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
         <div style={styles.loadingSpinner} />
-        <p style={styles.loadingText}>Finding your perfect matches...</p>
+        <p style={styles.loadingText}>Loading inventory...</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -125,9 +124,15 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           <h1 style={styles.title}>
-            <span style={styles.matchCount}>{vehicles.length}</span> Vehicles Match
+            {getTitle()}
+            <span style={styles.matchCount}> ({vehicles.length})</span>
           </h1>
-          <p style={styles.subtitle}>Sorted by best match based on your preferences</p>
+          <p style={styles.subtitle}>
+            {customerData.path === 'browse' 
+              ? 'Browse our complete inventory' 
+              : 'Sorted by best match based on your preferences'
+            }
+          </p>
         </div>
 
         <div style={styles.headerRight}>
@@ -153,8 +158,8 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
               style={styles.vehicleCard}
               onClick={() => handleVehicleSelect(vehicle)}
             >
-              {/* Match Score */}
-              {vehicle.matchScore && (
+              {/* Match Score - only show if from quiz */}
+              {vehicle.matchScore && customerData.quizAnswers && (
                 <div style={styles.matchBadge}>
                   <span style={styles.matchScore}>{vehicle.matchScore}%</span>
                   <span style={styles.matchLabel}>Match</span>
@@ -201,12 +206,12 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
                 <div style={styles.pricingSection}>
                   <div style={styles.priceColumn}>
                     <span style={styles.priceLabel}>Your Price</span>
-                    <span style={styles.priceValue}>${(vehicle.salePrice || 0).toLocaleString()}</span>
+                    <span style={styles.priceValue}>${(vehicle.price || 0).toLocaleString()}</span>
                   </div>
                   <div style={styles.paymentColumn}>
                     <span style={styles.priceLabel}>Est. Payment</span>
                     <span style={styles.paymentValue}>
-                      ${Math.round((vehicle.salePrice || 40000) / 72)}/mo
+                      ${Math.round((vehicle.price || 40000) / 72)}/mo
                     </span>
                   </div>
                 </div>
@@ -313,6 +318,7 @@ const styles = {
   },
   matchCount: {
     color: '#4ade80',
+    fontWeight: '500',
   },
   subtitle: {
     fontSize: '14px',
