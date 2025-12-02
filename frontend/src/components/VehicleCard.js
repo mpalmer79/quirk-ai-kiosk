@@ -1,181 +1,659 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+"""
+Inventory Router - Handles vehicle inventory endpoints
+Reads from PBS DMS Excel export
+"""
+from fastapi import APIRouter, HTTPException, Query
+from typing import Optional, List
+from pydantic import BaseModel
+import pandas as pd
+import os
+import re
 
-function VehicleCard({ vehicle }) {
-  const navigate = useNavigate();
+router = APIRouter()
 
-  const handleClick = () => {
-    navigate(`/vehicle/${vehicle.id}`);
-  };
 
-  const savings = vehicle.msrp ? vehicle.msrp - vehicle.price : 0;
-  const hasSavings = savings > 500;
+# Pydantic models for response schema
+class Vehicle(BaseModel):
+    id: str
+    vin: str
+    year: int
+    make: str
+    model: str
+    trim: str
+    bodyStyle: str
+    exteriorColor: str
+    interiorColor: str
+    mileage: int
+    price: float
+    msrp: Optional[float] = None
+    engine: str
+    transmission: str
+    drivetrain: str
+    fuelType: str
+    mpgCity: Optional[int] = None
+    mpgHighway: Optional[int] = None
+    evRange: Optional[int] = None
+    features: List[str]
+    imageUrl: str
+    status: str
+    stockNumber: str
+    cabStyle: Optional[str] = None
+    bedLength: Optional[str] = None
 
-  return (
-    <motion.div
-      style={styles.card}
-      onClick={handleClick}
-      whileTap={{ scale: 0.98 }}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <div style={styles.imageContainer}>
-        <img
-          src={vehicle.imageUrl}
-          alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-          style={styles.image}
-          onError={(e) => {
-            e.target.src = 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=800';
-          }}
-        />
-        {hasSavings && (
-          <div style={styles.savingsBadge}>
-            Save ${savings.toLocaleString()}
-          </div>
-        )}
-        <div style={styles.statusBadge} data-status={vehicle.status}>
-          {vehicle.status}
-        </div>
-      </div>
 
-      <div style={styles.content}>
-        <div style={styles.header}>
-          <span style={styles.year}>{vehicle.year}</span>
-          <span style={styles.stockNumber}>#{vehicle.stockNumber}</span>
-        </div>
+class InventoryResponse(BaseModel):
+    vehicles: List[Vehicle]
+    total: int
+    featured: Optional[List[Vehicle]] = None
 
-        <h3 style={styles.title}>
-          {vehicle.make} {vehicle.model}
-        </h3>
 
-        <p style={styles.trim}>{vehicle.trim}</p>
-
-        <div style={styles.specs}>
-          <span style={styles.spec}>{vehicle.drivetrain}</span>
-          <span style={styles.specDivider}>•</span>
-          <span style={styles.spec}>{vehicle.fuelType}</span>
-          <span style={styles.specDivider}>•</span>
-          <span style={styles.spec}>{vehicle.engine}</span>
-        </div>
-
-        <div style={styles.priceRow}>
-          <span style={styles.price}>
-            ${vehicle.price.toLocaleString()}
-          </span>
-          {vehicle.msrp && vehicle.msrp > vehicle.price && (
-            <span style={styles.msrp}>
-              ${vehicle.msrp.toLocaleString()}
-            </span>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
+# Body type mapping from PBS codes
+BODY_TYPE_MAP = {
+    'PKUP': 'Truck',
+    'FLTBD': 'Truck',
+    'VAN': 'Van',
+    'COUPE': 'Coupe',
+    'CONVT': 'Convertible',
+    'APURP': 'SUV',
 }
 
-const styles = {
-  card: {
-    background: '#1a1a1a',
-    borderRadius: '16px',
-    border: '1px solid #2a2a2a',
-    overflow: 'hidden',
-    cursor: 'pointer',
-    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-  },
-  imageContainer: {
-    position: 'relative',
-    width: '100%',
-    height: '200px',
-    background: '#141414',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-  },
-  savingsBadge: {
-    position: 'absolute',
-    top: '12px',
-    left: '12px',
-    background: '#22c55e',
-    color: '#ffffff',
-    padding: '6px 12px',
-    borderRadius: '8px',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-  },
-  statusBadge: {
-    position: 'absolute',
-    top: '12px',
-    right: '12px',
-    background: 'rgba(26, 71, 42, 0.9)',
-    color: '#ffffff',
-    padding: '6px 12px',
-    borderRadius: '8px',
-    fontSize: '0.75rem',
-    fontWeight: 600,
-    textTransform: 'uppercase',
-  },
-  content: {
-    padding: '16px',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '8px',
-  },
-  year: {
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    color: '#c9a227',
-  },
-  stockNumber: {
-    fontSize: '0.75rem',
-    color: '#666666',
-  },
-  title: {
-    fontSize: '1.25rem',
-    fontWeight: 700,
-    color: '#ffffff',
-    marginBottom: '4px',
-  },
-  trim: {
-    fontSize: '0.875rem',
-    color: '#a0a0a0',
-    marginBottom: '12px',
-  },
-  specs: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '16px',
-    flexWrap: 'wrap',
-  },
-  spec: {
-    fontSize: '0.75rem',
-    color: '#666666',
-  },
-  specDivider: {
-    color: '#444444',
-  },
-  priceRow: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '12px',
-  },
-  price: {
-    fontSize: '1.5rem',
-    fontWeight: 700,
-    color: '#ffffff',
-  },
-  msrp: {
-    fontSize: '1rem',
-    color: '#666666',
-    textDecoration: 'line-through',
-  },
-};
+# Category mapping
+CATEGORY_MAP = {
+    'ON DEALER LOT': 'In Stock',
+    'ON DEALER LOT ': 'In Stock',
+    'IN TRANSIT': 'In Transit',
+    'IN TRANSIT SOLD': 'Sold - In Transit',
+}
 
-export default VehicleCard;
+
+# =============================================================================
+# GM MODEL CODE DECODER
+# =============================================================================
+
+BODY_CODE_MAP = {
+    '703': {'cab': 'Regular Cab', 'bed': 'Standard Bed'},
+    '903': {'cab': 'Regular Cab', 'bed': 'Long Bed'},
+    '753': {'cab': 'Double Cab', 'bed': 'Standard Bed'},
+    '953': {'cab': 'Double Cab', 'bed': 'Long Bed'},
+    '543': {'cab': 'Crew Cab', 'bed': 'Short Bed'},
+    '743': {'cab': 'Crew Cab', 'bed': 'Standard Bed'},
+    '943': {'cab': 'Crew Cab', 'bed': 'Long Bed'},
+}
+
+
+def parse_model_code(model_str: str) -> dict:
+    """Parse GM model code to extract cab style and bed length."""
+    result = {'cab': None, 'bed': None, 'drive': None}
+    
+    if not model_str:
+        return result
+    
+    model_upper = model_str.upper()
+    pattern = r'(CC|CK)([123]0)(\d{3})'
+    match = re.search(pattern, model_upper)
+    
+    if match:
+        drive_code = match.group(1)
+        body_code = match.group(3)
+        result['drive'] = '4WD' if drive_code == 'CK' else '2WD'
+        if body_code in BODY_CODE_MAP:
+            result['cab'] = BODY_CODE_MAP[body_code]['cab']
+            result['bed'] = BODY_CODE_MAP[body_code]['bed']
+    
+    return result
+
+
+# =============================================================================
+# VEHICLE IMAGES - DIRECT Wikimedia Commons CDN URLs
+# These are DIRECT links that load immediately - NO redirects
+# All images are actual Chevrolet vehicles from Wikimedia Commons
+# =============================================================================
+
+VEHICLE_IMAGES = {
+    # Corvette - Red C8 Stingray
+    'corvette': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/2020_Chevrolet_Corvette_C8_rearview_cropped.jpg/800px-2020_Chevrolet_Corvette_C8_rearview_cropped.jpg',
+    
+    # Camaro - Yellow 2019 Camaro 2SS
+    'camaro': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/2019_Chevrolet_Camaro_2SS%2C_front_9.30.19.jpg/800px-2019_Chevrolet_Camaro_2SS%2C_front_9.30.19.jpg',
+    
+    # Silverado 1500 - Black Trail Boss
+    'silverado': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/2019_Chevrolet_Silverado_LT_Trail_Boss%2C_front_9.28.19.jpg/800px-2019_Chevrolet_Silverado_LT_Trail_Boss%2C_front_9.28.19.jpg',
+    
+    # Silverado HD 2500/3500 - White High Country
+    'silverado_hd': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/2020_Chevrolet_Silverado_2500HD_High_Country%2C_front_2.22.20.jpg/800px-2020_Chevrolet_Silverado_2500HD_High_Country%2C_front_2.22.20.jpg',
+    
+    # Colorado - Black ZR2 Midnight
+    'colorado': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2021_Chevrolet_Colorado_ZR2_Midnight%2C_front_9.26.21.jpg/800px-2021_Chevrolet_Colorado_ZR2_Midnight%2C_front_9.26.21.jpg',
+    
+    # Tahoe - Black Z71
+    'tahoe': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg/800px-2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg',
+    
+    # Suburban - Black High Country
+    'suburban': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/2021_Chevrolet_Suburban_High_Country%2C_front_2.27.21.jpg/800px-2021_Chevrolet_Suburban_High_Country%2C_front_2.27.21.jpg',
+    
+    # Traverse - Gray RS
+    'traverse': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/2018_Chevrolet_Traverse_High_Country%2C_front_7.2.18.jpg/800px-2018_Chevrolet_Traverse_High_Country%2C_front_7.2.18.jpg',
+    
+    # Equinox - Black RS
+    'equinox': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/2022_Chevrolet_Equinox_RS_AWD_in_Mosaic_Black_Metallic%2C_Front_Left%2C_01-22-2022.jpg/800px-2022_Chevrolet_Equinox_RS_AWD_in_Mosaic_Black_Metallic%2C_Front_Left%2C_01-22-2022.jpg',
+    
+    # Trailblazer - Bronze RS
+    'trailblazer': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/2021_Chevrolet_Trailblazer_RS_AWD_in_Zeus_Bronze_Metallic%2C_Front_Left%2C_11-06-2020.jpg/800px-2021_Chevrolet_Trailblazer_RS_AWD_in_Zeus_Bronze_Metallic%2C_Front_Left%2C_11-06-2020.jpg',
+    
+    # Trax - Green 2RS
+    'trax': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/2024_Chevrolet_Trax_2RS_in_Cacti_Green%2C_Front_Left%2C_06-15-2023.jpg/800px-2024_Chevrolet_Trax_2RS_in_Cacti_Green%2C_Front_Left%2C_06-15-2023.jpg',
+    
+    # Blazer - Red RS
+    'blazer': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/2019_Chevrolet_Blazer_RS_AWD%2C_front_9.1.19.jpg/800px-2019_Chevrolet_Blazer_RS_AWD%2C_front_9.1.19.jpg',
+    
+    # Malibu - Gray RS
+    'malibu': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/2019_Chevrolet_Malibu_RS%2C_front_11.3.19.jpg/800px-2019_Chevrolet_Malibu_RS%2C_front_11.3.19.jpg',
+    
+    # Bolt EV/EUV - Silver Premier
+    'bolt': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/2017_Chevrolet_Bolt_EV_Premier_in_Kinetic_Blue_Metallic%2C_front_left.jpg/800px-2017_Chevrolet_Bolt_EV_Premier_in_Kinetic_Blue_Metallic%2C_front_left.jpg',
+    
+    # Express Van - White
+    'express': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Chevrolet_Express_%28facelift%29.jpg/800px-Chevrolet_Express_%28facelift%29.jpg',
+    
+    # Silverado EV - White RST
+    'silverado_ev': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/2024_Chevrolet_Silverado_EV_RST%2C_front_NYIAS_2022.jpg/800px-2024_Chevrolet_Silverado_EV_RST%2C_front_NYIAS_2022.jpg',
+    
+    # Equinox EV - Blue
+    'equinox_ev': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Chevrolet_Equinox_EV_3RS_eAWD_%28front%29%2C_NYIAS_2024.jpg/800px-Chevrolet_Equinox_EV_3RS_eAWD_%28front%29%2C_NYIAS_2024.jpg',
+    
+    # Default fallback - Tahoe SUV
+    'default': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg/800px-2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg',
+}
+
+
+def get_image_url(model: str, exterior_color: str = '', cab_style: str = None) -> str:
+    """Get reliable Wikimedia Commons image URL based on model type."""
+    model_lower = model.lower()
+    
+    # Corvette
+    if 'corvette' in model_lower:
+        return VEHICLE_IMAGES['corvette']
+    
+    # Camaro
+    if 'camaro' in model_lower:
+        return VEHICLE_IMAGES['camaro']
+    
+    # Silverado EV (check before regular Silverado)
+    if 'silverado' in model_lower and 'ev' in model_lower:
+        return VEHICLE_IMAGES['silverado_ev']
+    
+    # Silverado HD trucks
+    if 'silverado' in model_lower:
+        if '2500' in model_lower or '3500' in model_lower or 'hd' in model_lower:
+            return VEHICLE_IMAGES['silverado_hd']
+        return VEHICLE_IMAGES['silverado']
+    
+    # Colorado
+    if 'colorado' in model_lower:
+        return VEHICLE_IMAGES['colorado']
+    
+    # Tahoe
+    if 'tahoe' in model_lower:
+        return VEHICLE_IMAGES['tahoe']
+    
+    # Suburban
+    if 'suburban' in model_lower:
+        return VEHICLE_IMAGES['suburban']
+    
+    # Traverse
+    if 'traverse' in model_lower:
+        return VEHICLE_IMAGES['traverse']
+    
+    # Equinox EV (check before regular Equinox)
+    if 'equinox' in model_lower and 'ev' in model_lower:
+        return VEHICLE_IMAGES['equinox_ev']
+    
+    # Equinox
+    if 'equinox' in model_lower:
+        return VEHICLE_IMAGES['equinox']
+    
+    # Trailblazer
+    if 'trailblazer' in model_lower:
+        return VEHICLE_IMAGES['trailblazer']
+    
+    # Trax
+    if 'trax' in model_lower:
+        return VEHICLE_IMAGES['trax']
+    
+    # Blazer
+    if 'blazer' in model_lower:
+        return VEHICLE_IMAGES['blazer']
+    
+    # Malibu
+    if 'malibu' in model_lower:
+        return VEHICLE_IMAGES['malibu']
+    
+    # Bolt EV/EUV
+    if 'bolt' in model_lower:
+        return VEHICLE_IMAGES['bolt']
+    
+    # Express
+    if 'express' in model_lower:
+        return VEHICLE_IMAGES['express']
+    
+    # Default
+    return VEHICLE_IMAGES['default']
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def get_engine(cylinders, model: str) -> str:
+    """Derive engine string from cylinders and model"""
+    model_upper = model.upper()
+    
+    if 'EV' in model_upper or 'ELECTRIC' in model_upper:
+        return 'Electric Motor'
+    
+    if 'CORVETTE' in model_upper:
+        if 'E-RAY' in model_upper:
+            return '6.2L V8 + Electric Motor'
+        return '6.2L V8'
+    
+    try:
+        cyl = int(cylinders)
+        if cyl == 8:
+            if 'HD' in model_upper or '2500' in model_upper or '3500' in model_upper:
+                return '6.6L V8'
+            return '6.2L V8'
+        elif cyl == 6:
+            return '3.6L V6'
+        elif cyl == 4:
+            return '2.0L Turbo I4'
+        elif cyl == 3:
+            return '1.2L Turbo I3'
+    except (ValueError, TypeError):
+        pass
+    
+    return '2.0L Turbo'
+
+
+def get_transmission(model: str) -> str:
+    """Derive transmission from model"""
+    model_upper = model.upper()
+    
+    if 'EV' in model_upper:
+        return 'Single-Speed Direct Drive'
+    if 'CORVETTE' in model_upper:
+        return '8-Speed Dual Clutch'
+    if 'SILVERADO' in model_upper or 'COLORADO' in model_upper:
+        return '10-Speed Automatic'
+    
+    return '9-Speed Automatic'
+
+
+def parse_drivetrain(body: str, model: str = '') -> str:
+    """Parse drivetrain from PBS Body field"""
+    model_upper = model.upper() if model else ''
+    
+    if 'CORVETTE' in model_upper:
+        if 'E-RAY' in model_upper:
+            return 'AWD'
+        return 'RWD'
+    
+    if 'CK' in model_upper or '4WD' in model_upper or '4X4' in model_upper:
+        return '4WD'
+    
+    if not body or pd.isna(body):
+        return 'FWD'
+    
+    body_upper = str(body).upper()
+    if '4WD' in body_upper or '4X4' in body_upper:
+        return '4WD'
+    if 'AWD' in body_upper:
+        return 'AWD'
+    if 'RWD' in body_upper:
+        return 'RWD'
+    
+    return 'FWD'
+
+
+def get_fuel_type(model: str) -> str:
+    """Determine fuel type from model"""
+    model_upper = model.upper()
+    
+    if 'EV' in model_upper or 'ELECTRIC' in model_upper:
+        return 'Electric'
+    if 'E-RAY' in model_upper:
+        return 'Hybrid'
+    
+    return 'Gasoline'
+
+
+def get_mpg(model: str):
+    """Get MPG estimates based on model"""
+    model_upper = model.upper()
+    
+    if 'EV' in model_upper:
+        return None, None, 300
+    
+    if 'SILVERADO' in model_upper or 'COLORADO' in model_upper:
+        if '2500' in model_upper or '3500' in model_upper:
+            return 15, 19, None
+        return 17, 23, None
+    
+    if 'TAHOE' in model_upper or 'SUBURBAN' in model_upper:
+        return 16, 21, None
+    if 'TRAVERSE' in model_upper:
+        return 20, 27, None
+    if 'EQUINOX' in model_upper:
+        return 26, 31, None
+    if 'TRAILBLAZER' in model_upper:
+        return 28, 33, None
+    if 'TRAX' in model_upper:
+        return 28, 32, None
+    if 'CORVETTE' in model_upper:
+        return 16, 24, None
+    
+    return 24, 30, None
+
+
+def get_features(trim: str, model: str) -> List[str]:
+    """Generate feature list based on trim and model"""
+    features = ['Apple CarPlay', 'Android Auto', 'Backup Camera']
+    
+    trim_upper = (trim or '').upper()
+    model_upper = model.upper()
+    
+    if 'LT' in trim_upper or 'RS' in trim_upper:
+        features.extend(['Heated Seats', 'Remote Start'])
+    
+    if 'Z71' in trim_upper:
+        features.extend(['Z71 Off-Road Package', 'Skid Plates'])
+    
+    if 'ZR2' in trim_upper:
+        features.extend(['ZR2 Off-Road Package', 'Multimatic DSSV Dampers'])
+    
+    if 'TRAIL BOSS' in trim_upper:
+        features.extend(['Trail Boss Package', 'Lifted Suspension'])
+    
+    if 'PREMIER' in trim_upper or 'HIGH COUNTRY' in trim_upper:
+        features.extend(['Leather Seats', 'Bose Audio', 'Panoramic Sunroof'])
+    
+    if 'Z06' in trim_upper or 'Z06' in model_upper:
+        features.extend(['Z06 Performance Package', 'Carbon Fiber Aero'])
+    
+    if 'CORVETTE' in model_upper:
+        features.extend(['Performance Exhaust', 'Head-Up Display'])
+    
+    if 'EV' in model_upper:
+        features.extend(['One-Pedal Driving', 'DC Fast Charging'])
+    
+    return list(set(features))
+
+
+def get_body_style(body_type: str, model: str, cab_style: str = None) -> str:
+    """Determine body style from PBS data and model info"""
+    model_upper = model.upper()
+    
+    if 'SILVERADO' in model_upper or 'COLORADO' in model_upper:
+        return 'Truck'
+    
+    if body_type and body_type.strip() in BODY_TYPE_MAP:
+        return BODY_TYPE_MAP[body_type.strip()]
+    
+    if any(x in model_upper for x in ['TAHOE', 'SUBURBAN', 'TRAVERSE', 'EQUINOX', 'TRAILBLAZER', 'TRAX', 'BLAZER']):
+        return 'SUV'
+    if 'CORVETTE' in model_upper or 'CAMARO' in model_upper:
+        return 'Coupe'
+    if 'MALIBU' in model_upper:
+        return 'Sedan'
+    if 'EXPRESS' in model_upper:
+        return 'Van'
+    if 'BOLT' in model_upper:
+        return 'Electric'
+    
+    return 'SUV'
+
+
+# =============================================================================
+# INVENTORY LOADING
+# =============================================================================
+
+def load_inventory_from_excel() -> List[dict]:
+    """Load and transform PBS Excel export to vehicle records"""
+    
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'inventory.xlsx'),
+        '/app/data/inventory.xlsx',
+        'data/inventory.xlsx',
+        'inventory.xlsx',
+    ]
+    
+    excel_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            excel_path = path
+            break
+    
+    if not excel_path:
+        print("Warning: No inventory file found, using empty inventory")
+        return []
+    
+    try:
+        df = pd.read_excel(excel_path)
+        print(f"Reading inventory from {excel_path}")
+    except Exception as e:
+        print(f"Error reading inventory: {e}")
+        return []
+    
+    vehicles = []
+    
+    for idx, row in df.iterrows():
+        try:
+            msrp = float(row.get('MSRP', 0) or 0)
+            if msrp <= 0:
+                continue
+            
+            model = str(row.get('Model', ''))
+            trim = str(row.get('Trim', ''))
+            body = str(row.get('Body', ''))
+            body_type = str(row.get('Body Type', ''))
+            cylinders = row.get('Cylinders', 0)
+            exterior_color = str(row.get('Exterior Color', '')).strip()
+            
+            model_info = parse_model_code(model)
+            cab_style = model_info.get('cab')
+            bed_length = model_info.get('bed')
+            drivetrain = model_info.get('drive') or parse_drivetrain(body, model)
+            
+            fuel_type = get_fuel_type(model)
+            mpg_city, mpg_highway, ev_range = get_mpg(model)
+            
+            vehicle = {
+                'id': f"v{str(row.get('Stock Number', idx)).strip()}",
+                'vin': str(row.get('VIN', '')).strip(),
+                'year': int(row.get('Year', 2024)),
+                'make': str(row.get('Make', 'Chevrolet')).strip().title(),
+                'model': model.strip().title(),
+                'trim': trim.strip(),
+                'bodyStyle': get_body_style(body_type, model, cab_style),
+                'exteriorColor': exterior_color.title(),
+                'interiorColor': 'Jet Black',
+                'mileage': 0,
+                'price': round(msrp * 0.97, 2),
+                'msrp': msrp,
+                'engine': get_engine(cylinders, model),
+                'transmission': get_transmission(model),
+                'drivetrain': drivetrain,
+                'fuelType': fuel_type,
+                'mpgCity': mpg_city,
+                'mpgHighway': mpg_highway,
+                'evRange': ev_range,
+                'features': get_features(trim, model),
+                'imageUrl': get_image_url(model, exterior_color, cab_style),
+                'status': CATEGORY_MAP.get(str(row.get('Category', '')).strip(), 'In Stock'),
+                'stockNumber': str(row.get('Stock Number', '')).strip(),
+                'cabStyle': cab_style,
+                'bedLength': bed_length,
+            }
+            
+            vehicles.append(vehicle)
+            
+        except Exception as e:
+            print(f"Error processing row {idx}: {e}")
+            continue
+    
+    return vehicles
+
+
+# Load inventory on module import
+INVENTORY = load_inventory_from_excel()
+print(f"Loaded {len(INVENTORY)} vehicles from PBS inventory")
+
+
+# =============================================================================
+# API ENDPOINTS
+# =============================================================================
+
+@router.get("", response_model=InventoryResponse)
+async def get_inventory(
+    body_style: Optional[str] = Query(None, description="Filter by body style"),
+    make: Optional[str] = Query(None, description="Filter by make"),
+    min_price: Optional[float] = Query(None, description="Minimum price"),
+    max_price: Optional[float] = Query(None, description="Maximum price"),
+    fuel_type: Optional[str] = Query(None, description="Filter by fuel type"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    cab_style: Optional[str] = Query(None, description="Filter by cab style"),
+):
+    """Get all vehicles in inventory with optional filters"""
+    vehicles = INVENTORY.copy()
+    
+    if body_style:
+        vehicles = [v for v in vehicles if v["bodyStyle"].lower() == body_style.lower()]
+    if make:
+        vehicles = [v for v in vehicles if v["make"].lower() == make.lower()]
+    if min_price:
+        vehicles = [v for v in vehicles if v["price"] >= min_price]
+    if max_price:
+        vehicles = [v for v in vehicles if v["price"] <= max_price]
+    if fuel_type:
+        vehicles = [v for v in vehicles if v["fuelType"].lower() == fuel_type.lower()]
+    if status:
+        vehicles = [v for v in vehicles if status.lower() in v["status"].lower()]
+    if cab_style:
+        vehicles = [v for v in vehicles if v.get("cabStyle") and cab_style.lower() in v["cabStyle"].lower()]
+    
+    vehicles.sort(key=lambda x: x["price"], reverse=True)
+    
+    featured = []
+    seen_models = set()
+    for v in vehicles:
+        if v["model"] not in seen_models and len(featured) < 6:
+            featured.append(v)
+            seen_models.add(v["model"])
+    
+    return InventoryResponse(
+        vehicles=vehicles,
+        total=len(vehicles),
+        featured=featured
+    )
+
+
+@router.get("/featured", response_model=List[Vehicle])
+async def get_featured_vehicles():
+    """Get featured vehicles - variety of top models"""
+    featured = []
+    seen_models = set()
+    sorted_inv = sorted(INVENTORY, key=lambda x: x["price"], reverse=True)
+    
+    for v in sorted_inv:
+        model_key = v["model"].split()[0]
+        if model_key not in seen_models and len(featured) < 8:
+            featured.append(v)
+            seen_models.add(model_key)
+    
+    return featured
+
+
+@router.get("/search")
+async def search_inventory(q: str = Query(..., min_length=1)):
+    """Search inventory"""
+    query = q.lower()
+    results = [
+        v for v in INVENTORY
+        if query in v["make"].lower()
+        or query in v["model"].lower()
+        or query in v["vin"].lower()
+        or query in v["stockNumber"].lower()
+        or query in v["bodyStyle"].lower()
+        or query in v["exteriorColor"].lower()
+        or query in v["trim"].lower()
+        or (v.get("cabStyle") and query in v["cabStyle"].lower())
+    ]
+    return {"vehicles": results, "total": len(results), "query": q}
+
+
+@router.get("/models")
+async def get_available_models():
+    """Get available models for filtering"""
+    models = {}
+    for v in INVENTORY:
+        model = v["model"]
+        if model not in models:
+            models[model] = {"count": 0, "minPrice": v["price"], "maxPrice": v["price"]}
+        models[model]["count"] += 1
+        models[model]["minPrice"] = min(models[model]["minPrice"], v["price"])
+        models[model]["maxPrice"] = max(models[model]["maxPrice"], v["price"])
+    
+    return {"models": models, "total": len(models)}
+
+
+@router.get("/stats")
+async def get_inventory_stats():
+    """Get inventory statistics"""
+    if not INVENTORY:
+        return {"total": 0}
+    
+    by_body = {}
+    by_status = {}
+    by_cab = {}
+    
+    for v in INVENTORY:
+        by_body[v["bodyStyle"]] = by_body.get(v["bodyStyle"], 0) + 1
+        by_status[v["status"]] = by_status.get(v["status"], 0) + 1
+        if v.get("cabStyle"):
+            by_cab[v["cabStyle"]] = by_cab.get(v["cabStyle"], 0) + 1
+    
+    prices = [v["price"] for v in INVENTORY]
+    
+    return {
+        "total": len(INVENTORY),
+        "byBodyStyle": by_body,
+        "byStatus": by_status,
+        "byCabStyle": by_cab,
+        "priceRange": {"min": min(prices), "max": max(prices), "avg": sum(prices) / len(prices)}
+    }
+
+
+@router.get("/{vehicle_id}", response_model=Vehicle)
+async def get_vehicle_by_id(vehicle_id: str):
+    """Get vehicle by ID"""
+    vehicle = next((v for v in INVENTORY if v["id"] == vehicle_id), None)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    return vehicle
+
+
+@router.get("/vin/{vin}", response_model=Vehicle)
+async def get_vehicle_by_vin(vin: str):
+    """Get vehicle by VIN"""
+    vehicle = next((v for v in INVENTORY if v["vin"].upper() == vin.upper()), None)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    return vehicle
+
+
+@router.get("/stock/{stock_number}", response_model=Vehicle)
+async def get_vehicle_by_stock(stock_number: str):
+    """Get vehicle by stock number"""
+    vehicle = next((v for v in INVENTORY if v["stockNumber"] == stock_number), None)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    return vehicle
