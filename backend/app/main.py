@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 import os
 
 # Import routes
-from kiosk_routes import router as kiosk_router
+from app.kiosk_routes import router as kiosk_router
 
 # Lifespan handler for startup/shutdown
 @asynccontextmanager
