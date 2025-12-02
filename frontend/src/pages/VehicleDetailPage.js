@@ -6,6 +6,49 @@ import { inventoryAPI, recommendationsAPI } from '../services/api';
 import VehicleCard from '../components/VehicleCard';
 import LeadForm from '../components/LeadForm';
 
+// Model-aware fallback images using reliable Wikimedia Commons URLs
+const FALLBACK_IMAGES = {
+  corvette: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/2020_Chevrolet_Corvette_C8_rearview_cropped.jpg/800px-2020_Chevrolet_Corvette_C8_rearview_cropped.jpg',
+  camaro: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/2019_Chevrolet_Camaro_2SS%2C_front_9.30.19.jpg/800px-2019_Chevrolet_Camaro_2SS%2C_front_9.30.19.jpg',
+  silverado: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/2019_Chevrolet_Silverado_LT_Trail_Boss%2C_front_9.28.19.jpg/800px-2019_Chevrolet_Silverado_LT_Trail_Boss%2C_front_9.28.19.jpg',
+  colorado: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2021_Chevrolet_Colorado_ZR2_Midnight%2C_front_9.26.21.jpg/800px-2021_Chevrolet_Colorado_ZR2_Midnight%2C_front_9.26.21.jpg',
+  tahoe: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg/800px-2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg',
+  suburban: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/2021_Chevrolet_Suburban_High_Country%2C_front_2.27.21.jpg/800px-2021_Chevrolet_Suburban_High_Country%2C_front_2.27.21.jpg',
+  traverse: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/2018_Chevrolet_Traverse_High_Country%2C_front_7.2.18.jpg/800px-2018_Chevrolet_Traverse_High_Country%2C_front_7.2.18.jpg',
+  equinox: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/2022_Chevrolet_Equinox_RS_AWD_in_Mosaic_Black_Metallic%2C_Front_Left%2C_01-22-2022.jpg/800px-2022_Chevrolet_Equinox_RS_AWD_in_Mosaic_Black_Metallic%2C_Front_Left%2C_01-22-2022.jpg',
+  trailblazer: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/2021_Chevrolet_Trailblazer_RS_AWD_in_Zeus_Bronze_Metallic%2C_Front_Left%2C_11-06-2020.jpg/800px-2021_Chevrolet_Trailblazer_RS_AWD_in_Zeus_Bronze_Metallic%2C_Front_Left%2C_11-06-2020.jpg',
+  trax: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/2024_Chevrolet_Trax_2RS_in_Cacti_Green%2C_Front_Left%2C_06-15-2023.jpg/800px-2024_Chevrolet_Trax_2RS_in_Cacti_Green%2C_Front_Left%2C_06-15-2023.jpg',
+  blazer: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/2019_Chevrolet_Blazer_RS_AWD%2C_front_9.1.19.jpg/800px-2019_Chevrolet_Blazer_RS_AWD%2C_front_9.1.19.jpg',
+  malibu: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/2019_Chevrolet_Malibu_RS%2C_front_11.3.19.jpg/800px-2019_Chevrolet_Malibu_RS%2C_front_11.3.19.jpg',
+  bolt: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/2017_Chevrolet_Bolt_EV_Premier_in_Kinetic_Blue_Metallic%2C_front_left.jpg/800px-2017_Chevrolet_Bolt_EV_Premier_in_Kinetic_Blue_Metallic%2C_front_left.jpg',
+  express: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Chevrolet_Express_%28facelift%29.jpg/800px-Chevrolet_Express_%28facelift%29.jpg',
+  default: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg/800px-2021_Chevrolet_Tahoe_Z71%2C_front_8.16.20.jpg',
+};
+
+// Get the correct fallback image based on vehicle model
+function getFallbackImage(model) {
+  if (!model) return FALLBACK_IMAGES.default;
+  
+  const modelLower = model.toLowerCase();
+  
+  if (modelLower.includes('corvette')) return FALLBACK_IMAGES.corvette;
+  if (modelLower.includes('camaro')) return FALLBACK_IMAGES.camaro;
+  if (modelLower.includes('silverado')) return FALLBACK_IMAGES.silverado;
+  if (modelLower.includes('colorado')) return FALLBACK_IMAGES.colorado;
+  if (modelLower.includes('tahoe')) return FALLBACK_IMAGES.tahoe;
+  if (modelLower.includes('suburban')) return FALLBACK_IMAGES.suburban;
+  if (modelLower.includes('traverse')) return FALLBACK_IMAGES.traverse;
+  if (modelLower.includes('equinox')) return FALLBACK_IMAGES.equinox;
+  if (modelLower.includes('trailblazer')) return FALLBACK_IMAGES.trailblazer;
+  if (modelLower.includes('trax')) return FALLBACK_IMAGES.trax;
+  if (modelLower.includes('blazer')) return FALLBACK_IMAGES.blazer;
+  if (modelLower.includes('malibu')) return FALLBACK_IMAGES.malibu;
+  if (modelLower.includes('bolt')) return FALLBACK_IMAGES.bolt;
+  if (modelLower.includes('express')) return FALLBACK_IMAGES.express;
+  
+  return FALLBACK_IMAGES.default;
+}
+
 function VehicleDetailPage() {
   const { id } = useParams();
   const { trackVehicleView } = useKiosk();
@@ -53,6 +96,15 @@ function VehicleDetailPage() {
     setShowLeadForm(true);
   };
 
+  // Handle image error with model-aware fallback
+  const handleImageError = (e) => {
+    if (!vehicle) return;
+    const fallbackUrl = getFallbackImage(vehicle.model);
+    if (e.target.src !== fallbackUrl) {
+      e.target.src = fallbackUrl;
+    }
+  };
+
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
@@ -89,9 +141,7 @@ function VehicleDetailPage() {
               src={vehicle.imageUrl}
               alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
               style={styles.image}
-              onError={(e) => {
-                e.target.src = 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=800';
-              }}
+              onError={handleImageError}
             />
             {savings > 500 && (
               <div style={styles.savingsBadge}>
