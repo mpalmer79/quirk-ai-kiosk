@@ -7,6 +7,51 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
   const [error, setError] = useState(null);
   const [sortBy, setSortBy] = useState('recommended');
 
+  // Generate Quirk Chevy NH website URL for a vehicle
+  const generateDealerUrl = (vehicle) => {
+    const baseUrl = 'https://www.quirkchevynh.com/inventory/';
+    
+    // Helper to slugify text (lowercase, replace spaces with hyphens)
+    const slugify = (text) => {
+      if (!text) return '';
+      return text.toString().toLowerCase()
+        .replace(/\s+/g, '-')      // Replace spaces with hyphens
+        .replace(/[^\w\-]/g, '')   // Remove special characters except hyphens
+        .replace(/\-\-+/g, '-')    // Replace multiple hyphens with single
+        .replace(/^-+/, '')        // Trim hyphens from start
+        .replace(/-+$/, '');       // Trim hyphens from end
+    };
+    
+    // Build URL components
+    const condition = 'new'; // All inventory appears to be new
+    const year = vehicle.year || '2026';
+    const make = 'chevrolet';
+    const model = slugify(vehicle.model || '');
+    const trim = slugify(vehicle.trim || '');
+    const drivetrain = slugify(vehicle.drivetrain || vehicle.driveTrain || '4wd');
+    const bodyType = slugify(vehicle.cabType || vehicle.bodyStyle || vehicle.body || '');
+    const vin = (vehicle.vin || vehicle.VIN || '').toLowerCase();
+    
+    // Construct URL: new-year-chevrolet-model-trim-drivetrain-bodytype-vin
+    const urlParts = [condition, year, make, model, trim, drivetrain, bodyType, vin]
+      .filter(part => part && part.length > 0); // Remove empty parts
+    
+    return baseUrl + urlParts.join('-') + '/';
+  };
+
+  // Handle vehicle card click - open dealership website
+  const handleVehicleClick = (vehicle) => {
+    const dealerUrl = generateDealerUrl(vehicle);
+    window.open(dealerUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  // Handle View Details button - internal navigation (for future use)
+  const handleViewDetails = (vehicle, e) => {
+    e.stopPropagation(); // Prevent card click
+    updateCustomerData({ selectedVehicle: vehicle });
+    navigateTo('vehicleDetail');
+  };
+
   useEffect(() => {
     const fetchVehicles = async () => {
       setLoading(true);
@@ -109,11 +154,6 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
 
     fetchVehicles();
   }, [customerData, sortBy]);
-
-  const handleVehicleSelect = (vehicle) => {
-    updateCustomerData({ selectedVehicle: vehicle });
-    navigateTo('vehicleDetail');
-  };
 
   // Generate gradient based on color
   const getGradient = (color) => {
@@ -227,7 +267,8 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
             <div 
               key={vehicle.id || vehicle.stockNumber || index}
               style={styles.vehicleCard}
-              onClick={() => handleVehicleSelect(vehicle)}
+              onClick={() => handleVehicleClick(vehicle)}
+              title={`View on QuirkChevyNH.com`}
             >
               {/* Match Score - only show if from quiz */}
               {vehicle.matchScore && customerData.quizAnswers && (
@@ -287,10 +328,16 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
                   </div>
                 </div>
 
-                <button style={styles.viewDetailsButton}>
+                <button 
+                  style={styles.viewDetailsButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleVehicleClick(vehicle);
+                  }}
+                >
                   View Details
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
                   </svg>
                 </button>
               </div>
