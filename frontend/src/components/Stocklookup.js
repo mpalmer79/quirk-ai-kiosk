@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { inventoryAPI } from '../services/api';
+import api from './api';
 
 const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
   const [stockNumber, setStockNumber] = useState('');
@@ -36,8 +36,7 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
     const fullStockNumber = STOCK_PREFIX + stockNumber;
 
     try {
-      const response = await inventoryAPI.getByStock(fullStockNumber);
-      const vehicle = response.data;
+      const vehicle = await api.getVehicleByStock(fullStockNumber);
       
       if (vehicle) {
         setSearchResult(vehicle);
