@@ -1,102 +1,181 @@
-## 🚀 QUIRK AI Kiosk Project
+# 🚀 Quirk AI Kiosk  
+A next-generation AI-powered showroom experience for Quirk dealerships.
 
-This is the official repository for the **QUIRK AI Kiosk**—a next-generation, AI-powered car dealership showroom application.
+The **Quirk AI Kiosk** is a unified, production-ready monorepo that powers an interactive in-store kiosk experience. Customers can browse inventory, compare vehicles, submit leads, and receive AI-generated vehicle recommendations — all through a secure, locked-down touchscreen interface.
 
-The project is structured as a **Monorepo**, housing three interconnected services: the Kiosk User Interface (Frontend), the API Gateway (Backend), and the Vehicle Recommendation Engine (AI Service).
+This repo contains **three major services**:
 
----
-
-## 🏗️ Project Architecture Overview
-
-| Component | Role | Technology | Deployment Strategy |
-| :--- | :--- | :--- | :--- |
-| **Frontend** | The customer-facing, locked-down UI running on the physical kiosk display. | **React, JavaScript** | Built artifact deployed to physical kiosks via a Device Management Platform (DMP). |
-| **Backend Gateway** | Routes all Kiosk requests, manages security, and handles integration with external systems. | **Python (FastAPI)** | Containerized deployment (Docker) to a cloud server. |
-| **AI Service** | Serves real-time vehicle recommendations and predictive pricing models. | **Python (Scikit-learn, Pandas)** | Containerized deployment (Docker) to a high-performance serving platform. |
+1. **Frontend Kiosk App** (React)
+2. **Backend Gateway API** (FastAPI)
+3. **AI Recommendation Service** (Python)
 
 ---
 
-## 📂 Repository Structure
+# 🏗️ Architecture Overview
 
-The project uses a clear monorepo layout to isolate dependencies and deployments:
+| Component | Purpose | Tech Stack | Deployment |
+|----------|---------|------------|-------------|
+| **Frontend** | Customer-facing kiosk UI | React, Vite, Tailwind | Bundled + deployed to kiosk devices (DMP) |
+| **Backend Gateway** | API routing, auth, logging, lead submission | FastAPI, Python | Docker container on central server |
+| **AI Service** | Real-time vehicle recommendation engine | Python, custom ML model | Docker container on high-performance node |
+
+All services communicate over **internal REST endpoints**. The system is deployed using a modular multi-container design.
 
 ---
 
-## 🛠️ Getting Started (Local Development)
+# 📁 Project Structure
 
-To run the full QUIRK AI system locally, you will need **Docker** and **Docker Compose** installed.
+```
+quirk-ai-kiosk/
+│
+├── frontend/               # React Kiosk UI
+│   ├── public/
+│   ├── src/
+│   ├── Dockerfile
+│   └── .env.development
+│
+├── backend/                # API Gateway
+│   ├── app/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── .env.development
+│
+├── ai_service/             # Vehicle Recommendation Engine
+│   ├── predictor/
+│   ├── models/
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── docker-compose.yml
+├── README.md
+└── LICENSE
+```
 
-### 1. Configure Local Secrets
+---
 
-**Security Note:** We do **not** commit actual API keys. For local testing, create the following environment files in their respective directories and populate them with **MOCK data** or local development keys:
+# ⚙️ Local Development Setup
 
-* **`/backend/.env.development`**
-    * `PBS_API_KEY=mock-pbs-key-dev`
-    * `CRM_API_KEY=mock-crm-key-dev`
-* **`/frontend/.env.development`**
-    * `REACT_APP_API_URL=http://localhost:8000/api/v1` (The Backend Gateway address)
+You’ll need:
 
-### 2. Mock Data Initialization
+- Docker
+- Docker Compose
+- Node 18+ (optional if you want to run frontend natively)
 
-The system currently relies on the **Mock Data Model** defined for the PBS Inventory API integration. Ensure a mock JSON file is available within the **`/backend`** directory that contains the structure described in the planning phase.
+### 1. Create Local Environment Files
 
-### 3. Build and Run Services
+#### **`backend/.env.development`**
+```
+PBS_API_KEY=mock-pbs-key-dev
+CRM_API_KEY=mock-crm-key-dev
+LOG_LEVEL=info
+```
 
-Use Docker Compose to build and start all three services simultaneously:
+#### **`frontend/.env.development`**
+```
+REACT_APP_API_URL=http://localhost:8000/api/v1
+```
+
+#### **`ai_service/.env.development`**
+```
+MODEL_PATH=./models/default-model.pkl
+```
+
+> Production secrets are not stored here. These values are mock-key safe defaults for local use.
+
+---
+
+# 🧪 Running the Entire Stack (Local Demo)
+
+From the repo root:
 
 ```bash
 docker-compose build
 docker-compose up
-ServiceLocal URLBackend Gatewayhttp://localhost:8000Frontend Kiosk UIhttp://localhost:3000AI ServiceInternal (not publicly exposed)
+```
 
-Markdown## 🚀 QUIRK AI Kiosk Project
+After startup:
 
-This is the official repository for the **QUIRK AI Kiosk**—a next-generation, AI-powered car dealership showroom application.
-
-The project is structured as a **Monorepo**, housing three interconnected services: the Kiosk User Interface (Frontend), the API Gateway (Backend), and the Vehicle Recommendation Engine (AI Service).
-
----
-
-## 🏗️ Project Architecture Overview
-
-| Component | Role | Technology | Deployment Strategy |
-| :--- | :--- | :--- | :--- |
-| **Frontend** | The customer-facing, locked-down UI running on the physical kiosk display. | **React, JavaScript** | Built artifact deployed to physical kiosks via a Device Management Platform (DMP). |
-| **Backend Gateway** | Routes all Kiosk requests, manages security, and handles integration with external systems. | **Python (FastAPI)** | Containerized deployment (Docker) to a cloud server. |
-| **AI Service** | Serves real-time vehicle recommendations and predictive pricing models. | **Python (Scikit-learn, Pandas)** | Containerized deployment (Docker) to a high-performance serving platform. |
+| Service | Local URL |
+|---------|-----------|
+| **Frontend** | http://localhost:3000 |
+| **Backend Gateway** | http://localhost:8000 |
+| **AI Service** | http://localhost:5000 |
 
 ---
 
-## 📂 Repository Structure
+# 🔧 Running Services Individually
 
-The project uses a clear monorepo layout to isolate dependencies and deployments:
+### Frontend
+```
+cd frontend
+npm install
+npm run dev
+```
 
-quirk-ai-kiosk/├── .github/              # GitHub Actions CI/CD Workflows├── frontend/             # Kiosk UI (React)├── backend/              # API Gateway (FastAPI)├── ai_service/           # ML Model Serving Logic├── .gitignore            # Combined for Python, Node, and security├── README.md             # This file└── docker-compose.yml    # For running all services locally
+### Backend Gateway
+```
+cd backend
+uvicorn app.main:app --reload --port 8000
+```
+
+### AI Recommender
+```
+cd ai_service
+python predictor/server.py
+```
+
 ---
 
-## 🛠️ Getting Started (Local Development)
+# 🤖 Vehicle Recommendation Engine
 
-To run the full QUIRK AI system locally, you will need **Docker** and **Docker Compose** installed.
+The AI service consumes structured inventory data and customer preference signals to generate:
 
-### 1. Configure Local Secrets
+- Ranked vehicle recommendations  
+- Similar-vehicle suggestions  
+- Feature-weighted scoring outputs  
 
-**Security Note:** We do **not** commit actual API keys. For local testing, create the following environment files in their respective directories and populate them with **MOCK data** or local development keys:
+Model files are stored separately to keep the repo lightweight.
 
-* **`/backend/.env.development`**
-    * `PBS_API_KEY=mock-pbs-key-dev`
-    * `CRM_API_KEY=mock-crm-key-dev`
-* **`/frontend/.env.development`**
-    * `REACT_APP_API_URL=http://localhost:8000/api/v1` (The Backend Gateway address)
+---
 
-### 2. Mock Data Initialization
+# 🧱 Production Deployment Strategy
 
-The system currently relies on the **Mock Data Model** defined for the PBS Inventory API integration. Ensure a mock JSON file is available within the **`/backend`** directory that contains the structure described in the planning phase.
+- **Kiosk Frontend**  
+  Bundled and deployed through the dealership’s Device Management Platform (DMP). Runs in secure kiosk-mode.
 
-### 3. Build and Run Services
+- **Backend Gateway**  
+  Docker container deployed to Quirk’s internal server environment.
 
-Use Docker Compose to build and start all three services simultaneously:
+- **AI Service**  
+  Runs in an isolated container on a dedicated compute node for real-time inference.
 
-```bash
-docker-compose build
-docker-compose up
-ServiceLocal URLBackend Gatewayhttp://localhost:8000Frontend Kiosk UIhttp://localhost:3000AI ServiceInternal (not publicly exposed)🧩 Core Integration Points1. DMS Inventory Integration (PBS)API Target: PBS Dealer Management Systems (DMS) Partner HUB.Protocol: Simulated via RESTful JSON in the mock phase; actual integration will use the required PBS protocol (e.g., SOAP/XML/JSON HTTP Posts).Data Flow: The Backend Gateway translates the proprietary PBS data structure into the standardized internal Vehicle object schema used by the Frontend and the AI Service.2. Foundational Recommendation ModelType: Initial model is Content-Based Filtering.Goal: Recommend vehicles that share key characteristics (Make, Body Style, Price Range) with the vehicle a customer is currently viewing on the Kiosk UI.🛡️ Licensing and SecurityLicenseThis project currently uses the MIT License for its core structure, providing maximum flexibility for internal use and integration with open-source libraries. Note: Due to the commercial nature of the Backend Gateway and AI Service, these components may transition to a Proprietary License upon full commercial deployment.Security Best PracticesSecrets Management: API keys and sensitive credentials are never committed to the repository. They are managed locally via .env files (ignored by Git) and in production via GitHub Actions Secrets.Git LFS: The /ai_service/models directory uses Git LFS (Large File Storage) to track trained model file versions without bloating the main repository.
+- **Logging**  
+  Centralized logging (stdout + gateway instrumentation) for audit and improvement.
+
+---
+
+# 📦 Data & Mocking
+
+Local development uses:
+
+- Mock PBS inventory data  
+- Mock CRM lead submission  
+- Local fallback model  
+
+This allows full kiosk simulation with zero external dependencies.
+
+---
+
+# 🧭 Roadmap
+
+- 🔒 Full auth handshake (kiosk → gateway)  
+- 📈 Dealer-specific recommendation tuning  
+- ⚡ PBS real-time inventory sync  
+- 📤 Automated CRM lead submission  
+- 🖼 Enhanced comparison UI  
+
+---
+
+# 📝 License
+
+This project is licensed under the **MIT License**.
