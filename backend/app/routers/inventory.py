@@ -7,6 +7,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 import pandas as pd
 import os
+import re
 
 router = APIRouter()
 
@@ -83,10 +84,6 @@ BODY_CODE_MAP = {
     '543': {'cab': 'Crew Cab', 'bed': 'Short Bed'},
     '743': {'cab': 'Crew Cab', 'bed': 'Standard Bed'},
     '943': {'cab': 'Crew Cab', 'bed': 'Long Bed'},
-    # Colorado specific codes
-    '410': {'cab': 'Extended Cab', 'bed': 'Standard Bed'},
-    '442': {'cab': 'Crew Cab', 'bed': 'Short Bed'},
-    '443': {'cab': 'Crew Cab', 'bed': 'Standard Bed'},
 }
 
 
@@ -102,16 +99,12 @@ def parse_model_code(model_str: str) -> dict:
     
     model_upper = model_str.upper()
     
-    # Look for model codes like CK10703, CC20943, etc.
-    import re
-    
     # Pattern for Silverado/Sierra codes: CC/CK + 10/20/30 + 3-digit body code
     pattern = r'(CC|CK)([123]0)(\d{3})'
     match = re.search(pattern, model_upper)
     
     if match:
         drive_code = match.group(1)
-        series = match.group(2)
         body_code = match.group(3)
         
         result['drive'] = '4WD' if drive_code == 'CK' else '2WD'
@@ -119,396 +112,80 @@ def parse_model_code(model_str: str) -> dict:
         if body_code in BODY_CODE_MAP:
             result['cab'] = BODY_CODE_MAP[body_code]['cab']
             result['bed'] = BODY_CODE_MAP[body_code]['bed']
-        
-        return result
-    
-    # Pattern for Colorado codes: CC/CK + 204 + 2-digit body code
-    pattern_colorado = r'(CC|CK)(204)(\d{2})'
-    match_colorado = re.search(pattern_colorado, model_upper)
-    
-    if match_colorado:
-        drive_code = match_colorado.group(1)
-        body_code = match_colorado.group(2) + match_colorado.group(3)[-2:]
-        
-        result['drive'] = '4WD' if drive_code == 'CK' else '2WD'
-        
-        # Colorado body codes
-        if '42' in body_code or '43' in body_code:
-            result['cab'] = 'Crew Cab'
-            result['bed'] = 'Standard Bed'
-        elif '10' in body_code:
-            result['cab'] = 'Extended Cab'
-            result['bed'] = 'Standard Bed'
-        
-        return result
     
     return result
 
 
 # =============================================================================
-# COLOR NORMALIZATION
+# VEHICLE IMAGES - Using verified working Unsplash URLs
 # =============================================================================
-
-COLOR_MAP = {
-    # Whites
-    'summit white': 'white',
-    'iridescent pearl tricoat': 'white',
-    'iridescent pearl': 'white',
-    'polar white': 'white',
-    'arctic white': 'white',
-    'pearl white': 'white',
-    'white frost': 'white',
-    'summit white tricoat': 'white',
-    'white': 'white',
-    # Blacks
-    'black': 'black',
-    'mosaic black': 'black',
-    'mosaic black metallic': 'black',
-    'black metallic': 'black',
-    'midnight black': 'black',
-    'gloss black': 'black',
-    'onyx black': 'black',
-    # Silvers/Grays
-    'silver ice metallic': 'silver',
-    'sterling gray': 'silver',
-    'satin steel metallic': 'gray',
-    'satin steel': 'gray',
-    'shadow gray metallic': 'gray',
-    'shadow gray': 'gray',
-    'graphite gray': 'gray',
-    'graphite metallic': 'gray',
-    'smoke gray': 'gray',
-    'sterling silver': 'silver',
-    'quicksilver metallic': 'silver',
-    'silver sage metallic': 'silver',
-    # Reds
-    'radiant red': 'red',
-    'radiant red tintcoat': 'red',
-    'cherry red': 'red',
-    'cherry red tintcoat': 'red',
-    'cajun red': 'red',
-    'cajun red tintcoat': 'red',
-    'red hot': 'red',
-    'glory red': 'red',
-    'torch red': 'red',
-    'rapid red': 'red',
-    'crimson red': 'red',
-    # Blues
-    'kinetic blue': 'blue',
-    'kinetic blue metallic': 'blue',
-    'northsky blue': 'blue',
-    'northsky blue metallic': 'blue',
-    'glacier blue': 'blue',
-    'glacier blue metallic': 'blue',
-    'pacific blue': 'blue',
-    'pacific blue metallic': 'blue',
-    'riverside blue': 'blue',
-    'riverside blue metallic': 'blue',
-    'bright blue': 'blue',
-    'midnight blue': 'blue',
-    'midnight blue metallic': 'blue',
-    'riptide blue': 'blue',
-    'riptide blue metallic': 'blue',
-    # Greens
-    'evergreen gray': 'green',
-    'evergreen gray metallic': 'green',
-    'woodland green': 'green',
-    'heritage green': 'green',
-    'cypress gray': 'green',
-    'cypress green': 'green',
-    # Browns/Tans
-    'harvest bronze': 'brown',
-    'harvest bronze metallic': 'brown',
-    'auburn metallic': 'brown',
-    'sand dune': 'tan',
-    'sand dune metallic': 'tan',
-    # Oranges
-    'orange burst': 'orange',
-    'orange burst metallic': 'orange',
-    'sebring orange': 'orange',
-    'sebring orange tintcoat': 'orange',
-    'crush orange': 'orange',
-    # Yellows
-    'accelerate yellow': 'yellow',
-    'accelerate yellow metallic': 'yellow',
-    'nitro yellow': 'yellow',
-    'nitro yellow metallic': 'yellow',
-    'bright yellow': 'yellow',
-}
-
-
-def normalize_color(exterior_color: str) -> str:
-    """Normalize PBS color name to base color"""
-    if not exterior_color:
-        return 'white'
-    
-    color_lower = exterior_color.lower().strip()
-    
-    # Check direct mapping
-    if color_lower in COLOR_MAP:
-        return COLOR_MAP[color_lower]
-    
-    # Check if base color is in the name
-    base_colors = ['white', 'black', 'silver', 'gray', 'grey', 'red', 'blue', 'green', 'brown', 'orange', 'yellow', 'tan', 'gold']
-    for base in base_colors:
-        if base in color_lower:
-            if base == 'grey':
-                return 'gray'
-            return base
-    
-    # Default to white
-    return 'white'
-
-
-# =============================================================================
-# VEHICLE IMAGE MAPPING BY MODEL, CAB STYLE, AND COLOR
-# =============================================================================
-
-# Silverado 1500 images by cab style and color
-SILVERADO_1500_IMAGES = {
-    'regular_cab': {
-        'white': 'https://vehicle-images.dealerinspire.com/stock-images/chrome/cc5fc4a7c3b0d5e8b8c7a7d9e7f8a9b0.png',
-        'black': 'https://vehicle-images.dealerinspire.com/stock-images/chrome/cc5fc4a7c3b0d5e8b8c7a7d9e7f8a9b1.png',
-        'red': 'https://vehicle-images.dealerinspire.com/stock-images/chrome/cc5fc4a7c3b0d5e8b8c7a7d9e7f8a9b2.png',
-        'gray': 'https://vehicle-images.dealerinspire.com/stock-images/chrome/cc5fc4a7c3b0d5e8b8c7a7d9e7f8a9b3.png',
-        'blue': 'https://vehicle-images.dealerinspire.com/stock-images/chrome/cc5fc4a7c3b0d5e8b8c7a7d9e7f8a9b4.png',
-        'silver': 'https://vehicle-images.dealerinspire.com/stock-images/chrome/cc5fc4a7c3b0d5e8b8c7a7d9e7f8a9b5.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gaz-702x398.png',
-    },
-    'double_cab': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-g7c-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-g9k-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-glt-702x398.png',
-        'silver': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gan-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gaz-702x398.png',
-    },
-    'crew_cab': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-g7c-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-g9k-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-glt-702x398.png',
-        'silver': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gan-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gaz-702x398.png',
-    },
-    'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gaz-702x398.png',
-}
-
-# Silverado HD (2500/3500) images by cab style and color
-SILVERADO_HD_IMAGES = {
-    'regular_cab': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-g7c-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-g9k-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-glt-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-gaz-702x398.png',
-    },
-    'double_cab': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-g7c-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-g9k-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-glt-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-gaz-702x398.png',
-    },
-    'crew_cab': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-g7c-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-g9k-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-glt-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-gaz-702x398.png',
-    },
-    'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-hd/colorizer/jellybean/01-images/2024-silverado-hd-gaz-702x398.png',
-}
-
-# Colorado images by cab style and color
-COLORADO_IMAGES = {
-    'extended_cab': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-g7c-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-g9k-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-glt-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-gaz-702x398.png',
-    },
-    'crew_cab': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-g7c-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-g9k-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-glt-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-gaz-702x398.png',
-    },
-    'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/colorado/colorizer/jellybean/01-images/2024-colorado-gaz-702x398.png',
-}
-
-# Non-truck vehicle images by model and color
-VEHICLE_IMAGES = {
-    'corvette': {
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/corvette-stingray/colorizer/jellybean/01-images/2024-corvette-stingray-g8e-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/corvette-stingray/colorizer/jellybean/01-images/2024-corvette-stingray-gba-702x398.png',
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/corvette-stingray/colorizer/jellybean/01-images/2024-corvette-stingray-gaz-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/corvette-stingray/colorizer/jellybean/01-images/2024-corvette-stingray-gkz-702x398.png',
-        'yellow': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/corvette-stingray/colorizer/jellybean/01-images/2024-corvette-stingray-g9d-702x398.png',
-        'orange': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/corvette-stingray/colorizer/jellybean/01-images/2024-corvette-stingray-gcm-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/corvette-stingray/colorizer/jellybean/01-images/2024-corvette-stingray-g9k-702x398.png',
-        'silver': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/corvette-stingray/colorizer/jellybean/01-images/2024-corvette-stingray-g9k-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/corvette-stingray/colorizer/jellybean/01-images/2024-corvette-stingray-g8e-702x398.png',
-    },
-    'tahoe': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/tahoe/colorizer/jellybean/01-images/2024-tahoe-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/tahoe/colorizer/jellybean/01-images/2024-tahoe-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/tahoe/colorizer/jellybean/01-images/2024-tahoe-g7c-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/tahoe/colorizer/jellybean/01-images/2024-tahoe-glt-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/tahoe/colorizer/jellybean/01-images/2024-tahoe-g9k-702x398.png',
-        'silver': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/tahoe/colorizer/jellybean/01-images/2024-tahoe-gan-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/tahoe/colorizer/jellybean/01-images/2024-tahoe-gba-702x398.png',
-    },
-    'suburban': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/suburban/colorizer/jellybean/01-images/2024-suburban-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/suburban/colorizer/jellybean/01-images/2024-suburban-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/suburban/colorizer/jellybean/01-images/2024-suburban-g7c-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/suburban/colorizer/jellybean/01-images/2024-suburban-glt-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/suburban/colorizer/jellybean/01-images/2024-suburban-g9k-702x398.png',
-        'silver': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/suburban/colorizer/jellybean/01-images/2024-suburban-gan-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/suvs/suburban/colorizer/jellybean/01-images/2024-suburban-gaz-702x398.png',
-    },
-    'traverse': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/traverse/colorizer/jellybean/01-images/2024-traverse-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/traverse/colorizer/jellybean/01-images/2024-traverse-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/traverse/colorizer/jellybean/01-images/2024-traverse-g7c-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/traverse/colorizer/jellybean/01-images/2024-traverse-glt-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/traverse/colorizer/jellybean/01-images/2024-traverse-g9k-702x398.png',
-        'silver': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/traverse/colorizer/jellybean/01-images/2024-traverse-gan-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/traverse/colorizer/jellybean/01-images/2024-traverse-gan-702x398.png',
-    },
-    'equinox': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/equinox/colorizer/jellybean/01-images/2024-equinox-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/equinox/colorizer/jellybean/01-images/2024-equinox-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/equinox/colorizer/jellybean/01-images/2024-equinox-g7c-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/equinox/colorizer/jellybean/01-images/2024-equinox-glt-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/equinox/colorizer/jellybean/01-images/2024-equinox-g9k-702x398.png',
-        'silver': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/equinox/colorizer/jellybean/01-images/2024-equinox-gan-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/equinox/colorizer/jellybean/01-images/2024-equinox-glt-702x398.png',
-    },
-    'trailblazer': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trailblazer/colorizer/jellybean/01-images/2024-trailblazer-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trailblazer/colorizer/jellybean/01-images/2024-trailblazer-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trailblazer/colorizer/jellybean/01-images/2024-trailblazer-g7c-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trailblazer/colorizer/jellybean/01-images/2024-trailblazer-glt-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trailblazer/colorizer/jellybean/01-images/2024-trailblazer-g9k-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trailblazer/colorizer/jellybean/01-images/2024-trailblazer-g7c-702x398.png',
-    },
-    'trax': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trax/colorizer/jellybean/01-images/2024-trax-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trax/colorizer/jellybean/01-images/2024-trax-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trax/colorizer/jellybean/01-images/2024-trax-g7c-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trax/colorizer/jellybean/01-images/2024-trax-glt-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trax/colorizer/jellybean/01-images/2024-trax-g9k-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/trax/colorizer/jellybean/01-images/2024-trax-glt-702x398.png',
-    },
-    'blazer': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/blazer-ev/colorizer/jellybean/01-images/2024-blazer-ev-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/blazer-ev/colorizer/jellybean/01-images/2024-blazer-ev-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/blazer-ev/colorizer/jellybean/01-images/2024-blazer-ev-g7c-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/blazer-ev/colorizer/jellybean/01-images/2024-blazer-ev-glt-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/blazer-ev/colorizer/jellybean/01-images/2024-blazer-ev-g9k-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/crossovers/blazer-ev/colorizer/jellybean/01-images/2024-blazer-ev-gba-702x398.png',
-    },
-    'malibu': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/cars/malibu/colorizer/jellybean/01-images/2024-malibu-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/cars/malibu/colorizer/jellybean/01-images/2024-malibu-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/cars/malibu/colorizer/jellybean/01-images/2024-malibu-g7c-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/cars/malibu/colorizer/jellybean/01-images/2024-malibu-glt-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/cars/malibu/colorizer/jellybean/01-images/2024-malibu-g9k-702x398.png',
-        'silver': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/cars/malibu/colorizer/jellybean/01-images/2024-malibu-gan-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/cars/malibu/colorizer/jellybean/01-images/2024-malibu-gan-702x398.png',
-    },
-    'camaro': {
-        'yellow': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/camaro/colorizer/jellybean/01-images/2024-camaro-g9d-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/camaro/colorizer/jellybean/01-images/2024-camaro-g7c-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/camaro/colorizer/jellybean/01-images/2024-camaro-gba-702x398.png',
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/camaro/colorizer/jellybean/01-images/2024-camaro-gaz-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/camaro/colorizer/jellybean/01-images/2024-camaro-glt-702x398.png',
-        'orange': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/camaro/colorizer/jellybean/01-images/2024-camaro-gcm-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/sports-cars/camaro/colorizer/jellybean/01-images/2024-camaro-g9d-702x398.png',
-    },
-    'bolt': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/electric/bolt-euv/colorizer/jellybean/01-images/2024-bolt-euv-gaz-702x398.png',
-        'black': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/electric/bolt-euv/colorizer/jellybean/01-images/2024-bolt-euv-gba-702x398.png',
-        'red': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/electric/bolt-euv/colorizer/jellybean/01-images/2024-bolt-euv-g7c-702x398.png',
-        'blue': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/electric/bolt-euv/colorizer/jellybean/01-images/2024-bolt-euv-glt-702x398.png',
-        'gray': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/electric/bolt-euv/colorizer/jellybean/01-images/2024-bolt-euv-g9k-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/electric/bolt-euv/colorizer/jellybean/01-images/2024-bolt-euv-g9k-702x398.png',
-    },
-    'express': {
-        'white': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/vans/express/01-images/2024-express-702x398.png',
-        'default': 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/vans/express/01-images/2024-express-702x398.png',
-    },
-}
-
-# Default fallback image
-DEFAULT_IMAGE = 'https://www.chevrolet.com/content/dam/chevrolet/na/us/english/index/vehicles/2024/trucks/silverado-1500/colorizer/jellybean/01-images/2024-silverado-1500-gaz-702x398.png'
-
 
 def get_image_url(model: str, exterior_color: str = '', cab_style: str = None) -> str:
-    """
-    Get stock image URL based on model, color, and cab style.
-    Uses GM model codes to determine cab configuration for trucks.
-    """
+    """Get stock image URL based on model type - using verified working URLs"""
     model_lower = model.lower()
-    normalized_color = normalize_color(exterior_color)
     
-    # Normalize cab style for lookup
-    cab_key = None
-    if cab_style:
-        cab_lower = cab_style.lower()
-        if 'regular' in cab_lower:
-            cab_key = 'regular_cab'
-        elif 'double' in cab_lower:
-            cab_key = 'double_cab'
-        elif 'extended' in cab_lower:
-            cab_key = 'extended_cab'
-        elif 'crew' in cab_lower:
-            cab_key = 'crew_cab'
+    # Corvette - Red sports car
+    if 'corvette' in model_lower:
+        return 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=800&q=80'
     
-    # Handle Silverado trucks with cab style awareness
+    # Camaro - Yellow muscle car
+    if 'camaro' in model_lower:
+        return 'https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?w=800&q=80'
+    
+    # Silverado trucks
     if 'silverado' in model_lower:
         if '2500' in model_lower or '3500' in model_lower:
-            # Silverado HD
-            image_set = SILVERADO_HD_IMAGES
-        else:
-            # Silverado 1500
-            image_set = SILVERADO_1500_IMAGES
-        
-        # Get cab-specific images or default
-        if cab_key and cab_key in image_set:
-            cab_images = image_set[cab_key]
-            return cab_images.get(normalized_color, cab_images.get('default', image_set['default']))
-        else:
-            # Default to crew cab images
-            crew_images = image_set.get('crew_cab', {})
-            return crew_images.get(normalized_color, crew_images.get('default', image_set['default']))
+            # Heavy duty truck
+            return 'https://images.unsplash.com/photo-1590362891991-f776e747a588?w=800&q=80'
+        # Silverado 1500
+        return 'https://images.unsplash.com/photo-1559416523-140ddc3d238c?w=800&q=80'
     
-    # Handle Colorado trucks with cab style awareness
+    # Colorado - Midsize truck
     if 'colorado' in model_lower:
-        if cab_key and cab_key in COLORADO_IMAGES:
-            cab_images = COLORADO_IMAGES[cab_key]
-            return cab_images.get(normalized_color, cab_images.get('default', COLORADO_IMAGES['default']))
-        else:
-            crew_images = COLORADO_IMAGES.get('crew_cab', {})
-            return crew_images.get(normalized_color, crew_images.get('default', COLORADO_IMAGES['default']))
+        return 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80'
     
-    # Handle non-truck vehicles
-    for model_key, images in VEHICLE_IMAGES.items():
-        if model_key in model_lower:
-            return images.get(normalized_color, images.get('default', DEFAULT_IMAGE))
+    # Tahoe - Full size SUV
+    if 'tahoe' in model_lower:
+        return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=800&q=80'
     
-    return DEFAULT_IMAGE
+    # Suburban - Large SUV
+    if 'suburban' in model_lower:
+        return 'https://images.unsplash.com/photo-1609521263047-f8f205293f24?w=800&q=80'
+    
+    # Traverse - Midsize SUV
+    if 'traverse' in model_lower:
+        return 'https://images.unsplash.com/photo-1568844293986-8c31f0e89e0e?w=800&q=80'
+    
+    # Equinox - Compact SUV
+    if 'equinox' in model_lower:
+        return 'https://images.unsplash.com/photo-1606611013016-969c19ba27bb?w=800&q=80'
+    
+    # Trailblazer - Subcompact SUV
+    if 'trailblazer' in model_lower:
+        return 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=800&q=80'
+    
+    # Trax - Subcompact SUV
+    if 'trax' in model_lower:
+        return 'https://images.unsplash.com/photo-1551830820-330a71b99659?w=800&q=80'
+    
+    # Blazer - Midsize SUV
+    if 'blazer' in model_lower:
+        return 'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?w=800&q=80'
+    
+    # Malibu - Sedan
+    if 'malibu' in model_lower:
+        return 'https://images.unsplash.com/photo-1550355291-bbee04a92027?w=800&q=80'
+    
+    # Bolt - Electric
+    if 'bolt' in model_lower:
+        return 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800&q=80'
+    
+    # Express - Van
+    if 'express' in model_lower:
+        return 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80'
+    
+    # Default - Generic SUV
+    return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=800&q=80'
 
 
 # =============================================================================
@@ -572,9 +249,6 @@ def parse_drivetrain(body: str, model: str = '') -> str:
     # Check for drive codes in model string
     if 'CK' in model_upper or '4WD' in model_upper or '4X4' in model_upper:
         return '4WD'
-    if 'CC' in model_upper and '2WD' not in model_upper:
-        # CC prefix indicates 2WD for Chevrolet trucks
-        pass  # Continue to check body field
     
     if not body or pd.isna(body):
         return 'FWD'
