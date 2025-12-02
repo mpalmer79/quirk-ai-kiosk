@@ -7,6 +7,9 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
   const [searchResult, setSearchResult] = useState(null);
   const [error, setError] = useState(null);
 
+  // Stock numbers always start with M
+  const STOCK_PREFIX = 'M';
+
   const handleKeyPress = (key) => {
     if (key === 'clear') {
       setStockNumber('');
@@ -15,31 +18,35 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
     } else if (key === 'backspace') {
       setStockNumber(prev => prev.slice(0, -1));
       setError(null);
-    } else if (stockNumber.length < 10) {
+    } else if (stockNumber.length < 8) {
+      // Limit to 8 digits after M
       setStockNumber(prev => prev + key);
       setError(null);
     }
   };
 
   const handleSearch = async () => {
-    if (stockNumber.length < 3) {
-      setError('Please enter at least 3 characters');
+    if (stockNumber.length < 4) {
+      setError('Please enter at least 4 digits');
       return;
     }
 
     setIsSearching(true);
     setError(null);
 
+    // Full stock number with M prefix
+    const fullStockNumber = STOCK_PREFIX + stockNumber;
+
     try {
       // Call API to find vehicle by stock number
-      const vehicle = await api.getVehicleByStock(stockNumber);
+      const vehicle = await api.getVehicleByStock(fullStockNumber);
       
       if (vehicle) {
         setSearchResult(vehicle);
         updateCustomerData({ selectedVehicle: vehicle });
       }
     } catch (err) {
-      setError('Vehicle not found. Please check the stock number and try again.');
+      setError(`Vehicle ${fullStockNumber} not found. Please check the number and try again.`);
       setSearchResult(null);
     } finally {
       setIsSearching(false);
@@ -60,21 +67,6 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
     ['7', '8', '9'],
     ['clear', '0', 'backspace'],
   ];
-
-  // Generate gradient based on color
-  const getGradient = (color) => {
-    const colorMap = {
-      'white': 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
-      'black': 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
-      'red': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-      'blue': 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-      'silver': 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
-      'gray': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-    };
-    const lowerColor = (color || '').toLowerCase();
-    return Object.entries(colorMap).find(([key]) => lowerColor.includes(key))?.[1] 
-      || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
-  };
 
   return (
     <div style={styles.container}>
@@ -97,13 +89,18 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
         <div style={styles.inputSection}>
           <div style={styles.inputDisplay}>
             <span style={styles.inputPrefix}>STK#</span>
+            <span style={styles.mPrefix}>M</span>
             <span style={styles.inputValue}>
-              {stockNumber || <span style={styles.placeholder}>Enter stock number</span>}
+              {stockNumber || <span style={styles.placeholder}>Enter numbers</span>}
             </span>
             {stockNumber && (
               <span style={styles.cursor}>|</span>
             )}
           </div>
+          
+          <p style={styles.inputHint}>
+            Example: For stock M39547, enter <strong>39547</strong>
+          </p>
           
           {error && (
             <div style={styles.errorMessage}>
@@ -158,7 +155,7 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
               </div>
               <div style={styles.priceRow}>
                 <span style={styles.salePriceLabel}>Your Price</span>
-                <span style={styles.salePriceValue}>${(searchResult.salePrice || 0).toLocaleString()}</span>
+                <span style={styles.salePriceValue}>${(searchResult.salePrice || searchResult.price || 0).toLocaleString()}</span>
               </div>
               {searchResult.msrp && searchResult.salePrice && searchResult.msrp > searchResult.salePrice && (
                 <div style={styles.savings}>
@@ -221,10 +218,10 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
             <button
               style={{
                 ...styles.searchButton,
-                opacity: stockNumber.length >= 3 ? 1 : 0.5,
+                opacity: stockNumber.length >= 4 ? 1 : 0.5,
               }}
               onClick={handleSearch}
-              disabled={stockNumber.length < 3 || isSearching}
+              disabled={stockNumber.length < 4 || isSearching}
             >
               {isSearching ? (
                 <>
@@ -237,7 +234,7 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
                     <circle cx="11" cy="11" r="8"/>
                     <path d="M21 21l-4.35-4.35"/>
                   </svg>
-                  Search Inventory
+                  Search for M{stockNumber || '...'}
                 </>
               )}
             </button>
@@ -274,7 +271,8 @@ const styles = {
   container: {
     flex: 1,
     display: 'flex',
-    justifyContent: 'center',
+    flexDirection: 'column',
+    alignItems: 'center',
     padding: '40px',
     overflow: 'auto',
   },
@@ -298,7 +296,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     color: '#ffffff',
-    margin: '0 auto 16px',
+    margin: '0 auto 20px',
   },
   title: {
     fontSize: '32px',
@@ -331,6 +329,11 @@ const styles = {
     marginRight: '12px',
     fontSize: '20px',
   },
+  mPrefix: {
+    color: '#4ade80',
+    fontSize: '32px',
+    fontWeight: '700',
+  },
   inputValue: {
     color: '#ffffff',
     letterSpacing: '4px',
@@ -345,6 +348,12 @@ const styles = {
   cursor: {
     color: '#4ade80',
     animation: 'blink 1s infinite',
+  },
+  inputHint: {
+    marginTop: '12px',
+    textAlign: 'center',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.5)',
   },
   errorMessage: {
     display: 'flex',
