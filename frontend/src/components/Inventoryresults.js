@@ -41,18 +41,59 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
         // Handle different response formats
         let vehicleList = data?.vehicles || data || [];
         
-        // Filter by color preferences if provided
+        // CLIENT-SIDE EXACT MODEL FILTERING
+        // Backend may do partial/fuzzy matching, so we enforce strict model match here
+        if (customerData.selectedModel) {
+          const targetModel = customerData.selectedModel.toLowerCase().trim();
+          
+          vehicleList = vehicleList.filter(vehicle => {
+            // Get vehicle model - try various field names
+            const rawModel = vehicle.model || vehicle.Model || vehicle.modelName || '';
+            const vehicleModel = rawModel.toLowerCase().trim();
+            
+            // Check for exact match or model at start of string
+            // "Silverado 1500" should match "Silverado 1500" and "Silverado 1500 LT"
+            // but NOT "Silverado 2500HD" or "Tahoe"
+            if (vehicleModel === targetModel) return true;
+            if (vehicleModel.startsWith(targetModel + ' ')) return true;
+            if (vehicleModel.startsWith(targetModel)) {
+              // Make sure next char isn't a digit (to prevent 1500 matching 15000)
+              const nextChar = vehicleModel.charAt(targetModel.length);
+              return !nextChar || nextChar === ' ' || !/\d/.test(nextChar);
+            }
+            return false;
+          });
+        }
+        
+        // Filter by cab type if specified
+        if (customerData.selectedCab) {
+          const targetCab = customerData.selectedCab.toLowerCase();
+          vehicleList = vehicleList.filter(vehicle => {
+            const cab = (vehicle.cabType || vehicle.cab || vehicle.body || vehicle.bodyStyle || '').toLowerCase();
+            // Match first word: "crew" from "Crew Cab"
+            const cabKeyword = targetCab.split(' ')[0];
+            return cab.includes(cabKeyword);
+          });
+        }
+        
+        // Sort by color preferences if provided (1st choice best, then 2nd, then 3rd)
         if (customerData.colorPreferences?.length > 0) {
           const colorPrefs = customerData.colorPreferences.map(c => c.toLowerCase());
           vehicleList = vehicleList.sort((a, b) => {
-            const aColor = (a.exteriorColor || '').toLowerCase();
-            const bColor = (b.exteriorColor || '').toLowerCase();
-            const aMatch = colorPrefs.findIndex(c => aColor.includes(c));
-            const bMatch = colorPrefs.findIndex(c => bColor.includes(c));
-            if (aMatch === -1 && bMatch === -1) return 0;
-            if (aMatch === -1) return 1;
-            if (bMatch === -1) return -1;
-            return aMatch - bMatch;
+            const aColor = (a.exteriorColor || a.color || '').toLowerCase();
+            const bColor = (b.exteriorColor || b.color || '').toLowerCase();
+            
+            // Find which preference each color matches (0=1st, 1=2nd, 2=3rd, -1=no match)
+            const getMatchIndex = (color) => {
+              for (let i = 0; i < colorPrefs.length; i++) {
+                // Match first word of color preference
+                const keyword = colorPrefs[i].split(' ')[0];
+                if (color.includes(keyword)) return i;
+              }
+              return 999; // No match goes to end
+            };
+            
+            return getMatchIndex(aColor) - getMatchIndex(bColor);
           });
         }
         
@@ -92,7 +133,22 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
       || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
   };
 
-  const sortedVehicles = [...vehicles].sort((a, b) => {
+  // Apply additional client-side filtering as a safety net
+  const filteredVehicles = vehicles.filter(vehicle => {
+    if (!customerData.selectedModel) return true; // No filter if no model selected
+    
+    const targetModel = customerData.selectedModel.toLowerCase().trim();
+    const vehicleModel = (vehicle.model || '').toLowerCase().trim();
+    
+    // Must match the selected model exactly (or with trim suffix)
+    // "silverado 1500" matches "silverado 1500" or "silverado 1500 lt"
+    // but NOT "silverado 2500hd" or "tahoe"
+    return vehicleModel === targetModel || 
+           vehicleModel.startsWith(targetModel + ' ') ||
+           (vehicleModel.startsWith(targetModel) && !/\d/.test(vehicleModel.charAt(targetModel.length)));
+  });
+
+  const sortedVehicles = [...filteredVehicles].sort((a, b) => {
     switch (sortBy) {
       case 'priceLow': return (a.price || 0) - (b.price || 0);
       case 'priceHigh': return (b.price || 0) - (a.price || 0);
@@ -140,7 +196,7 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
         <div style={styles.headerLeft}>
           <h1 style={styles.title}>
             {getTitle()}
-            <span style={styles.matchCount}> ({vehicles.length})</span>
+            <span style={styles.matchCount}> ({filteredVehicles.length})</span>
           </h1>
           <p style={styles.subtitle}>
             {customerData.path === 'browse' 
@@ -262,9 +318,12 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
 
 const styles = {
   container: {
-    flex: 1,
+    minHeight: '100vh',
+    maxHeight: '100vh',
     padding: '32px 40px',
-    overflow: 'auto',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    boxSizing: 'border-box',
   },
   loadingContainer: {
     flex: 1,
