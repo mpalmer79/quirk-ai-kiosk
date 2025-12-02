@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from './api';
 
 const TradeInEstimator = ({ navigateTo, updateCustomerData, customerData }) => {
   const [step, setStep] = useState(1);
@@ -13,23 +14,11 @@ const TradeInEstimator = ({ navigateTo, updateCustomerData, customerData }) => {
   });
   const [estimate, setEstimate] = useState(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [makes, setMakes] = useState([]);
+  const [models, setModels] = useState([]);
+  const [error, setError] = useState(null);
 
   const years = Array.from({ length: 15 }, (_, i) => 2025 - i);
-  
-  const makes = [
-    'Acura', 'Audi', 'BMW', 'Buick', 'Cadillac', 'Chevrolet', 'Chrysler',
-    'Dodge', 'Ford', 'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Jeep', 'Kia',
-    'Lexus', 'Lincoln', 'Mazda', 'Mercedes-Benz', 'Nissan', 'Ram', 'Subaru',
-    'Tesla', 'Toyota', 'Volkswagen', 'Volvo',
-  ];
-
-  const modelsByMake = {
-    'Honda': ['Accord', 'Civic', 'CR-V', 'HR-V', 'Odyssey', 'Passport', 'Pilot', 'Ridgeline'],
-    'Toyota': ['4Runner', 'Camry', 'Corolla', 'Highlander', 'RAV4', 'Tacoma', 'Tundra'],
-    'Ford': ['Bronco', 'Edge', 'Escape', 'Explorer', 'F-150', 'Maverick', 'Mustang', 'Ranger'],
-    'Chevrolet': ['Blazer', 'Camaro', 'Colorado', 'Corvette', 'Equinox', 'Malibu', 'Silverado', 'Tahoe', 'Traverse'],
-    'default': ['Model 1', 'Model 2', 'Model 3'],
-  };
 
   const conditions = [
     { value: 'excellent', label: 'Excellent', desc: 'Like new, no visible wear', multiplier: 1.05 },
@@ -38,8 +27,48 @@ const TradeInEstimator = ({ navigateTo, updateCustomerData, customerData }) => {
     { value: 'poor', label: 'Poor', desc: 'Significant wear or damage', multiplier: 0.75 },
   ];
 
+  // Fetch makes on mount
+  useEffect(() => {
+    const fetchMakes = async () => {
+      try {
+        const result = await api.getMakes();
+        setMakes(result.makes || []);
+      } catch (err) {
+        console.error('Failed to fetch makes:', err);
+        // Fallback makes
+        setMakes([
+          'Acura', 'Audi', 'BMW', 'Buick', 'Cadillac', 'Chevrolet', 'Chrysler',
+          'Dodge', 'Ford', 'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Jeep', 'Kia',
+          'Lexus', 'Lincoln', 'Mazda', 'Mercedes-Benz', 'Nissan', 'Ram', 'Subaru',
+          'Tesla', 'Toyota', 'Volkswagen', 'Volvo'
+        ]);
+      }
+    };
+    fetchMakes();
+  }, []);
+
+  // Fetch models when make changes
+  useEffect(() => {
+    const fetchModels = async () => {
+      if (!tradeData.make) {
+        setModels([]);
+        return;
+      }
+      
+      try {
+        const result = await api.getModels(tradeData.make);
+        setModels(result.models || []);
+      } catch (err) {
+        console.error('Failed to fetch models:', err);
+        setModels(['Model 1', 'Model 2', 'Model 3']);
+      }
+    };
+    fetchModels();
+  }, [tradeData.make]);
+
   const handleInputChange = (field, value) => {
     setTradeData(prev => ({ ...prev, [field]: value }));
+    setError(null);
     
     // Clear dependent fields
     if (field === 'make') {
@@ -47,34 +76,48 @@ const TradeInEstimator = ({ navigateTo, updateCustomerData, customerData }) => {
     }
   };
 
+  // Handle VIN decode
+  const handleVinDecode = async () => {
+    if (tradeData.vin.length !== 17) return;
+    
+    try {
+      const decoded = await api.decodeTradeInVin(tradeData.vin);
+      if (decoded) {
+        setTradeData(prev => ({
+          ...prev,
+          year: decoded.year?.toString() || prev.year,
+          make: decoded.make || prev.make,
+          model: decoded.model || prev.model,
+          trim: decoded.trim || prev.trim,
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to decode VIN:', err);
+    }
+  };
+
   const calculateEstimate = async () => {
     setIsCalculating(true);
+    setError(null);
     
-    // Simulated API call - replace with actual valuation API
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock calculation based on inputs
-    const baseValue = {
-      2024: 28000, 2023: 25000, 2022: 22000, 2021: 19500, 2020: 17000,
-      2019: 15000, 2018: 13000, 2017: 11500, 2016: 10000, 2015: 8500,
-    };
-    
-    const yearValue = baseValue[tradeData.year] || 7000;
-    const conditionMultiplier = conditions.find(c => c.value === tradeData.condition)?.multiplier || 1;
-    const mileageAdjustment = Math.max(0, (100000 - parseInt(tradeData.mileage || 50000)) * 0.05);
-    
-    const estimatedValue = Math.round((yearValue + mileageAdjustment) * conditionMultiplier);
-    const lowValue = Math.round(estimatedValue * 0.92);
-    const highValue = Math.round(estimatedValue * 1.08);
-    
-    setEstimate({
-      low: lowValue,
-      mid: estimatedValue,
-      high: highValue,
-    });
-    
-    setIsCalculating(false);
-    setStep(3);
+    try {
+      const result = await api.getTradeInEstimate({
+        year: parseInt(tradeData.year),
+        make: tradeData.make,
+        model: tradeData.model,
+        trim: tradeData.trim,
+        mileage: parseInt(tradeData.mileage),
+        condition: tradeData.condition,
+        vin: tradeData.vin,
+      });
+      
+      setEstimate(result);
+      setStep(3);
+    } catch (err) {
+      setError('Unable to calculate estimate. Please try again.');
+    } finally {
+      setIsCalculating(false);
+    }
   };
 
   const handleApplyTrade = () => {
@@ -88,16 +131,30 @@ const TradeInEstimator = ({ navigateTo, updateCustomerData, customerData }) => {
     navigateTo('paymentCalculator');
   };
 
-  const handleRequestAppraisal = () => {
-    updateCustomerData({
-      tradeIn: {
-        ...tradeData,
-        estimatedValue: estimate.mid,
-        estimateRange: estimate,
-        requestedAppraisal: true,
-      },
-    });
-    navigateTo('handoff');
+  const handleRequestAppraisal = async () => {
+    try {
+      await api.requestAppraisal({
+        year: parseInt(tradeData.year),
+        make: tradeData.make,
+        model: tradeData.model,
+        trim: tradeData.trim,
+        mileage: parseInt(tradeData.mileage),
+        condition: tradeData.condition,
+        vin: tradeData.vin,
+      });
+      
+      updateCustomerData({
+        tradeIn: {
+          ...tradeData,
+          estimatedValue: estimate.mid,
+          estimateRange: estimate,
+          requestedAppraisal: true,
+        },
+      });
+      navigateTo('handoff');
+    } catch (err) {
+      setError('Unable to request appraisal. Please try again.');
+    }
   };
 
   const renderStep1 = () => (
@@ -146,7 +203,7 @@ const TradeInEstimator = ({ navigateTo, updateCustomerData, customerData }) => {
             disabled={!tradeData.make}
           >
             <option value="">Select Model</option>
-            {(modelsByMake[tradeData.make] || modelsByMake.default).map(model => (
+            {models.map(model => (
               <option key={model} value={model}>{model}</option>
             ))}
           </select>
@@ -177,9 +234,14 @@ const TradeInEstimator = ({ navigateTo, updateCustomerData, customerData }) => {
           placeholder="Enter 17-character VIN"
           value={tradeData.vin}
           onChange={(e) => handleInputChange('vin', e.target.value.toUpperCase())}
+          onBlur={handleVinDecode}
           maxLength={17}
         />
       </div>
+
+      {error && (
+        <div style={styles.errorMessage}>{error}</div>
+      )}
 
       <button
         style={{
@@ -235,6 +297,10 @@ const TradeInEstimator = ({ navigateTo, updateCustomerData, customerData }) => {
         ))}
       </div>
 
+      {error && (
+        <div style={styles.errorMessage}>{error}</div>
+      )}
+
       <button
         style={{
           ...styles.continueButton,
@@ -282,9 +348,9 @@ const TradeInEstimator = ({ navigateTo, updateCustomerData, customerData }) => {
         <div style={styles.estimateValueSection}>
           <span style={styles.estimateLabel}>Estimated Trade-In Value</span>
           <div style={styles.estimateRange}>
-            <span style={styles.rangeLow}>${estimate?.low.toLocaleString()}</span>
-            <span style={styles.rangeMid}>${estimate?.mid.toLocaleString()}</span>
-            <span style={styles.rangeHigh}>${estimate?.high.toLocaleString()}</span>
+            <span style={styles.rangeLow}>${estimate?.low?.toLocaleString()}</span>
+            <span style={styles.rangeMid}>${estimate?.mid?.toLocaleString()}</span>
+            <span style={styles.rangeHigh}>${estimate?.high?.toLocaleString()}</span>
           </div>
           <div style={styles.rangeBar}>
             <div style={styles.rangeBarFill} />
@@ -543,6 +609,15 @@ const styles = {
     fontFamily: 'monospace',
     letterSpacing: '2px',
     textTransform: 'uppercase',
+  },
+  errorMessage: {
+    padding: '12px 16px',
+    background: 'rgba(220, 38, 38, 0.2)',
+    borderRadius: '8px',
+    color: '#fca5a5',
+    fontSize: '14px',
+    marginBottom: '16px',
+    textAlign: 'center',
   },
   continueButton: {
     display: 'flex',
