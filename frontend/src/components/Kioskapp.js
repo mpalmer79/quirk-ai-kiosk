@@ -1,4 +1,15 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+
+// Import all customer journey components
+import WelcomeScreen from './WelcomeScreen';
+import StockLookup from './StockLookup';
+import ModelBudgetSelector from './ModelBudgetSelector';
+import GuidedQuiz from './GuidedQuiz';
+import InventoryResults from './InventoryResults';
+import VehicleDetail from './VehicleDetail';
+import PaymentCalculator from './PaymentCalculator';
+import TradeInEstimator from './TradeInEstimator';
+import CustomerHandoff from './CustomerHandoff';
 
 // Main Kiosk Application - Customer Journey Controller
 const KioskApp = () => {
@@ -15,13 +26,18 @@ const KioskApp = () => {
     paymentPreference: null,
     contactInfo: null,
   });
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const updateCustomerData = useCallback((updates) => {
     setCustomerData(prev => ({ ...prev, ...updates }));
   }, []);
 
   const navigateTo = useCallback((screen) => {
-    setCurrentScreen(screen);
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentScreen(screen);
+      setIsTransitioning(false);
+    }, 150);
   }, []);
 
   const resetJourney = useCallback(() => {
@@ -41,7 +57,7 @@ const KioskApp = () => {
   }, []);
 
   // Idle timeout - return to welcome after 3 minutes of inactivity
-  React.useEffect(() => {
+  useEffect(() => {
     let timeout;
     const resetTimer = () => {
       clearTimeout(timeout);
@@ -52,16 +68,38 @@ const KioskApp = () => {
       }
     };
 
-    window.addEventListener('touchstart', resetTimer);
-    window.addEventListener('click', resetTimer);
+    const events = ['touchstart', 'click', 'mousemove', 'keypress'];
+    events.forEach(event => window.addEventListener(event, resetTimer));
     resetTimer();
 
     return () => {
       clearTimeout(timeout);
-      window.removeEventListener('touchstart', resetTimer);
-      window.removeEventListener('click', resetTimer);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
     };
   }, [currentScreen, resetJourney]);
+
+  // Screen components map
+  const screens = {
+    welcome: WelcomeScreen,
+    stockLookup: StockLookup,
+    modelBudget: ModelBudgetSelector,
+    guidedQuiz: GuidedQuiz,
+    inventory: InventoryResults,
+    vehicleDetail: VehicleDetail,
+    paymentCalculator: PaymentCalculator,
+    tradeIn: TradeInEstimator,
+    handoff: CustomerHandoff,
+  };
+
+  const CurrentScreenComponent = screens[currentScreen] || WelcomeScreen;
+
+  // Props passed to all screen components
+  const screenProps = {
+    customerData,
+    updateCustomerData,
+    navigateTo,
+    resetJourney,
+  };
 
   return (
     <div style={styles.container}>
@@ -74,7 +112,7 @@ const KioskApp = () => {
         {currentScreen !== 'welcome' && (
           <button style={styles.backButton} onClick={resetJourney}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
+              <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
             </svg>
             Start Over
           </button>
@@ -82,13 +120,12 @@ const KioskApp = () => {
       </header>
 
       {/* Main Content Area */}
-      <main style={styles.main}>
-        {renderScreen(currentScreen, {
-          customerData,
-          updateCustomerData,
-          navigateTo,
-          resetJourney,
-        })}
+      <main style={{
+        ...styles.main,
+        opacity: isTransitioning ? 0 : 1,
+        transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)',
+      }}>
+        <CurrentScreenComponent {...screenProps} />
       </main>
 
       {/* Footer */}
@@ -96,42 +133,52 @@ const KioskApp = () => {
         <span>Quirk Chevrolet</span>
         <span style={styles.footerDot}>•</span>
         <span>New England's #1 Dealer</span>
+        <span style={styles.footerDot}>•</span>
+        <span style={styles.footerTime}>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
       </footer>
+
+      {/* Google Font Import */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+        
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        
+        body {
+          font-family: 'Montserrat', 'Segoe UI', sans-serif;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+        
+        input, select, button {
+          font-family: inherit;
+        }
+        
+        input:focus, select:focus, button:focus {
+          outline: none;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+          background: rgba(255,255,255,0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.2);
+          border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(255,255,255,0.3);
+        }
+      `}</style>
     </div>
   );
 };
-
-// Screen Router
-const renderScreen = (screen, props) => {
-  // These will be imported from separate files in production
-  // For now, returning placeholder - components defined in separate files
-  const screens = {
-    welcome: <WelcomeScreen {...props} />,
-    stockLookup: <StockLookup {...props} />,
-    modelBudget: <ModelBudgetSelector {...props} />,
-    guidedQuiz: <GuidedQuiz {...props} />,
-    inventory: <InventoryResults {...props} />,
-    vehicleDetail: <VehicleDetail {...props} />,
-    paymentCalculator: <PaymentCalculator {...props} />,
-    tradeIn: <TradeInEstimator {...props} />,
-    handoff: <CustomerHandoff {...props} />,
-  };
-  
-  return screens[screen] || screens.welcome;
-};
-
-// Placeholder components - will be replaced with imports
-const WelcomeScreen = ({ navigateTo, updateCustomerData }) => (
-  <div>Welcome Screen - See WelcomeScreen.js</div>
-);
-const StockLookup = (props) => <div>Stock Lookup - See StockLookup.js</div>;
-const ModelBudgetSelector = (props) => <div>Model Budget - See ModelBudgetSelector.js</div>;
-const GuidedQuiz = (props) => <div>Guided Quiz - See GuidedQuiz.js</div>;
-const InventoryResults = (props) => <div>Inventory Results - See InventoryResults.js</div>;
-const VehicleDetail = (props) => <div>Vehicle Detail - See VehicleDetail.js</div>;
-const PaymentCalculator = (props) => <div>Payment Calculator - See PaymentCalculator.js</div>;
-const TradeInEstimator = (props) => <div>Trade-In - See TradeInEstimator.js</div>;
-const CustomerHandoff = (props) => <div>Customer Handoff - See CustomerHandoff.js</div>;
 
 const styles = {
   container: {
@@ -151,12 +198,15 @@ const styles = {
     borderBottom: '1px solid rgba(255,255,255,0.1)',
     background: 'rgba(0,0,0,0.3)',
     backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    zIndex: 100,
   },
   logo: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     cursor: 'pointer',
+    transition: 'transform 0.2s ease',
   },
   logoText: {
     fontSize: '32px',
@@ -191,6 +241,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     overflow: 'auto',
+    transition: 'opacity 0.15s ease, transform 0.15s ease',
   },
   footer: {
     display: 'flex',
@@ -205,6 +256,10 @@ const styles = {
   },
   footerDot: {
     color: '#1B7340',
+  },
+  footerTime: {
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
   },
 };
 
