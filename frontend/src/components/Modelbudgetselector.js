@@ -959,7 +959,7 @@ const styles = {
   inputLabel: {
     fontSize: '12px',
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
+    color: '#ffffff',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
   },
