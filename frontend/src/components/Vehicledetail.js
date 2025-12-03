@@ -3,6 +3,9 @@ import React, { useState } from 'react';
 const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
   const [vehicleRequested, setVehicleRequested] = useState(false);
   
+  // Get customer name for personalization
+  const customerName = customerData?.customerName;
+  
   const vehicle = customerData.selectedVehicle || {
     stockNumber: '24789',
     year: 2025,
@@ -84,7 +87,9 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
               </svg>
             </div>
             
-            <h1 style={styles.confirmationTitle}>Vehicle Requested!</h1>
+            <h1 style={styles.confirmationTitle}>
+              {customerName ? `Great choice, ${customerName}!` : 'Vehicle Requested!'}
+            </h1>
             <p style={styles.confirmationSubtitle}>
               A team member will bring this vehicle to the front of the showroom shortly.
             </p>
