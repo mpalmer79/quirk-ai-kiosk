@@ -1,7 +1,6 @@
 name: CI/CD - AI Recommendation Service
 
 on:
-  # Triggers the workflow on push or pull request events for the ai_service directory
   push:
     branches:
       - main
@@ -15,64 +14,59 @@ on:
       - development
     paths:
       - 'ai_service/**'
+  workflow_dispatch:
 
 jobs:
   build_and_push_ai_service:
     runs-on: ubuntu-latest
     
-    # Define environment variables for the job
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}/ai_service
 
     steps:
-      - name: ⬇️ Checkout Repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          # Required for Git LFS to download model files
           lfs: true
 
-      - name: 🐍 Set up Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: 📦 Install Dependencies & Run Tests (AI Service)
+      - name: Install Dependencies & Run Tests (AI Service)
         run: |
           cd ai_service
           python -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
-          # Placeholder: Run Model Integrity and Unit Tests
-          # python -m pytest tests/
-        # Fail the build if any tests fail
-        # continue-on-error: false 
 
-      - name: ⚙️ Log in to GitHub Container Registry
-        # Use GitHub's built-in token for authentication
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🏗️ Extract Metadata for Docker
-        # Set image tags based on branch/commit hash
+      - name: Extract Metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha,prefix=,suffix=,enable=true,priority=100
-            type=raw,value=${{ github.ref_name }} # e.g., main or development
+            type=raw,value=${{ github.ref_name }}
 
-      - name: 🐳 Build and Push Docker Image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: ./ai_service
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Use cache for faster builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
