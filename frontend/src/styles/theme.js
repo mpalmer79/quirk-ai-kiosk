@@ -159,7 +159,7 @@ export const zIndex = {
 };
 
 // ============================================
-// BREAKPOINTS (for future responsive use)
+// BREAKPOINTS
 // ============================================
 export const breakpoints = {
   sm: '640px',
@@ -168,7 +168,7 @@ export const breakpoints = {
   xl: '1280px',
 };
 
-// Default export for convenience
+// Default export
 const theme = {
   colors,
   typography,
