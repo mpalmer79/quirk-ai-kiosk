@@ -1,12 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, ChangeEvent, KeyboardEvent } from 'react';
 import api from './api';
+import type { Vehicle, CustomerData, KioskComponentProps } from '../types';
 
-const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
-  const [stockNumber, setStockNumber] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState(null);
-  const [error, setError] = useState(null);
-  const inputRef = useRef(null);
+type KeypadKey = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'clear' | 'backspace';
+
+const StockLookup: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
+  const [stockNumber, setStockNumber] = useState<string>('');
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [searchResult, setSearchResult] = useState<Vehicle | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Stock numbers always start with M
   const STOCK_PREFIX = 'M';
@@ -25,7 +28,7 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
     }
   }, [searchResult]);
 
-  const handleKeyPress = (key) => {
+  const handleKeyPress = (key: KeypadKey): void => {
     if (key === 'clear') {
       setStockNumber('');
       setSearchResult(null);
@@ -40,7 +43,7 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
   };
 
   // Handle keyboard input from the hidden input field
-  const handleKeyboardInput = (e) => {
+  const handleKeyboardInput = (e: ChangeEvent<HTMLInputElement>): void => {
     const value = e.target.value;
     // Only allow numbers, max 8 digits
     const numbersOnly = value.replace(/\D/g, '').slice(0, 8);
@@ -49,7 +52,7 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
   };
 
   // Handle keyboard shortcuts (Enter to search, Escape to clear)
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter' && stockNumber.length >= 4 && !isSearching) {
       handleSearch();
     } else if (e.key === 'Escape') {
@@ -59,7 +62,7 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
     }
   };
 
-  const handleSearch = async () => {
+  const handleSearch = async (): Promise<void> => {
     if (stockNumber.length < 4) {
       setError('Please enter at least 4 digits');
       return;
@@ -85,15 +88,15 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
     }
   };
 
-  const handleViewDetails = () => {
+  const handleViewDetails = (): void => {
     navigateTo('vehicleDetail');
   };
 
-  const handleScheduleTestDrive = () => {
+  const handleScheduleTestDrive = (): void => {
     navigateTo('handoff');
   };
 
-  const keypadLayout = [
+  const keypadLayout: KeypadKey[][] = [
     ['1', '2', '3'],
     ['4', '5', '6'],
     ['7', '8', '9'],
@@ -166,7 +169,7 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
                 <span style={styles.statusDot} />
                 {searchResult.status || 'In Stock'}
               </div>
-              <span style={styles.stockLabel}>STK# {searchResult.stockNumber}</span>
+              <span style={styles.stockLabel}>STK# {searchResult.stockNumber || searchResult.stock_number}</span>
             </div>
 
             <h2 style={styles.vehicleTitle}>
@@ -177,11 +180,11 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
             <div style={styles.vehicleSpecs}>
               <div style={styles.specItem}>
                 <span style={styles.specLabel}>Exterior</span>
-                <span style={styles.specValue}>{searchResult.exteriorColor}</span>
+                <span style={styles.specValue}>{searchResult.exteriorColor || searchResult.exterior_color}</span>
               </div>
               <div style={styles.specItem}>
                 <span style={styles.specLabel}>Interior</span>
-                <span style={styles.specValue}>{searchResult.interiorColor}</span>
+                <span style={styles.specValue}>{searchResult.interiorColor || searchResult.interior_color}</span>
               </div>
               <div style={styles.specItem}>
                 <span style={styles.specLabel}>Engine</span>
@@ -200,11 +203,11 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
               </div>
               <div style={styles.priceRow}>
                 <span style={styles.salePriceLabel}>Your Price</span>
-                <span style={styles.salePriceValue}>${(searchResult.salePrice || searchResult.price || 0).toLocaleString()}</span>
+                <span style={styles.salePriceValue}>${(searchResult.salePrice || searchResult.sale_price || searchResult.price || 0).toLocaleString()}</span>
               </div>
-              {searchResult.msrp && searchResult.salePrice && searchResult.msrp > searchResult.salePrice && (
+              {searchResult.msrp && (searchResult.salePrice || searchResult.sale_price) && searchResult.msrp > (searchResult.salePrice || searchResult.sale_price || 0) && (
                 <div style={styles.savings}>
-                  You Save ${(searchResult.msrp - searchResult.salePrice).toLocaleString()}
+                  You Save ${(searchResult.msrp - (searchResult.salePrice || searchResult.sale_price || 0)).toLocaleString()}
                 </div>
               )}
             </div>
@@ -312,7 +315,9 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
   );
 };
 
-const styles = {
+import type { CSSProperties } from 'react';
+
+const styles: Record<string, CSSProperties> = {
   container: {
     flex: 1,
     display: 'flex',
@@ -381,7 +386,6 @@ const styles = {
     border: 'none',
     background: 'transparent',
     fontSize: '32px',
-    caretColor: 'transparent',
     color: 'transparent',
     outline: 'none',
   },
