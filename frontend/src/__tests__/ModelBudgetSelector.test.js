@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import ModelBudgetSelector from '../components/Modelbudgetselector';
+import ModelBudgetSelector from '../components/ModelBudgetSelector';
 
 // Mock the api module
 jest.mock('../components/api', () => ({
