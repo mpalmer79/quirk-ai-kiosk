@@ -199,7 +199,7 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedCab, setSelectedCab] = useState(null);
-  const [colorChoices, setColorChoices] = useState({ first: '', second: '', third: '' });
+  const [colorChoices, setColorChoices] = useState({ first: '', second: '' });
   const [budgetRange, setBudgetRange] = useState({ min: 400, max: 900 });
   const [downPayment, setDownPayment] = useState(3000);
   const [hasTrade, setHasTrade] = useState(null);
@@ -302,7 +302,7 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
     updateCustomerData({
       selectedModel: selectedModel?.name,
       selectedCab,
-      colorPreferences: [colorChoices.first, colorChoices.second, colorChoices.third].filter(Boolean),
+      colorPreferences: [colorChoices.first, colorChoices.second].filter(Boolean),
       budgetRange,
       downPayment,
       hasTrade,
@@ -435,7 +435,6 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
   const renderColorSelection = () => {
     const colors = getModelColors();
     const availableForSecond = colors.filter(c => c.name !== colorChoices.first);
-    const availableForThird = colors.filter(c => c.name !== colorChoices.first && c.name !== colorChoices.second);
 
     return (
       <div style={styles.stepContainer}>
@@ -453,7 +452,7 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
           </p>
         </div>
         <div style={styles.formSection}>
-          <p style={styles.formIntro}>Select up to 3 GM colors for {selectedModel.name} in order of preference:</p>
+          <p style={styles.formIntro}>Select up to 2 GM colors for {selectedModel.name} in order of preference:</p>
           <div style={styles.colorSelects}>
             <div style={styles.colorSelectGroup}>
               <label style={styles.inputLabel}>First Choice</label>
@@ -486,23 +485,6 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
                 <div style={styles.colorPreview}>
                   <div style={{...styles.colorSwatch, backgroundColor: colors.find(c => c.name === colorChoices.second)?.hex || '#666'}} />
                   <span>{colorChoices.second}</span>
-                </div>
-              )}
-            </div>
-            <div style={styles.colorSelectGroup}>
-              <label style={styles.inputLabel}>Third Choice</label>
-              <select style={{...styles.selectInput, opacity: colorChoices.second ? 1 : 0.5}} value={colorChoices.third} onChange={(e) => handleColorChange('third', e.target.value)} disabled={!colorChoices.second}>
-                <option value="">Select a color...</option>
-                {availableForThird.map((color) => (
-                  <option key={color.code} value={color.name}>
-                    {color.name} {color.premium && `(+$${color.price})`}
-                  </option>
-                ))}
-              </select>
-              {colorChoices.third && (
-                <div style={styles.colorPreview}>
-                  <div style={{...styles.colorSwatch, backgroundColor: colors.find(c => c.name === colorChoices.third)?.hex || '#666'}} />
-                  <span>{colorChoices.third}</span>
                 </div>
               )}
             </div>
