@@ -1,4 +1,3 @@
-
 """
 QUIRK AI Service - Vehicle Recommendation Engine
 Content-based filtering with feature engineering for vehicle similarity
@@ -7,10 +6,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-import numpy as np
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.metrics.pairwise import cosine_similarity
-import joblib
 import os
 
 app = FastAPI(
@@ -27,7 +22,6 @@ app.add_middleware(
 )
 
 
-# Pydantic models
 class Vehicle(BaseModel):
     id: str
     year: int
@@ -69,43 +63,35 @@ class RecommendationResponse(BaseModel):
 class VehicleRecommender:
     """
     Content-based vehicle recommendation engine.
-    Uses feature engineering and cosine similarity.
+    Uses feature engineering and weighted scoring for similarity.
     """
     
-    # Feature weights for similarity calculation
     WEIGHTS = {
-        'body_style': 2.0,      # Same body style is very important
-        'price_range': 1.5,     # Similar price matters
-        'fuel_type': 1.5,       # Same fuel type preference
-        'drivetrain': 1.0,      # Similar drivetrain
-        'features': 1.0,        # Feature overlap
-        'performance': 0.75,    # Similar performance characteristics
+        'body_style': 2.0,
+        'price_range': 1.5,
+        'fuel_type': 1.5,
+        'drivetrain': 1.0,
+        'features': 1.0,
+        'performance': 0.75,
     }
     
-    # Price range buckets
     PRICE_BUCKETS = [0, 30000, 50000, 75000, 100000, 150000, float('inf')]
     
-    def __init__(self):
-        self.scaler = StandardScaler()
-        
     def _extract_features(self, vehicle: Vehicle) -> Dict[str, Any]:
         """Extract normalized features from a vehicle."""
         
-        # Price bucket
         price_bucket = 0
         for i, threshold in enumerate(self.PRICE_BUCKETS[1:]):
             if vehicle.price < threshold:
                 price_bucket = i
                 break
         
-        # Performance score (0-100)
         if vehicle.fuelType == "Electric":
             perf_score = 80 + (vehicle.evRange or 250) / 10
         else:
             mpg_avg = ((vehicle.mpgCity or 20) + (vehicle.mpgHighway or 30)) / 2
             perf_score = 50 + mpg_avg
         
-        # Extract feature set
         feature_set = set(f.lower() for f in vehicle.features)
         
         return {
@@ -132,28 +118,23 @@ class VehicleRecommender:
         score = 0.0
         max_score = sum(self.WEIGHTS.values())
         
-        # Body style match
         if source_features['body_style'] == target_features['body_style']:
             score += self.WEIGHTS['body_style']
         
-        # Price range match
         price_diff = abs(source_features['price_bucket'] - target_features['price_bucket'])
         if price_diff == 0:
             score += self.WEIGHTS['price_range']
         elif price_diff == 1:
             score += self.WEIGHTS['price_range'] * 0.5
         
-        # Fuel type match
         if source_features['fuel_type'] == target_features['fuel_type']:
             score += self.WEIGHTS['fuel_type']
         elif source_features['is_electric'] == target_features['is_electric']:
             score += self.WEIGHTS['fuel_type'] * 0.5
         
-        # Drivetrain match
         if source_features['drivetrain'] == target_features['drivetrain']:
             score += self.WEIGHTS['drivetrain']
         
-        # Feature overlap (Jaccard similarity)
         if source_features['features'] and target_features['features']:
             intersection = len(source_features['features'] & target_features['features'])
             union = len(source_features['features'] | target_features['features'])
@@ -161,7 +142,6 @@ class VehicleRecommender:
                 jaccard = intersection / union
                 score += self.WEIGHTS['features'] * jaccard
         
-        # Performance similarity
         perf_diff = abs(source_features['performance_score'] - target_features['performance_score'])
         perf_similarity = max(0, 1 - perf_diff / 50)
         score += self.WEIGHTS['performance'] * perf_similarity
@@ -190,7 +170,6 @@ class VehicleRecommender:
                 "matchReason": match_reason,
             })
         
-        # Sort by similarity score
         scored.sort(key=lambda x: x["similarityScore"], reverse=True)
         
         return scored[:limit]
@@ -208,7 +187,6 @@ class VehicleRecommender:
         
         viewed_ids = {v.id for v in viewed}
         
-        # Calculate aggregate preference profile
         body_prefs = {}
         fuel_prefs = {}
         total_price = 0
@@ -222,18 +200,15 @@ class VehicleRecommender:
         preferred_body = max(body_prefs, key=body_prefs.get)
         preferred_fuel = max(fuel_prefs, key=fuel_prefs.get)
         
-        # Score candidates based on preference match
         scored = []
         for candidate in candidates:
             if candidate.id in viewed_ids:
                 continue
             
-            # Average similarity to all viewed vehicles
             avg_similarity = sum(
                 self.calculate_similarity(v, candidate) for v in viewed
             ) / len(viewed)
             
-            # Preference bonuses
             preference_score = 0
             if candidate.bodyStyle == preferred_body:
                 preference_score += 0.2
@@ -280,7 +255,6 @@ class VehicleRecommender:
         return reasons[0] if reasons else "Popular choice"
 
 
-# Initialize recommender
 recommender = VehicleRecommender()
 
 
