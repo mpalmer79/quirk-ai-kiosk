@@ -83,6 +83,7 @@ const screenErrorStyles = {
 const KioskApp = () => {
   const [currentScreen, setCurrentScreen] = useState('welcome');
   const [customerData, setCustomerData] = useState({
+    customerName: null,
     path: null,
     stockNumber: null,
     selectedModel: null,
@@ -110,6 +111,7 @@ const KioskApp = () => {
 
   const resetJourney = useCallback(() => {
     setCustomerData({
+      customerName: null,
       path: null,
       stockNumber: null,
       selectedModel: null,
