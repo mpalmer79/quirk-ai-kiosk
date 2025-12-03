@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 const PaymentCalculator = ({ navigateTo, updateCustomerData, customerData }) => {
   const vehicle = customerData.selectedVehicle || {
@@ -18,9 +18,9 @@ const PaymentCalculator = ({ navigateTo, updateCustomerData, customerData }) => 
   const [financeDown, setFinanceDown] = useState(3000);
   const [apr, setApr] = useState(6.9);
 
-  // Trade-in
-  const [tradeValue, setTradeValue] = useState(customerData.tradeIn?.estimatedValue || 0);
-  const [tradeOwed, setTradeOwed] = useState(0);
+  // Trade-in (read-only from customerData)
+  const tradeValue = customerData.tradeIn?.estimatedValue || 0;
+  const tradeOwed = customerData.tradeIn?.amountOwed || 0;
 
   // Calculate Lease Payment
   const calculateLease = () => {
