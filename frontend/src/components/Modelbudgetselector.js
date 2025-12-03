@@ -941,7 +941,7 @@ const styles = {
   },
   formIntro: {
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.9)',
     marginBottom: '20px',
     textAlign: 'center',
   },
@@ -959,14 +959,14 @@ const styles = {
   inputLabel: {
     fontSize: '12px',
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.9)',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
   },
   downPaymentDisclaimer: {
     fontSize: '10px',
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'rgba(255,255,255,0.7)',
     textTransform: 'none',
     letterSpacing: '0',
     marginLeft: '8px',
@@ -1023,15 +1023,15 @@ const styles = {
     flexWrap: 'wrap',
   },
   budgetValue: { fontSize: 'clamp(28px, 6vw, 36px)', fontWeight: '700', color: '#4ade80' },
-  budgetSeparator: { fontSize: '16px', color: 'rgba(255,255,255,0.5)' },
-  budgetLabel: { fontSize: '14px', color: 'rgba(255,255,255,0.5)' },
+  budgetSeparator: { fontSize: '16px', color: 'rgba(255,255,255,0.9)' },
+  budgetLabel: { fontSize: '14px', color: 'rgba(255,255,255,0.9)' },
   sliderGroup: {
     marginBottom: '20px',
   },
   sliderLabel: {
     display: 'block',
     fontSize: '13px',
-    color: 'rgba(255,255,255,0.6)',
+    color: '#ffffff',
     marginBottom: '8px',
   },
   slider: {
@@ -1187,7 +1187,7 @@ const styles = {
   },
   buyingPowerIntro: {
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.9)',
     marginBottom: '16px',
   },
   buyingPowerCard: {
@@ -1209,13 +1209,13 @@ const styles = {
     listStyle: 'disc',
     paddingLeft: '20px',
     marginBottom: '16px',
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.95)',
     fontSize: '14px',
     lineHeight: '1.8',
   },
   buyingPowerText: {
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.9)',
     marginBottom: '12px',
   },
   buyingPowerResult: {
@@ -1247,7 +1247,7 @@ const styles = {
   mathTitle: {
     fontSize: '14px',
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.95)',
     marginBottom: '10px',
     display: 'flex',
     alignItems: 'center',
@@ -1256,7 +1256,7 @@ const styles = {
   mathList: {
     listStyle: 'disc',
     paddingLeft: '20px',
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.9)',
     fontSize: '13px',
     lineHeight: '1.8',
   },
@@ -1264,7 +1264,7 @@ const styles = {
     marginTop: '16px',
     textAlign: 'center',
     fontSize: '12px',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.7)',
     fontStyle: 'italic',
   },
 };
