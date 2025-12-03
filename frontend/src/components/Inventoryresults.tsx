@@ -1,92 +1,116 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent, CSSProperties, MouseEvent } from 'react';
 import api from './api';
+import type { Vehicle, KioskComponentProps } from '../types';
 
-const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
-  const [vehicles, setVehicles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [sortBy, setSortBy] = useState(customerData?.sortBy || 'recommended');
+type SortOption = 'recommended' | 'priceLow' | 'priceHigh' | 'newest';
 
-  // Generate Quirk Chevy NH website URL for a vehicle
-  const generateDealerUrl = (vehicle) => {
-    const baseUrl = 'https://www.quirkchevynh.com/inventory/';
-    
-    // Helper to slugify text (lowercase, replace spaces with hyphens)
-    const slugify = (text) => {
-      if (!text) return '';
-      return text.toString().toLowerCase()
-        .replace(/\s+/g, '-')           // Replace spaces with hyphens
-        .replace(/[^\w-]/g, '')         // Remove special characters except hyphens
-        .replace(/--+/g, '-')           // Replace multiple hyphens with single
-        .replace(/^-+/, '')             // Trim hyphens from start
-        .replace(/-+$/, '');            // Trim hyphens from end
-    };
-    
-    // Build URL components
-    const condition = 'new'; // All inventory appears to be new
-    const year = vehicle.year || '2026';
-    const make = 'chevrolet';
-    const model = slugify(vehicle.model || '');
-    const trim = slugify(vehicle.trim || '');
-    const drivetrain = slugify(vehicle.drivetrain || vehicle.driveTrain || '4wd');
-    const bodyType = slugify(vehicle.cabType || vehicle.bodyStyle || vehicle.body || '');
-    const vin = (vehicle.vin || vehicle.VIN || '').toLowerCase();
-    
-    // Construct URL: new-year-chevrolet-model-trim-drivetrain-bodytype-vin
-    const urlParts = [condition, year, make, model, trim, drivetrain, bodyType, vin]
-      .filter(part => part && part.length > 0); // Remove empty parts
-    
-    return baseUrl + urlParts.join('-') + '/';
+// Generate Quirk Chevy NH website URL for a vehicle
+const generateDealerUrl = (vehicle: Vehicle): string => {
+  const baseUrl = 'https://www.quirkchevynh.com/inventory/';
+  
+  // Helper to slugify text (lowercase, replace spaces with hyphens)
+  const slugify = (text?: string): string => {
+    if (!text) return '';
+    return text.toString().toLowerCase()
+      .replace(/\s+/g, '-')           // Replace spaces with hyphens
+      .replace(/[^\w-]/g, '')         // Remove special characters except hyphens
+      .replace(/--+/g, '-')           // Replace multiple hyphens with single
+      .replace(/^-+/, '')             // Trim hyphens from start
+      .replace(/-+$/, '');            // Trim hyphens from end
   };
+  
+  // Build URL components
+  const condition = 'new'; // All inventory appears to be new
+  const year = String(vehicle.year || '2026');
+  const make = 'chevrolet';
+  const model = slugify(vehicle.model || '');
+  const trim = slugify(vehicle.trim || '');
+  const drivetrain = slugify(vehicle.drivetrain || '4wd');
+  const bodyType = slugify(vehicle.cabType || vehicle.bodyStyle || vehicle.body_style || '');
+  const vin = (vehicle.vin || '').toLowerCase();
+  
+  // Construct URL: new-year-chevrolet-model-trim-drivetrain-bodytype-vin
+  const urlParts = [condition, year, make, model, trim, drivetrain, bodyType, vin]
+    .filter(part => part && part.length > 0); // Remove empty parts
+  
+  return baseUrl + urlParts.join('-') + '/';
+};
+
+// Generate gradient based on color
+const getGradient = (color?: string): string => {
+  const colorMap: Record<string, string> = {
+    'white': 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
+    'black': 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+    'red': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+    'blue': 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+    'silver': 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
+    'gray': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+    'beige': 'linear-gradient(135deg, #d4b896 0%, #a78b6c 100%)',
+    'cypress': 'linear-gradient(135deg, #4a5568 0%, #2d3748 100%)',
+    'polar': 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)',
+  };
+  const lowerColor = (color || '').toLowerCase();
+  return Object.entries(colorMap).find(([key]) => lowerColor.includes(key))?.[1] 
+    || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
+};
+
+// Format price without decimals
+const formatPrice = (price?: number): string => {
+  return Math.round(price || 0).toLocaleString();
+};
+
+const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>((customerData?.sortBy as SortOption) || 'recommended');
 
   // Handle vehicle card click - open dealership website
-  const handleVehicleClick = (vehicle) => {
+  const handleVehicleClick = (vehicle: Vehicle): void => {
     const dealerUrl = generateDealerUrl(vehicle);
     window.open(dealerUrl, '_blank', 'noopener,noreferrer');
   };
 
   useEffect(() => {
-    const fetchVehicles = async () => {
+    const fetchVehicles = async (): Promise<void> => {
       setLoading(true);
       setError(null);
       
       try {
-        let data;
-        
         // Build filter params based on customer selections
-        const params = {};
+        const params: Record<string, string | number> = {};
         
-        if (customerData.selectedModel) {
+        if (customerData?.selectedModel) {
           params.model = customerData.selectedModel;
         }
         
-        if (customerData.budgetRange) {
+        if (customerData?.budgetRange) {
           // Convert monthly payment to rough vehicle price
           params.minPrice = customerData.budgetRange.min * 60;
           params.maxPrice = customerData.budgetRange.max * 80;
         }
         
-        if (customerData.selectedCab) {
+        if (customerData?.selectedCab) {
           params.cabType = customerData.selectedCab;
         }
         
-        if (customerData.preferences?.bodyStyle) {
+        if (customerData?.preferences?.bodyStyle) {
           params.bodyType = customerData.preferences.bodyStyle;
         }
         
-        data = await api.getInventory(params);
+        const data = await api.getInventory(params);
         
         // Handle different response formats
-        let vehicleList = data?.vehicles || data || [];
+        let vehicleList: Vehicle[] = Array.isArray(data) ? data : (data as { vehicles?: Vehicle[] })?.vehicles || [];
         
         // CLIENT-SIDE EXACT MODEL FILTERING
         // Backend may do partial/fuzzy matching, so we enforce strict model match here
-        if (customerData.selectedModel) {
+        if (customerData?.selectedModel) {
           const targetModel = customerData.selectedModel.toLowerCase().trim();
           
-          vehicleList = vehicleList.filter(vehicle => {
+          vehicleList = vehicleList.filter((vehicle: Vehicle) => {
             // Get vehicle model - try various field names
-            const rawModel = vehicle.model || vehicle.Model || vehicle.modelName || '';
+            const rawModel = vehicle.model || '';
             const vehicleModel = rawModel.toLowerCase().trim();
             
             // Check for exact match or model at start of string
@@ -104,10 +128,10 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
         }
         
         // Filter by cab type if specified
-        if (customerData.selectedCab) {
+        if (customerData?.selectedCab) {
           const targetCab = customerData.selectedCab.toLowerCase();
-          vehicleList = vehicleList.filter(vehicle => {
-            const cab = (vehicle.cabType || vehicle.cab || vehicle.body || vehicle.bodyStyle || '').toLowerCase();
+          vehicleList = vehicleList.filter((vehicle: Vehicle) => {
+            const cab = (vehicle.cabType || vehicle.bodyStyle || vehicle.body_style || '').toLowerCase();
             // Match first word: "crew" from "Crew Cab"
             const cabKeyword = targetCab.split(' ')[0];
             return cab.includes(cabKeyword);
@@ -115,14 +139,14 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
         }
         
         // Sort by color preferences if provided (1st choice best, then 2nd, then 3rd)
-        if (customerData.colorPreferences?.length > 0) {
-          const colorPrefs = customerData.colorPreferences.map(c => c.toLowerCase());
-          vehicleList = vehicleList.sort((a, b) => {
-            const aColor = (a.exteriorColor || a.color || '').toLowerCase();
-            const bColor = (b.exteriorColor || b.color || '').toLowerCase();
+        if (customerData?.colorPreferences && customerData.colorPreferences.length > 0) {
+          const colorPrefs = customerData.colorPreferences.map((c: string) => c.toLowerCase());
+          vehicleList = vehicleList.sort((a: Vehicle, b: Vehicle) => {
+            const aColor = (a.exteriorColor || a.exterior_color || '').toLowerCase();
+            const bColor = (b.exteriorColor || b.exterior_color || '').toLowerCase();
             
             // Find which preference each color matches (0=1st, 1=2nd, 2=3rd, -1=no match)
-            const getMatchIndex = (color) => {
+            const getMatchIndex = (color: string): number => {
               for (let i = 0; i < colorPrefs.length; i++) {
                 // Match first word of color preference
                 const keyword = colorPrefs[i].split(' ')[0];
@@ -148,32 +172,9 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
     fetchVehicles();
   }, [customerData]);
 
-  // Generate gradient based on color
-  const getGradient = (color) => {
-    const colorMap = {
-      'white': 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
-      'black': 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
-      'red': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-      'blue': 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-      'silver': 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
-      'gray': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-      'beige': 'linear-gradient(135deg, #d4b896 0%, #a78b6c 100%)',
-      'cypress': 'linear-gradient(135deg, #4a5568 0%, #2d3748 100%)',
-      'polar': 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)',
-    };
-    const lowerColor = (color || '').toLowerCase();
-    return Object.entries(colorMap).find(([key]) => lowerColor.includes(key))?.[1] 
-      || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
-  };
-
-  // Format price without decimals
-  const formatPrice = (price) => {
-    return Math.round(price || 0).toLocaleString();
-  };
-
   // Apply additional client-side filtering as a safety net
-  const filteredVehicles = vehicles.filter(vehicle => {
-    if (!customerData.selectedModel) return true; // No filter if no model selected
+  const filteredVehicles = vehicles.filter((vehicle: Vehicle) => {
+    if (!customerData?.selectedModel) return true; // No filter if no model selected
     
     const targetModel = customerData.selectedModel.toLowerCase().trim();
     const vehicleModel = (vehicle.model || '').toLowerCase().trim();
@@ -186,23 +187,27 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
            (vehicleModel.startsWith(targetModel) && !/\d/.test(vehicleModel.charAt(targetModel.length)));
   });
 
-  const sortedVehicles = [...filteredVehicles].sort((a, b) => {
+  const sortedVehicles = [...filteredVehicles].sort((a: Vehicle, b: Vehicle) => {
     switch (sortBy) {
       case 'priceLow': return (a.price || 0) - (b.price || 0);
       case 'priceHigh': return (b.price || 0) - (a.price || 0);
       case 'newest': return (b.year || 0) - (a.year || 0);
-      default: return (b.matchScore || 50) - (a.matchScore || 50);
+      default: return ((b as Vehicle & { matchScore?: number }).matchScore || 50) - ((a as Vehicle & { matchScore?: number }).matchScore || 50);
     }
   });
 
   // Get the appropriate title based on path
-  const getTitle = () => {
-    if (customerData.path === 'browse') return 'All Inventory';
-    if (customerData.quizAnswers && Object.keys(customerData.quizAnswers).length > 0) {
+  const getTitle = (): string => {
+    if (customerData?.path === 'browse') return 'All Inventory';
+    if (customerData?.quizAnswers && Object.keys(customerData.quizAnswers).length > 0) {
       return 'Recommended For You';
     }
-    if (customerData.selectedModel) return `${customerData.selectedModel} Inventory`;
+    if (customerData?.selectedModel) return `${customerData.selectedModel} Inventory`;
     return 'All Inventory';
+  };
+
+  const handleSortChange = (e: ChangeEvent<HTMLSelectElement>): void => {
+    setSortBy(e.target.value as SortOption);
   };
 
   if (loading) {
@@ -237,7 +242,7 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
             <span style={styles.matchCount}> ({filteredVehicles.length})</span>
           </h1>
           <p style={styles.subtitle}>
-            {customerData.path === 'browse' 
+            {customerData?.path === 'browse' 
               ? 'Browse our complete inventory' 
               : 'Sorted by best match based on your preferences'
             }
@@ -248,7 +253,7 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
           <select 
             style={styles.sortSelect}
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
+            onChange={handleSortChange}
           >
             <option value="recommended">Best Match</option>
             <option value="priceLow">Price: Low to High</option>
@@ -261,86 +266,92 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
       {/* Vehicle Grid */}
       {sortedVehicles.length > 0 ? (
         <div style={styles.vehicleGrid}>
-          {sortedVehicles.map((vehicle, index) => (
-            <div 
-              key={vehicle.id || vehicle.stockNumber || index}
-              style={styles.vehicleCard}
-              onClick={() => handleVehicleClick(vehicle)}
-              title={`View on QuirkChevyNH.com`}
-            >
-              {/* Match Score - only show if from quiz */}
-              {vehicle.matchScore && customerData.quizAnswers && (
-                <div style={styles.matchBadge}>
-                  <span style={styles.matchScore}>{vehicle.matchScore}%</span>
-                  <span style={styles.matchLabel}>Match</span>
-                </div>
-              )}
-
-              {/* Vehicle Image */}
-              <div style={{ ...styles.vehicleImage, background: getGradient(vehicle.exteriorColor) }}>
-                <span style={styles.vehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
-                <div style={styles.statusBadge}>
-                  <span style={{
-                    ...styles.statusDot,
-                    background: vehicle.status === 'In Stock' ? '#4ade80' : '#fbbf24',
-                  }} />
-                  {vehicle.status || 'In Stock'}
-                </div>
-              </div>
-
-              {/* Vehicle Info */}
-              <div style={styles.vehicleInfo}>
-                <div style={styles.vehicleHeader}>
-                  <div>
-                    <h3 style={styles.vehicleName}>{vehicle.year} {vehicle.model}</h3>
-                    <p style={styles.vehicleTrim}>{vehicle.trim}</p>
-                  </div>
-                  <span style={styles.stockNumber}>STK# {vehicle.stockNumber}</span>
-                </div>
-
-                <div style={styles.vehicleColor}>
-                  <div style={{ ...styles.colorSwatch, background: getGradient(vehicle.exteriorColor) }} />
-                  {vehicle.exteriorColor}
-                </div>
-
-                {/* Features */}
-                {vehicle.features && vehicle.features.length > 0 && (
-                  <div style={styles.featureTags}>
-                    {vehicle.features.slice(0, 3).map((feature, idx) => (
-                      <span key={idx} style={styles.featureTag}>{feature}</span>
-                    ))}
+          {sortedVehicles.map((vehicle, index) => {
+            const vehicleWithScore = vehicle as Vehicle & { matchScore?: number };
+            const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
+            const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
+            
+            return (
+              <div 
+                key={vehicle.id || stockNumber || index}
+                style={styles.vehicleCard}
+                onClick={() => handleVehicleClick(vehicle)}
+                title="View on QuirkChevyNH.com"
+              >
+                {/* Match Score - only show if from quiz */}
+                {vehicleWithScore.matchScore && customerData?.quizAnswers && (
+                  <div style={styles.matchBadge}>
+                    <span style={styles.matchScore}>{vehicleWithScore.matchScore}%</span>
+                    <span style={styles.matchLabel}>Match</span>
                   </div>
                 )}
 
-                {/* Pricing - MSRP on left, Your Price on right */}
-                <div style={styles.pricingSection}>
-                  <div style={styles.priceColumn}>
-                    <span style={styles.priceLabel}>MSRP</span>
-                    <span style={styles.msrpValue}>${formatPrice(vehicle.msrp || vehicle.price)}</span>
-                  </div>
-                  <div style={styles.paymentColumn}>
-                    <span style={styles.priceLabel}>Your Price</span>
-                    <span style={styles.paymentValue}>
-                      ${formatPrice(vehicle.price)}
-                    </span>
+                {/* Vehicle Image */}
+                <div style={{ ...styles.vehicleImage, background: getGradient(exteriorColor) }}>
+                  <span style={styles.vehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
+                  <div style={styles.statusBadge}>
+                    <span style={{
+                      ...styles.statusDot,
+                      background: vehicle.status === 'In Stock' ? '#4ade80' : '#fbbf24',
+                    }} />
+                    {vehicle.status || 'In Stock'}
                   </div>
                 </div>
 
-                <button 
-                  style={styles.viewDetailsButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleVehicleClick(vehicle);
-                  }}
-                >
-                  View Details
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
-                  </svg>
-                </button>
+                {/* Vehicle Info */}
+                <div style={styles.vehicleInfo}>
+                  <div style={styles.vehicleHeader}>
+                    <div>
+                      <h3 style={styles.vehicleName}>{vehicle.year} {vehicle.model}</h3>
+                      <p style={styles.vehicleTrim}>{vehicle.trim}</p>
+                    </div>
+                    <span style={styles.stockNumber}>STK# {stockNumber}</span>
+                  </div>
+
+                  <div style={styles.vehicleColor}>
+                    <div style={{ ...styles.colorSwatch, background: getGradient(exteriorColor) }} />
+                    {exteriorColor}
+                  </div>
+
+                  {/* Features */}
+                  {vehicle.features && vehicle.features.length > 0 && (
+                    <div style={styles.featureTags}>
+                      {vehicle.features.slice(0, 3).map((feature, idx) => (
+                        <span key={idx} style={styles.featureTag}>{feature}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Pricing - MSRP on left, Your Price on right */}
+                  <div style={styles.pricingSection}>
+                    <div style={styles.priceColumn}>
+                      <span style={styles.priceLabel}>MSRP</span>
+                      <span style={styles.msrpValue}>${formatPrice(vehicle.msrp || vehicle.price)}</span>
+                    </div>
+                    <div style={styles.paymentColumn}>
+                      <span style={styles.priceLabel}>Your Price</span>
+                      <span style={styles.paymentValue}>
+                        ${formatPrice(vehicle.price)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button 
+                    style={styles.viewDetailsButton}
+                    onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                      e.stopPropagation();
+                      handleVehicleClick(vehicle);
+                    }}
+                  >
+                    View Details
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div style={styles.noResults}>
@@ -361,7 +372,7 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
   );
 };
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   container: {
     minHeight: '100vh',
     maxHeight: '100vh',
