@@ -120,56 +120,67 @@ const GM_COLORS = {
   ],
 };
 
-const VEHICLE_CATEGORIES = {
+// Base category definitions - models will be filtered by actual inventory
+const BASE_CATEGORIES = {
   trucks: {
     name: 'Trucks',
     icon: '🚛',
-    models: [
-      { name: 'Silverado 1500', cabOptions: ['Regular Cab', 'Double Cab', 'Crew Cab'] },
-      { name: 'Silverado 2500HD', cabOptions: ['Regular Cab', 'Double Cab', 'Crew Cab'] },
-      { name: 'Silverado 3500HD', cabOptions: ['Regular Cab', 'Double Cab', 'Crew Cab'] },
-      { name: 'Colorado', cabOptions: ['Extended Cab', 'Crew Cab'] },
-    ],
+    modelNames: ['Silverado 1500', 'Silverado 2500HD', 'Silverado 3500HD', 'Colorado', 'Silverado MD'],
+    cabOptions: {
+      'Silverado 1500': ['Regular Cab', 'Double Cab', 'Crew Cab'],
+      'Silverado 2500HD': ['Regular Cab', 'Double Cab', 'Crew Cab'],
+      'Silverado 3500HD': ['Regular Cab', 'Double Cab', 'Crew Cab'],
+      'Colorado': ['Extended Cab', 'Crew Cab'],
+    },
   },
   suvs: {
     name: 'SUVs & Crossovers',
     icon: '🚙',
-    models: [
-      { name: 'Trax' },
-      { name: 'Trailblazer' },
-      { name: 'Equinox' },
-      { name: 'Blazer' },
-      { name: 'Traverse' },
-      { name: 'Tahoe' },
-      { name: 'Suburban' },
-    ],
+    modelNames: ['Trax', 'Trailblazer', 'Equinox', 'Blazer', 'Traverse', 'Tahoe', 'Suburban'],
   },
   sports: {
     name: 'Sports Cars',
     icon: '🏎️',
-    models: [
-      { name: 'Corvette' },
-      { name: 'Camaro' },
-    ],
+    modelNames: ['Corvette', 'Camaro'],
   },
   sedans: {
     name: 'Sedans',
     icon: '🚗',
-    models: [
-      { name: 'Malibu' },
-    ],
+    modelNames: ['Malibu'],
   },
   electric: {
     name: 'Electric',
     icon: '⚡',
-    models: [
-      { name: 'Bolt EV' },
-      { name: 'Bolt EUV' },
-      { name: 'Equinox EV' },
-      { name: 'Blazer EV' },
-      { name: 'Silverado EV' },
-    ],
+    modelNames: ['Bolt EV', 'Bolt EUV', 'Equinox EV', 'Blazer EV', 'Silverado EV'],
   },
+};
+
+// Helper to normalize model names for matching
+const normalizeModelName = (name) => {
+  return name.toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+// Check if inventory model matches a category model
+const modelMatches = (inventoryModel, categoryModel) => {
+  const invNorm = normalizeModelName(inventoryModel);
+  const catNorm = normalizeModelName(categoryModel);
+  
+  // Exact match
+  if (invNorm === catNorm) return true;
+  
+  // Inventory model starts with category model (e.g., "Silverado 1500" matches "Silverado 1500 LT")
+  if (invNorm.startsWith(catNorm)) return true;
+  
+  // Handle special cases
+  if (catNorm === 'silverado 2500hd' && invNorm.includes('2500')) return true;
+  if (catNorm === 'silverado 3500hd' && (invNorm.includes('3500') || invNorm.includes('3500hd cc'))) return true;
+  if (catNorm === 'equinox ev' && invNorm === 'equinox ev') return true;
+  if (catNorm === 'equinox' && invNorm === 'equinox' && !invNorm.includes('ev')) return true;
+  if (catNorm === 'silverado ev' && invNorm === 'silverado ev') return true;
+  
+  return false;
 };
 
 const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) => {
@@ -185,25 +196,76 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
   const [hasPayoff, setHasPayoff] = useState(null);
   const [payoffAmount, setPayoffAmount] = useState('');
   const [inventoryCount, setInventoryCount] = useState(null);
+  const [inventoryByModel, setInventoryByModel] = useState({});
+  const [loadingInventory, setLoadingInventory] = useState(true);
+
+  // Fetch inventory counts on mount to filter available models
+  useEffect(() => {
+    const loadInventoryCounts = async () => {
+      try {
+        const data = await api.getInventory({});
+        const vehicles = data?.vehicles || data || [];
+        
+        // Count vehicles by model
+        const counts = {};
+        vehicles.forEach(vehicle => {
+          const model = (vehicle.model || '').trim();
+          if (model) {
+            // Try to match to our category models
+            Object.values(BASE_CATEGORIES).forEach(category => {
+              category.modelNames.forEach(categoryModel => {
+                if (modelMatches(model, categoryModel)) {
+                  counts[categoryModel] = (counts[categoryModel] || 0) + 1;
+                }
+              });
+            });
+          }
+        });
+        
+        setInventoryByModel(counts);
+      } catch (err) {
+        console.error('Error loading inventory counts:', err);
+      } finally {
+        setLoadingInventory(false);
+      }
+    };
+    
+    loadInventoryCounts();
+  }, []);
+
+  // Build dynamic categories based on actual inventory
+  const VEHICLE_CATEGORIES = Object.entries(BASE_CATEGORIES).reduce((acc, [key, category]) => {
+    const availableModels = category.modelNames
+      .filter(modelName => (inventoryByModel[modelName] || 0) > 0)
+      .map(modelName => ({
+        name: modelName,
+        count: inventoryByModel[modelName] || 0,
+        cabOptions: category.cabOptions?.[modelName],
+      }));
+    
+    // Only include category if it has available models
+    if (availableModels.length > 0) {
+      acc[key] = {
+        name: category.name,
+        icon: category.icon,
+        models: availableModels,
+      };
+    }
+    
+    return acc;
+  }, {});
 
   const getModelColors = () => {
     if (!selectedModel) return [];
     return GM_COLORS[selectedModel.name] || GM_COLORS['Equinox'];
   };
 
-  useEffect(() => {
-    const checkInventory = async () => {
-      if (selectedModel) {
-        try {
-          const data = await api.getInventory({ model: selectedModel.name });
-          setInventoryCount(data?.vehicles?.length || data?.length || 0);
-        } catch (err) {
-          console.error('Error checking inventory:', err);
-        }
-      }
-    };
-    checkInventory();
-  }, [selectedModel]);
+ useEffect(() => {
+    // Use pre-loaded inventory count instead of making another API call
+    if (selectedModel) {
+      setInventoryCount(inventoryByModel[selectedModel.name] || 0);
+    }
+  }, [selectedModel, inventoryByModel]);
 
   const handleCategorySelect = (categoryKey) => {
     setSelectedCategory(categoryKey);
