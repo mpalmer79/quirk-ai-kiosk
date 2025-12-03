@@ -146,7 +146,7 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
     };
 
     fetchVehicles();
-  }, [customerData, sortBy]);
+  }, [customerData]);
 
   // Generate gradient based on color
   const getGradient = (color) => {
