@@ -86,11 +86,12 @@ describe('InventoryResults Component', () => {
       
       renderInventoryResults();
       
+      // Component should show loading immediately (loading defaults to true)
       expect(screen.getByText('Loading inventory...')).toBeInTheDocument();
       
-      // Wait for load to complete
+      // Wait for load to complete - use getAllByText since there are 2 Silverados
       await waitFor(() => {
-        expect(screen.getByText('2025 Silverado 1500')).toBeInTheDocument();
+        expect(screen.getAllByText('2025 Silverado 1500').length).toBeGreaterThan(0);
       });
     });
   });
