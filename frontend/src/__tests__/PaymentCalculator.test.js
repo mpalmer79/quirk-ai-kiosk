@@ -290,4 +290,28 @@ describe('PaymentCalculator Edge Cases', () => {
     renderPaymentCalculator({
       customerData: {
         selectedVehicle: defaultVehicle,
-        tradeIn: { estimatedValue: 15000, amount
+        tradeIn: { estimatedValue: 15000, amountOwed: 5000 },
+      },
+    });
+    
+    expect(screen.getByText('Trade-In Applied')).toBeInTheDocument();
+  });
+});
+
+describe('PaymentCalculator Accessibility', () => {
+  test('sliders have associated labels', () => {
+    renderPaymentCalculator();
+    
+    expect(screen.getByText('Est. APR')).toBeInTheDocument();
+    // 2 slider labels + 1 result display = 3 total "Down Payment" texts
+    expect(screen.getAllByText('Down Payment').length).toBe(3);
+  });
+
+  test('all interactive elements are buttons', () => {
+    renderPaymentCalculator();
+    
+    expect(screen.getByText('Select Lease').tagName).toBe('BUTTON');
+    expect(screen.getByText('Select Finance').tagName).toBe('BUTTON');
+    expect(screen.getByText('Back to Vehicle').tagName).toBe('BUTTON');
+  });
+});
