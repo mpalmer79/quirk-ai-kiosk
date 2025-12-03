@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from './api';
-import GM_COLORS from '../constants/gmColors';
-import { BASE_CATEGORIES, modelMatches } from '../constants/vehicleCategories';
-import styles from '../styles/modelBudgetSelectorStyles';
+import GM_COLORS from './gmColors';
+import { BASE_CATEGORIES, modelMatches } from './vehicleCategories';
+import styles from './modelBudgetSelectorStyles';
 
 const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) => {
   // Steps: 1=Category, 2=Model, 3=Cab, 4=Colors, 5=Budget, 6=Trade-In
