@@ -1,16 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from './api';
 
-const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
+const WelcomeScreen = ({ navigateTo, updateCustomerData, customerData }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [hoveredPath, setHoveredPath] = useState(null);
   const [hoveredStat, setHoveredStat] = useState(null);
   const [stats, setStats] = useState(null);
+  
+  // Name capture state
+  const [customerName, setCustomerName] = useState(customerData?.customerName || '');
+  const [nameSubmitted, setNameSubmitted] = useState(!!customerData?.customerName);
+  const [isTyping, setIsTyping] = useState(false);
+  const nameInputRef = useRef(null);
 
   useEffect(() => {
     setIsVisible(true);
     loadStats();
-  }, []);
+    
+    // Focus name input after animation
+    if (!nameSubmitted) {
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 800);
+    }
+  }, [nameSubmitted]);
 
   const loadStats = async () => {
     try {
@@ -19,6 +32,27 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
     } catch (err) {
       console.error('Error loading stats:', err);
     }
+  };
+
+  const handleNameSubmit = () => {
+    const trimmedName = customerName.trim();
+    if (trimmedName) {
+      // Capitalize first letter
+      const formattedName = trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
+      updateCustomerData({ customerName: formattedName });
+      setCustomerName(formattedName);
+    }
+    setNameSubmitted(true);
+  };
+
+  const handleNameKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleNameSubmit();
+    }
+  };
+
+  const handleSkipName = () => {
+    setNameSubmitted(true);
   };
 
   const handlePathSelect = (path) => {
@@ -40,19 +74,15 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
   const handleStatClick = (statType) => {
     switch (statType) {
       case 'total':
-        // Show all vehicles
         updateCustomerData({ path: 'browse', filterType: null, sortBy: null });
         break;
       case 'suv':
-        // Filter to SUVs only
         updateCustomerData({ path: 'browse', filterType: 'SUV', bodyStyleFilter: 'SUV' });
         break;
       case 'truck':
-        // Filter to Trucks only
         updateCustomerData({ path: 'browse', filterType: 'Truck', bodyStyleFilter: 'Truck' });
         break;
       case 'price':
-        // Show all sorted by price ascending
         updateCustomerData({ path: 'browse', filterType: null, sortBy: 'priceLow' });
         break;
       default:
@@ -106,6 +136,131 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
     },
   ];
 
+  // Get personalized greeting
+  const getGreeting = () => {
+    if (customerName) {
+      return (
+        <>
+          Nice to meet you, <span style={styles.highlight}>{customerName}</span>!
+        </>
+      );
+    }
+    return (
+      <>
+        Hi, I'm your <span style={styles.highlight}>Quirk AI</span> assistant
+      </>
+    );
+  };
+
+  // Phase 1: Name Capture Screen
+  if (!nameSubmitted) {
+    return (
+      <div style={styles.container}>
+        {/* Background Image */}
+        <div style={styles.backgroundImage} />
+        <div style={styles.backgroundOverlay} />
+        
+        {/* Name Capture Section */}
+        <div style={{
+          ...styles.nameCaptureSection,
+          opacity: isVisible ? 1 : 0,
+          transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+        }}>
+          {/* AI Avatar */}
+          <div style={styles.largeAiAvatar}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="9" cy="10" r="1.5" fill="#ffffff" stroke="none" />
+              <circle cx="15" cy="10" r="1.5" fill="#ffffff" stroke="none" />
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round" />
+            </svg>
+          </div>
+
+          <h1 style={styles.nameTitle}>
+            Hi, I'm your <span style={styles.highlight}>Quirk AI</span> assistant
+          </h1>
+          
+          <h2 style={styles.nameSubtitle}>
+            Welcome to Quirk Chevrolet!
+          </h2>
+          
+          <p style={styles.namePrompt}>
+            What's your first name?
+          </p>
+
+          {/* Name Input */}
+          <div style={styles.nameInputContainer}>
+            <input
+              ref={nameInputRef}
+              type="text"
+              style={styles.nameInput}
+              placeholder="Enter your first name"
+              value={customerName}
+              onChange={(e) => {
+                setCustomerName(e.target.value);
+                setIsTyping(e.target.value.length > 0);
+              }}
+              onKeyPress={handleNameKeyPress}
+              maxLength={20}
+              autoComplete="off"
+              autoCapitalize="words"
+            />
+            
+            {isTyping && (
+              <button 
+                style={styles.nameSubmitButton}
+                onClick={handleNameSubmit}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Continue / Skip */}
+          <div style={styles.nameActions}>
+            <button 
+              style={{
+                ...styles.continueButton,
+                opacity: customerName.trim() ? 1 : 0.5,
+              }}
+              onClick={handleNameSubmit}
+              disabled={!customerName.trim()}
+            >
+              Continue
+            </button>
+            
+            <button 
+              style={styles.skipButton}
+              onClick={handleSkipName}
+            >
+              Skip for now
+            </button>
+          </div>
+
+          {/* Privacy Note */}
+          <p style={styles.privacyNote}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Your name is only used to personalize your experience today
+          </p>
+        </div>
+
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+          }
+          @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+        `}</style>
+      </div>
+    );
+  }
+
+  // Phase 2: Main Welcome Screen with Personalization
   return (
     <div style={styles.container}>
       {/* Background Image */}
@@ -120,25 +275,20 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData }) => {
       }}>
         <div style={styles.greeting}>
           <div style={styles.aiAvatar}>
-            {/* Fixed Smiley Face - proper eyes and smile */}
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
-              {/* Face circle */}
               <circle cx="12" cy="12" r="10" />
-              {/* Left eye - filled circle */}
               <circle cx="9" cy="10" r="1.5" fill="#ffffff" stroke="none" />
-              {/* Right eye - filled circle */}
               <circle cx="15" cy="10" r="1.5" fill="#ffffff" stroke="none" />
-              {/* Smile */}
               <path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round" />
             </svg>
           </div>
           <h1 style={styles.heroTitle}>
-            Hi, I'm your <span style={styles.highlight}>Quirk AI</span> assistant
+            {getGreeting()}
           </h1>
         </div>
         
         <h2 style={styles.heroSubtitle}>
-          Welcome to Quirk Chevrolet
+          {customerName ? 'Welcome to Quirk Chevrolet' : 'Welcome to Quirk Chevrolet'}
         </h2>
         
         <p style={styles.heroText}>
@@ -317,6 +467,122 @@ const styles = {
     background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.75) 50%, rgba(0,0,0,0.85) 100%)',
     zIndex: 1,
   },
+  // Name Capture Styles
+  nameCaptureSection: {
+    textAlign: 'center',
+    maxWidth: '500px',
+    padding: '40px',
+    position: 'relative',
+    zIndex: 2,
+    transition: 'all 0.6s ease',
+  },
+  largeAiAvatar: {
+    width: '100px',
+    height: '100px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#ffffff',
+    margin: '0 auto 24px',
+    boxShadow: '0 8px 32px rgba(27, 115, 64, 0.4)',
+  },
+  nameTitle: {
+    fontSize: '32px',
+    fontWeight: '700',
+    color: '#ffffff',
+    margin: '0 0 8px 0',
+    textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+  },
+  nameSubtitle: {
+    fontSize: '24px',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
+    margin: '0 0 32px 0',
+    textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+  },
+  namePrompt: {
+    fontSize: '20px',
+    color: 'rgba(255,255,255,0.8)',
+    margin: '0 0 20px 0',
+  },
+  nameInputContainer: {
+    position: 'relative',
+    width: '100%',
+    marginBottom: '24px',
+  },
+  nameInput: {
+    width: '100%',
+    padding: '20px 60px 20px 24px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '2px solid rgba(255,255,255,0.2)',
+    borderRadius: '16px',
+    color: '#ffffff',
+    fontSize: '24px',
+    fontWeight: '600',
+    textAlign: 'center',
+    transition: 'all 0.2s ease',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    boxSizing: 'border-box',
+  },
+  nameSubmitButton: {
+    position: 'absolute',
+    right: '12px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: '44px',
+    height: '44px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    color: '#ffffff',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+  },
+  nameActions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '24px',
+  },
+  continueButton: {
+    width: '100%',
+    padding: '18px 32px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    borderRadius: '12px',
+    color: '#ffffff',
+    fontSize: '18px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 4px 15px rgba(27, 115, 64, 0.3)',
+  },
+  skipButton: {
+    background: 'transparent',
+    border: 'none',
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    padding: '12px',
+    transition: 'color 0.2s ease',
+  },
+  privacyNote: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.4)',
+    margin: 0,
+  },
+  // Main Welcome Styles
   heroSection: {
     textAlign: 'center',
     marginBottom: '48px',
