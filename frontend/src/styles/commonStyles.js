@@ -9,7 +9,6 @@ import { colors, typography, spacing, borderRadius, transitions } from './theme'
 // BUTTONS
 // ============================================
 export const buttons = {
-  // Primary action button (green gradient)
   primary: {
     display: 'flex',
     alignItems: 'center',
@@ -26,7 +25,6 @@ export const buttons = {
     transition: transitions.normal,
   },
   
-  // Primary large (for CTAs)
   primaryLarge: {
     display: 'flex',
     alignItems: 'center',
@@ -43,7 +41,6 @@ export const buttons = {
     transition: transitions.normal,
   },
   
-  // Secondary button (outline style)
   secondary: {
     display: 'flex',
     alignItems: 'center',
@@ -60,7 +57,6 @@ export const buttons = {
     transition: transitions.normal,
   },
   
-  // Ghost button (transparent)
   ghost: {
     display: 'flex',
     alignItems: 'center',
@@ -74,7 +70,6 @@ export const buttons = {
     padding: 0,
   },
   
-  // Term/option button (selectable)
   term: {
     flex: 1,
     padding: spacing[3],
@@ -88,7 +83,6 @@ export const buttons = {
     background: 'transparent',
   },
   
-  // Term button selected state
   termSelected: {
     background: colors.primary,
     borderColor: colors.primary,
@@ -99,7 +93,6 @@ export const buttons = {
 // CARDS
 // ============================================
 export const cards = {
-  // Standard card container
   base: {
     padding: spacing[6],
     background: colors.bgCard,
@@ -107,7 +100,6 @@ export const cards = {
     border: `1px solid ${colors.border}`,
   },
   
-  // Card with hover effect
   interactive: {
     padding: spacing[6],
     background: colors.bgCard,
@@ -117,7 +109,6 @@ export const cards = {
     transition: transitions.normal,
   },
   
-  // Pricing/highlight card
   highlight: {
     padding: spacing[6],
     background: colors.primaryBg,
@@ -125,7 +116,6 @@ export const cards = {
     border: `1px solid ${colors.primaryBorder}`,
   },
   
-  // Results section card
   results: {
     padding: spacing[5],
     background: colors.bgOverlay,
@@ -137,19 +127,16 @@ export const cards = {
 // FORM INPUTS
 // ============================================
 export const inputs = {
-  // Slider container
   sliderContainer: {
     display: 'flex',
     alignItems: 'center',
     gap: spacing[4],
   },
   
-  // Slider track
   slider: {
     flex: 1,
   },
   
-  // Slider value display
   sliderValue: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
@@ -158,7 +145,6 @@ export const inputs = {
     textAlign: 'right',
   },
   
-  // Select dropdown
   select: {
     padding: `${spacing[3]} ${spacing[4]}`,
     background: colors.bgCard,
@@ -169,7 +155,6 @@ export const inputs = {
     cursor: 'pointer',
   },
   
-  // Input label
   label: {
     display: 'block',
     fontSize: typography.fontSize.base,
@@ -178,12 +163,10 @@ export const inputs = {
     marginBottom: spacing[2],
   },
   
-  // Input group wrapper
   group: {
     marginBottom: spacing[5],
   },
   
-  // Button group (horizontal)
   buttonGroup: {
     display: 'flex',
     gap: spacing[2],
@@ -194,7 +177,6 @@ export const inputs = {
 // TEXT STYLES
 // ============================================
 export const text = {
-  // Page title
   pageTitle: {
     fontSize: typography.fontSize['6xl'],
     fontWeight: typography.fontWeight.bold,
@@ -202,7 +184,6 @@ export const text = {
     margin: 0,
   },
   
-  // Section title
   sectionTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
@@ -210,7 +191,6 @@ export const text = {
     margin: 0,
   },
   
-  // Card title
   cardTitle: {
     fontSize: typography.fontSize['4xl'],
     fontWeight: typography.fontWeight.bold,
@@ -218,14 +198,12 @@ export const text = {
     margin: 0,
   },
   
-  // Subtitle/description
   subtitle: {
     fontSize: typography.fontSize.xl,
     color: colors.textMuted,
     margin: 0,
   },
   
-  // Small label (uppercase)
   label: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
@@ -233,34 +211,29 @@ export const text = {
     textTransform: 'uppercase',
   },
   
-  // Body text
   body: {
     fontSize: typography.fontSize.md,
     color: colors.textSecondary,
     lineHeight: typography.lineHeight.normal,
   },
   
-  // Muted/helper text
   muted: {
     fontSize: typography.fontSize.base,
     color: colors.textSubtle,
   },
   
-  // Large display number
   displayLarge: {
     fontSize: typography.fontSize['7xl'],
     fontWeight: typography.fontWeight.bold,
     color: colors.textPrimary,
   },
   
-  // Price display
   price: {
     fontSize: typography.fontSize['6xl'],
     fontWeight: typography.fontWeight.bold,
     color: colors.primaryLight,
   },
   
-  // Monospace (for VINs, codes)
   mono: {
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontMono,
@@ -272,60 +245,51 @@ export const text = {
 // LAYOUT
 // ============================================
 export const layout = {
-  // Page container
   pageContainer: {
     flex: 1,
     padding: `${spacing[6]} ${spacing[10]}`,
     overflow: 'auto',
   },
   
-  // Centered content container
   centeredContainer: {
     maxWidth: '1200px',
     margin: '0 auto',
   },
   
-  // Two column grid
   twoColumnGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: spacing[6],
   },
   
-  // Auto-fit grid
   autoGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
     gap: spacing[6],
   },
   
-  // Flex row
   flexRow: {
     display: 'flex',
     alignItems: 'center',
     gap: spacing[3],
   },
   
-  // Flex row with space between
   flexBetween: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   
-  // Flex column
   flexColumn: {
     display: 'flex',
     flexDirection: 'column',
     gap: spacing[5],
   },
   
-  // Header section
   header: {
     marginBottom: spacing[6],
   },
   
-  // Divider
   divider: {
     height: '1px',
     background: colors.border,
@@ -337,7 +301,6 @@ export const layout = {
 // BADGES & TAGS
 // ============================================
 export const badges = {
-  // Success badge
   success: {
     padding: `${spacing[2]} ${spacing[3]}`,
     background: colors.successBg,
@@ -347,7 +310,6 @@ export const badges = {
     fontWeight: typography.fontWeight.semibold,
   },
   
-  // Feature tag
   feature: {
     padding: `${spacing[1]} ${spacing[3]}`,
     background: colors.primaryBgStrong,
@@ -357,7 +319,6 @@ export const badges = {
     color: colors.primaryLight,
   },
   
-  // Status badge (with dot)
   status: {
     display: 'flex',
     alignItems: 'center',
@@ -370,14 +331,12 @@ export const badges = {
     color: colors.textPrimary,
   },
   
-  // Status dot
   statusDot: {
     width: '8px',
     height: '8px',
     borderRadius: borderRadius.full,
   },
   
-  // Match score badge
   matchScore: {
     display: 'flex',
     flexDirection: 'column',
@@ -393,7 +352,6 @@ export const badges = {
 // BANNERS
 // ============================================
 export const banners = {
-  // Info/tip banner
   info: {
     display: 'flex',
     alignItems: 'center',
@@ -403,7 +361,6 @@ export const banners = {
     borderRadius: borderRadius['2xl'],
   },
   
-  // Success banner
   success: {
     display: 'flex',
     alignItems: 'center',
@@ -413,7 +370,6 @@ export const banners = {
     borderRadius: borderRadius['2xl'],
   },
   
-  // CTA banner (dashed border)
   cta: {
     display: 'flex',
     alignItems: 'center',
@@ -433,33 +389,18 @@ export const banners = {
 // UTILITY HELPERS
 // ============================================
 export const utils = {
-  // Center content
   center: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   },
   
-  // Full width
   fullWidth: {
     width: '100%',
   },
   
-  // Text center
   textCenter: {
     textAlign: 'center',
-  },
-  
-  // Hide visually
-  srOnly: {
-    position: 'absolute',
-    width: '1px',
-    height: '1px',
-    padding: 0,
-    margin: '-1px',
-    overflow: 'hidden',
-    clip: 'rect(0, 0, 0, 0)',
-    border: 0,
   },
 };
 
