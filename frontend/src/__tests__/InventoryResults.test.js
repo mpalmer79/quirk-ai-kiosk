@@ -429,12 +429,19 @@ describe('InventoryResults URL Generation', () => {
     );
   });
 
-  test('URL includes year and make', async () => {
+ test('URL includes make and model', async () => {
     renderInventoryResults();
 
     await waitFor(() => {
       expect(screen.getAllByText('View Details')[0]).toBeInTheDocument();
     });
+
+    fireEvent.click(screen.getAllByText('View Details')[0]);
+
+    const call = mockWindowOpen.mock.calls[0][0];
+    expect(call).toContain('chevrolet');
+    expect(call).toContain('silverado');
+  });
 
     fireEvent.click(screen.getAllByText('View Details')[0]);
 
