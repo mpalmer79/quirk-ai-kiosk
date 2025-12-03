@@ -118,6 +118,16 @@ const GM_COLORS = {
     { name: 'Bright Blue Metallic', code: 'G1M', hex: '#0055aa', premium: false },
     { name: 'Ice Blue Metallic', code: 'GLS', hex: '#a8c8d8', premium: false },
   ],
+  'Silverado EV': [
+    { name: 'Summit White', code: 'GAZ', hex: '#f5f5f5', premium: false },
+    { name: 'Black', code: 'GBA', hex: '#1a1a1a', premium: false },
+    { name: 'Sterling Gray Metallic', code: 'GXD', hex: '#6b6b6b', premium: false },
+  ],
+  'Equinox EV': [
+    { name: 'Summit White', code: 'GAZ', hex: '#f5f5f5', premium: false },
+    { name: 'Black', code: 'GBA', hex: '#1a1a1a', premium: false },
+    { name: 'Riptide Blue Metallic', code: 'GJV', hex: '#1e5aa8', premium: false },
+  ],
 };
 
 // Base category definitions - models will be filtered by actual inventory
@@ -260,7 +270,7 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
     return GM_COLORS[selectedModel.name] || GM_COLORS['Equinox'];
   };
 
- useEffect(() => {
+  useEffect(() => {
     // Use pre-loaded inventory count instead of making another API call
     if (selectedModel) {
       setInventoryCount(inventoryByModel[selectedModel.name] || 0);
@@ -312,6 +322,19 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
     else if (step === 2) { setStep(1); setSelectedCategory(null); }
   };
 
+  // Loading state
+  if (loadingInventory) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loadingContainer}>
+          <div style={styles.loadingSpinner} />
+          <p style={styles.loadingText}>Loading available models...</p>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   // Step 1: Category Selection
   const renderCategorySelection = () => (
     <div style={styles.stepContainer}>
@@ -341,6 +364,10 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
   // Step 2: Model Selection
   const renderModelSelection = () => {
     const category = VEHICLE_CATEGORIES[selectedCategory];
+    if (!category) {
+      setStep(1);
+      return null;
+    }
     return (
       <div style={styles.stepContainer}>
         <button style={styles.backButton} onClick={handleBack}>
@@ -359,6 +386,7 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
             <button key={model.name} style={styles.modelCard} onClick={() => handleModelSelect(model)}>
               <div style={styles.modelInitial}>{model.name.charAt(0)}</div>
               <span style={styles.modelName}>{model.name}</span>
+              <span style={styles.modelCount}>{model.count} in stock</span>
               {model.cabOptions && <span style={styles.modelConfig}>{model.cabOptions.length} configurations</span>}
             </button>
           ))}
@@ -492,21 +520,16 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
 
   // Step 5: Budget Selection with Buying Power Calculation
   const renderBudgetSelection = () => {
-    const APR = 0.07; // 7% APR
+    const APR = 0.07;
     const monthlyRate = APR / 12;
     
-    // Calculate loan amount from monthly payment using amortization formula
-    // L = P * [(1 - (1 + r)^-n) / r]
     const calculateLoanAmount = (payment, months) => {
       if (monthlyRate === 0) return payment * months;
       return payment * ((1 - Math.pow(1 + monthlyRate, -months)) / monthlyRate);
     };
     
-    // Determine term based on estimated loan amount (use max payment for calculation)
     const estimatedLoan = calculateLoanAmount(budgetRange.max, 84);
     const term = estimatedLoan > 20000 ? 84 : 72;
-    
-    // Calculate buying power using max payment
     const loanAmount = calculateLoanAmount(budgetRange.max, term);
     const totalBuyingPower = loanAmount + downPayment;
     
@@ -564,7 +587,6 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
             </div>
           </div>
 
-          {/* Buying Power Breakdown */}
           <div style={styles.buyingPowerSection}>
             <p style={styles.buyingPowerIntro}>
               Here's the straight-up math on what that budget really buys today.
@@ -736,17 +758,43 @@ const styles = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    padding: '40px',
+    padding: '20px',
+    paddingTop: '80px',
     overflow: 'auto',
+    overflowX: 'hidden',
+    WebkitOverflowScrolling: 'touch',
+    minHeight: '100vh',
+    boxSizing: 'border-box',
+  },
+  loadingContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+  },
+  loadingSpinner: {
+    width: '48px',
+    height: '48px',
+    border: '4px solid rgba(255,255,255,0.1)',
+    borderTopColor: '#1B7340',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  loadingText: {
+    fontSize: '16px',
+    color: 'rgba(255,255,255,0.6)',
   },
   stepContainer: {
-    flex: 1,
+    flex: '1 0 auto',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     maxWidth: '900px',
     margin: '0 auto',
     width: '100%',
+    paddingBottom: '100px',
   },
   backButton: {
     alignSelf: 'flex-start',
@@ -766,6 +814,7 @@ const styles = {
   stepHeader: {
     textAlign: 'center',
     marginBottom: '32px',
+    padding: '0 10px',
   },
   stepIcon: {
     width: '64px',
@@ -779,10 +828,11 @@ const styles = {
     margin: '0 auto 20px',
   },
   stepTitle: {
-    fontSize: '28px',
+    fontSize: 'clamp(22px, 5vw, 28px)',
     fontWeight: '700',
     color: '#ffffff',
     margin: '0 0 8px 0',
+    textAlign: 'center',
   },
   stepSubtitle: {
     fontSize: '16px',
@@ -811,29 +861,30 @@ const styles = {
   },
   categoryGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: '16px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+    gap: '12px',
     width: '100%',
+    paddingBottom: '40px',
   },
   categoryCard: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '10px',
-    padding: '28px 20px',
+    padding: '20px 16px',
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: '16px',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
-  categoryIcon: { fontSize: '40px' },
-  categoryName: { fontSize: '16px', fontWeight: '600', color: '#ffffff' },
+  categoryIcon: { fontSize: '36px' },
+  categoryName: { fontSize: '15px', fontWeight: '600', color: '#ffffff', textAlign: 'center' },
   categoryCount: { fontSize: '12px', color: 'rgba(255,255,255,0.5)' },
   modelGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '16px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    gap: '12px',
     width: '100%',
   },
   modelCard: {
@@ -841,7 +892,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '8px',
-    padding: '24px',
+    padding: '20px 16px',
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: '16px',
@@ -849,23 +900,24 @@ const styles = {
     transition: 'all 0.2s ease',
   },
   modelInitial: {
-    width: '56px',
-    height: '56px',
+    width: '48px',
+    height: '48px',
     borderRadius: '50%',
     background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '24px',
+    fontSize: '20px',
     fontWeight: '700',
     color: '#ffffff',
   },
-  modelName: { fontSize: '16px', fontWeight: '600', color: '#ffffff' },
+  modelName: { fontSize: '15px', fontWeight: '600', color: '#ffffff', textAlign: 'center' },
+  modelCount: { fontSize: '12px', color: '#4ade80', fontWeight: '600' },
   modelConfig: { fontSize: '11px', color: 'rgba(255,255,255,0.5)' },
   cabGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '12px',
     width: '100%',
   },
   cabCard: {
@@ -873,32 +925,33 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '10px',
-    padding: '28px 20px',
+    padding: '24px 16px',
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: '16px',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
-  cabIcon: { fontSize: '40px' },
-  cabName: { fontSize: '18px', fontWeight: '600', color: '#ffffff' },
-  cabDesc: { fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center' },
+  cabIcon: { fontSize: '36px' },
+  cabName: { fontSize: '16px', fontWeight: '600', color: '#ffffff' },
+  cabDesc: { fontSize: '12px', color: 'rgba(255,255,255,0.5)', textAlign: 'center' },
   formSection: {
     width: '100%',
-    padding: '28px',
+    padding: '20px',
     background: 'rgba(255,255,255,0.05)',
     borderRadius: '16px',
     border: '1px solid rgba(255,255,255,0.1)',
+    boxSizing: 'border-box',
   },
   formIntro: {
-    fontSize: '15px',
+    fontSize: '14px',
     color: 'rgba(255,255,255,0.7)',
-    marginBottom: '24px',
+    marginBottom: '20px',
     textAlign: 'center',
   },
   colorSelects: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: '16px',
     marginBottom: '24px',
   },
@@ -922,6 +975,8 @@ const styles = {
     color: '#ffffff',
     fontSize: '15px',
     cursor: 'pointer',
+    width: '100%',
+    boxSizing: 'border-box',
   },
   colorPreview: {
     display: 'flex',
@@ -938,6 +993,7 @@ const styles = {
     height: '24px',
     borderRadius: '6px',
     border: '2px solid rgba(255,255,255,0.3)',
+    flexShrink: 0,
   },
   continueButton: {
     display: 'flex',
@@ -958,12 +1014,13 @@ const styles = {
     display: 'flex',
     alignItems: 'baseline',
     justifyContent: 'center',
-    gap: '12px',
+    gap: '8px',
     marginBottom: '28px',
+    flexWrap: 'wrap',
   },
-  budgetValue: { fontSize: '36px', fontWeight: '700', color: '#4ade80' },
-  budgetSeparator: { fontSize: '18px', color: 'rgba(255,255,255,0.5)' },
-  budgetLabel: { fontSize: '16px', color: 'rgba(255,255,255,0.5)' },
+  budgetValue: { fontSize: 'clamp(28px, 6vw, 36px)', fontWeight: '700', color: '#4ade80' },
+  budgetSeparator: { fontSize: '16px', color: 'rgba(255,255,255,0.5)' },
+  budgetLabel: { fontSize: '14px', color: 'rgba(255,255,255,0.5)' },
   sliderGroup: {
     marginBottom: '20px',
   },
@@ -987,19 +1044,22 @@ const styles = {
   },
   downPaymentOptions: {
     display: 'flex',
-    gap: '10px',
+    gap: '8px',
     marginTop: '10px',
     flexWrap: 'wrap',
   },
   optionButton: {
-    padding: '12px 18px',
+    padding: '10px 14px',
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.15)',
     borderRadius: '10px',
     color: '#ffffff',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: '600',
     cursor: 'pointer',
+    flex: '1 1 auto',
+    minWidth: '70px',
+    textAlign: 'center',
   },
   optionButtonActive: {
     background: 'rgba(27, 115, 64, 0.3)',
@@ -1008,8 +1068,8 @@ const styles = {
   },
   tradeOptions: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '12px',
     marginBottom: '24px',
   },
   tradeCard: {
@@ -1017,7 +1077,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '10px',
-    padding: '28px 20px',
+    padding: '24px 16px',
     background: 'rgba(255,255,255,0.05)',
     border: '2px solid rgba(255,255,255,0.1)',
     borderRadius: '16px',
@@ -1028,17 +1088,17 @@ const styles = {
     background: 'rgba(27, 115, 64, 0.15)',
     borderColor: '#1B7340',
   },
-  tradeIcon: { fontSize: '32px', color: '#4ade80' },
-  tradeName: { fontSize: '18px', fontWeight: '600', color: '#ffffff' },
-  tradeDesc: { fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center' },
+  tradeIcon: { fontSize: '28px', color: '#4ade80' },
+  tradeName: { fontSize: '16px', fontWeight: '600', color: '#ffffff', textAlign: 'center' },
+  tradeDesc: { fontSize: '12px', color: 'rgba(255,255,255,0.5)', textAlign: 'center' },
   payoffSection: {
-    padding: '20px',
+    padding: '16px',
     background: 'rgba(0,0,0,0.2)',
     borderRadius: '12px',
     marginBottom: '24px',
   },
   payoffTitle: {
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: '16px',
@@ -1047,6 +1107,7 @@ const styles = {
     display: 'flex',
     gap: '12px',
     marginBottom: '16px',
+    flexWrap: 'wrap',
   },
   payoffAmountGroup: {
     marginTop: '16px',
@@ -1075,6 +1136,7 @@ const styles = {
     color: '#ffffff',
     fontSize: '16px',
     outline: 'none',
+    minWidth: 0,
   },
   searchButton: {
     display: 'flex',
@@ -1082,12 +1144,12 @@ const styles = {
     justifyContent: 'center',
     gap: '12px',
     width: '100%',
-    padding: '18px',
+    padding: '16px',
     background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
     border: 'none',
     borderRadius: '12px',
     color: '#ffffff',
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: '700',
     cursor: 'pointer',
   },
@@ -1096,6 +1158,8 @@ const styles = {
     justifyContent: 'center',
     gap: '10px',
     marginTop: '32px',
+    marginBottom: '40px',
+    paddingBottom: 'env(safe-area-inset-bottom, 20px)',
   },
   progressDot: {
     width: '10px',
@@ -1110,10 +1174,9 @@ const styles = {
   progressDotComplete: {
     background: '#4ade80',
   },
-  // Buying Power styles
   buyingPowerSection: {
-    marginTop: '28px',
-    padding: '20px',
+    marginTop: '24px',
+    padding: '16px',
     background: 'rgba(0,0,0,0.3)',
     borderRadius: '12px',
     marginBottom: '24px',
@@ -1124,13 +1187,13 @@ const styles = {
     marginBottom: '16px',
   },
   buyingPowerCard: {
-    padding: '20px',
+    padding: '16px',
     background: 'rgba(255,255,255,0.05)',
     borderRadius: '10px',
     marginBottom: '16px',
   },
   buyingPowerTitle: {
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: '12px',
@@ -1159,7 +1222,7 @@ const styles = {
     background: 'rgba(74, 222, 128, 0.1)',
     borderRadius: '8px',
     marginBottom: '16px',
-    fontSize: '15px',
+    fontSize: '14px',
     color: '#4ade80',
   },
   buyingPowerTotal: {
@@ -1169,7 +1232,7 @@ const styles = {
     padding: '12px 16px',
     background: 'rgba(37, 99, 235, 0.15)',
     borderRadius: '8px',
-    fontSize: '16px',
+    fontSize: '15px',
     color: '#60a5fa',
   },
   mathBreakdown: {
