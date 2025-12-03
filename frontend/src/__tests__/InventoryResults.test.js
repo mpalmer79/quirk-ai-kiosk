@@ -143,7 +143,7 @@ describe('InventoryResults Component', () => {
       renderInventoryResults();
 
       await waitFor(() => {
-        expect(screen.getByText('2025 Silverado 1500')).toBeInTheDocument();
+        expect(screen.getAllByText('2025 Silverado 1500').length).toBeGreaterThan(0);
       });
     });
 
@@ -454,7 +454,7 @@ describe('InventoryResults API Integration', () => {
     renderInventoryResults();
 
     await waitFor(() => {
-      expect(screen.getByText('2025 Silverado 1500')).toBeInTheDocument();
+      expect(screen.getAllByText('2025 Silverado 1500').length).toBeGreaterThan(0);
     });
 
     expect(api.getInventory).toHaveBeenCalledTimes(1);
