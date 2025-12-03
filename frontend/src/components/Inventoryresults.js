@@ -15,11 +15,11 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
     const slugify = (text) => {
       if (!text) return '';
       return text.toString().toLowerCase()
-        .replace(/\s+/g, '-')      // Replace spaces with hyphens
-        .replace(/[^\w\-]/g, '')   // Remove special characters except hyphens
-        .replace(/\-\-+/g, '-')    // Replace multiple hyphens with single
-        .replace(/^-+/, '')        // Trim hyphens from start
-        .replace(/-+$/, '');       // Trim hyphens from end
+        .replace(/\s+/g, '-')           // Replace spaces with hyphens
+        .replace(/[^\w-]/g, '')         // Remove special characters except hyphens
+        .replace(/--+/g, '-')           // Replace multiple hyphens with single
+        .replace(/^-+/, '')             // Trim hyphens from start
+        .replace(/-+$/, '');            // Trim hyphens from end
     };
     
     // Build URL components
@@ -43,13 +43,6 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
   const handleVehicleClick = (vehicle) => {
     const dealerUrl = generateDealerUrl(vehicle);
     window.open(dealerUrl, '_blank', 'noopener,noreferrer');
-  };
-
-  // Handle View Details button - internal navigation (for future use)
-  const handleViewDetails = (vehicle, e) => {
-    e.stopPropagation(); // Prevent card click
-    updateCustomerData({ selectedVehicle: vehicle });
-    navigateTo('vehicleDetail');
   };
 
   useEffect(() => {
