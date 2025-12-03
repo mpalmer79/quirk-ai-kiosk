@@ -1,7 +1,14 @@
-import React from 'react';
+import React, { CSSProperties, MouseEvent } from 'react';
+import type { Vehicle } from '../types';
+
+// Component Props
+interface VehicleCardProps {
+  vehicle: Vehicle;
+  onClick?: (vehicle: Vehicle) => void;
+}
 
 // Professional gradient backgrounds based on vehicle type
-const getVehicleGradient = (bodyStyle, model) => {
+const getVehicleGradient = (bodyStyle?: string, model?: string): string => {
   const modelLower = (model || '').toLowerCase();
   
   if (modelLower.includes('corvette')) {
@@ -31,7 +38,7 @@ const getVehicleGradient = (bodyStyle, model) => {
 };
 
 // Get vehicle type icon (SVG as data URI)
-const getVehicleIcon = (bodyStyle) => {
+const getVehicleIcon = (bodyStyle?: string): JSX.Element => {
   const style = (bodyStyle || '').toLowerCase();
   
   if (style.includes('truck')) {
@@ -70,8 +77,8 @@ const getVehicleIcon = (bodyStyle) => {
   );
 };
 
-const VehicleCard = ({ vehicle, onClick }) => {
-  const formatPrice = (price) => {
+const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onClick }) => {
+  const formatPrice = (price: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -80,7 +87,23 @@ const VehicleCard = ({ vehicle, onClick }) => {
     }).format(price);
   };
 
-  const cardStyle = {
+  const handleMouseEnter = (e: MouseEvent<HTMLDivElement>): void => {
+    e.currentTarget.style.transform = 'translateY(-4px)';
+    e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.15)';
+  };
+
+  const handleMouseLeave = (e: MouseEvent<HTMLDivElement>): void => {
+    e.currentTarget.style.transform = 'translateY(0)';
+    e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+  };
+
+  // Get normalized values (handle both camelCase and snake_case)
+  const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || 'N/A';
+  const bodyStyle = vehicle.bodyStyle || vehicle.body_style;
+  const status = vehicle.status || 'In Stock';
+  const price = vehicle.price || vehicle.salePrice || vehicle.sale_price || 0;
+
+  const cardStyle: CSSProperties = {
     background: '#ffffff',
     borderRadius: '12px',
     overflow: 'hidden',
@@ -92,10 +115,10 @@ const VehicleCard = ({ vehicle, onClick }) => {
     flexShrink: 0,
   };
 
-  const imageContainerStyle = {
+  const imageContainerStyle: CSSProperties = {
     width: '100%',
     height: '180px',
-    background: getVehicleGradient(vehicle.bodyStyle, vehicle.model),
+    background: getVehicleGradient(bodyStyle, vehicle.model),
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -104,7 +127,7 @@ const VehicleCard = ({ vehicle, onClick }) => {
     overflow: 'hidden',
   };
 
-  const chevyLogoStyle = {
+  const chevyLogoStyle: CSSProperties = {
     position: 'absolute',
     top: '12px',
     left: '12px',
@@ -113,7 +136,7 @@ const VehicleCard = ({ vehicle, onClick }) => {
     opacity: 0.6,
   };
 
-  const modelTextStyle = {
+  const modelTextStyle: CSSProperties = {
     color: 'white',
     fontSize: '24px',
     fontWeight: '700',
@@ -122,7 +145,7 @@ const VehicleCard = ({ vehicle, onClick }) => {
     marginTop: '8px',
   };
 
-  const yearTrimStyle = {
+  const yearTrimStyle: CSSProperties = {
     color: 'rgba(255,255,255,0.8)',
     fontSize: '14px',
     fontWeight: '500',
@@ -130,11 +153,11 @@ const VehicleCard = ({ vehicle, onClick }) => {
     marginTop: '4px',
   };
 
-  const contentStyle = {
+  const contentStyle: CSSProperties = {
     padding: '16px',
   };
 
-  const titleStyle = {
+  const titleStyle: CSSProperties = {
     fontSize: '16px',
     fontWeight: '600',
     color: '#1a1a1a',
@@ -142,21 +165,21 @@ const VehicleCard = ({ vehicle, onClick }) => {
     lineHeight: '1.3',
   };
 
-  const detailsStyle = {
+  const detailsStyle: CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
     marginBottom: '12px',
   };
 
-  const detailRowStyle = {
+  const detailRowStyle: CSSProperties = {
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: '13px',
     color: '#666',
   };
 
-  const priceContainerStyle = {
+  const priceContainerStyle: CSSProperties = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -164,33 +187,27 @@ const VehicleCard = ({ vehicle, onClick }) => {
     paddingTop: '12px',
   };
 
-  const priceStyle = {
+  const priceStyle: CSSProperties = {
     fontSize: '20px',
     fontWeight: '700',
     color: '#cc0000',
   };
 
-  const statusStyle = {
+  const statusStyle: CSSProperties = {
     fontSize: '11px',
     fontWeight: '600',
     padding: '4px 8px',
     borderRadius: '4px',
-    background: vehicle.status === 'In Stock' ? '#e8f5e9' : '#fff3e0',
-    color: vehicle.status === 'In Stock' ? '#2e7d32' : '#e65100',
+    background: status === 'In Stock' ? '#e8f5e9' : '#fff3e0',
+    color: status === 'In Stock' ? '#2e7d32' : '#e65100',
   };
 
   return (
     <div
       style={cardStyle}
-      onClick={() => onClick && onClick(vehicle)}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-4px)';
-        e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.15)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-      }}
+      onClick={() => onClick?.(vehicle)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div style={imageContainerStyle}>
         {/* Chevrolet bowtie logo */}
@@ -199,7 +216,7 @@ const VehicleCard = ({ vehicle, onClick }) => {
         </svg>
         
         {/* Vehicle type icon */}
-        {getVehicleIcon(vehicle.bodyStyle)}
+        {getVehicleIcon(bodyStyle)}
         
         {/* Model name */}
         <div style={modelTextStyle}>{vehicle.model}</div>
@@ -214,21 +231,21 @@ const VehicleCard = ({ vehicle, onClick }) => {
         <div style={detailsStyle}>
           <div style={detailRowStyle}>
             <span>Exterior:</span>
-            <span style={{ fontWeight: '500', color: '#333' }}>{vehicle.exteriorColor}</span>
+            <span style={{ fontWeight: '500', color: '#333' }}>{exteriorColor}</span>
           </div>
           <div style={detailRowStyle}>
             <span>Drivetrain:</span>
-            <span style={{ fontWeight: '500', color: '#333' }}>{vehicle.drivetrain}</span>
+            <span style={{ fontWeight: '500', color: '#333' }}>{vehicle.drivetrain || 'N/A'}</span>
           </div>
           <div style={detailRowStyle}>
             <span>Engine:</span>
-            <span style={{ fontWeight: '500', color: '#333' }}>{vehicle.engine}</span>
+            <span style={{ fontWeight: '500', color: '#333' }}>{vehicle.engine || 'N/A'}</span>
           </div>
         </div>
 
         <div style={priceContainerStyle}>
-          <div style={priceStyle}>{formatPrice(vehicle.price)}</div>
-          <div style={statusStyle}>{vehicle.status}</div>
+          <div style={priceStyle}>{formatPrice(price)}</div>
+          <div style={statusStyle}>{status}</div>
         </div>
       </div>
     </div>
