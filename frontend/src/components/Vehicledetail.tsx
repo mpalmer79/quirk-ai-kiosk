@@ -1,58 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, CSSProperties } from 'react';
+import type { Vehicle, KioskComponentProps } from '../types';
 
-const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
-  const [vehicleRequested, setVehicleRequested] = useState(false);
+// Extended vehicle with additional detail fields
+interface DetailedVehicle extends Vehicle {
+  transmission?: string;
+  fuelEconomy?: string;
+  savings?: number;
+  monthlyLease?: number;
+  monthlyFinance?: number;
+  mileage?: number;
+  gradient?: string;
+  rebates?: Array<{ name: string; amount: number }>;
+}
+
+// Default vehicle for demo/fallback
+const defaultVehicle: DetailedVehicle = {
+  stockNumber: '24789',
+  stock_number: '24789',
+  year: 2025,
+  make: 'Chevrolet',
+  model: 'Silverado 1500',
+  trim: 'LT Crew Cab 4WD',
+  vin: '1GCUDDED5RZ123456',
+  exteriorColor: 'Summit White',
+  exterior_color: 'Summit White',
+  interiorColor: 'Jet Black',
+  interior_color: 'Jet Black',
+  engine: '5.3L EcoTec3 V8',
+  transmission: '10-Speed Automatic',
+  drivetrain: '4WD',
+  fuelEconomy: '16 city / 22 hwy',
+  msrp: 52995,
+  salePrice: 47495,
+  sale_price: 47495,
+  price: 47495,
+  savings: 5500,
+  monthlyLease: 398,
+  monthlyFinance: 612,
+  status: 'In Stock',
+  mileage: 12,
+  gradient: 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
+  features: [
+    'Trailering Package',
+    'Heated Front Seats',
+    '13.4" Diagonal Touchscreen',
+    'Apple CarPlay & Android Auto',
+    'Wireless Charging',
+    'Remote Start',
+    'LED Headlamps',
+    'Spray-On Bedliner',
+    '20" Painted Aluminum Wheels',
+    'Rear Vision Camera',
+  ],
+  rebates: [
+    { name: 'Customer Cash', amount: 2500 },
+    { name: 'Bonus Cash', amount: 1500 },
+    { name: 'Conquest Bonus', amount: 1000 },
+  ],
+};
+
+const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
+  const [vehicleRequested, setVehicleRequested] = useState<boolean>(false);
   
   // Get customer name for personalization
   const customerName = customerData?.customerName;
   
-  const vehicle = customerData.selectedVehicle || {
-    stockNumber: '24789',
-    year: 2025,
-    make: 'Chevrolet',
-    model: 'Silverado 1500',
-    trim: 'LT Crew Cab 4WD',
-    vin: '1GCUDDED5RZ123456',
-    exteriorColor: 'Summit White',
-    interiorColor: 'Jet Black',
-    engine: '5.3L EcoTec3 V8',
-    transmission: '10-Speed Automatic',
-    drivetrain: '4WD',
-    fuelEconomy: '16 city / 22 hwy',
-    msrp: 52995,
-    salePrice: 47495,
-    savings: 5500,
-    monthlyLease: 398,
-    monthlyFinance: 612,
-    status: 'In Stock',
-    mileage: 12,
-    gradient: 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
-    features: [
-      'Trailering Package',
-      'Heated Front Seats',
-      '13.4" Diagonal Touchscreen',
-      'Apple CarPlay & Android Auto',
-      'Wireless Charging',
-      'Remote Start',
-      'LED Headlamps',
-      'Spray-On Bedliner',
-      '20" Painted Aluminum Wheels',
-      'Rear Vision Camera',
-    ],
-    rebates: [
-      { name: 'Customer Cash', amount: 2500 },
-      { name: 'Bonus Cash', amount: 1500 },
-      { name: 'Conquest Bonus', amount: 1000 },
-    ],
-  };
+  const vehicle: DetailedVehicle = (customerData?.selectedVehicle as DetailedVehicle) || defaultVehicle;
+  
+  // Normalize vehicle properties (handle both camelCase and snake_case)
+  const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
+  const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
+  const interiorColor = vehicle.interiorColor || vehicle.interior_color || '';
+  const salePrice = vehicle.salePrice || vehicle.sale_price || vehicle.price || 0;
+  const gradient = vehicle.gradient || 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)';
 
-  const handleRequestVehicle = () => {
+  const handleRequestVehicle = (): void => {
     setVehicleRequested(true);
     
     // Update customer data with request info
     updateCustomerData({
       vehicleRequested: {
-        stockNumber: vehicle.stockNumber,
+        stockNumber: stockNumber,
         requestedAt: new Date().toISOString(),
       },
     });
@@ -61,15 +89,15 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
     // api.requestVehicle(vehicle.stockNumber);
   };
 
-  const handleCalculatePayment = () => {
+  const handleCalculatePayment = (): void => {
     navigateTo('paymentCalculator');
   };
 
-  const handleTradeIn = () => {
+  const handleTradeIn = (): void => {
     navigateTo('tradeIn');
   };
 
-  const handleTalkToSales = () => {
+  const handleTalkToSales = (): void => {
     navigateTo('handoff');
   };
 
@@ -96,7 +124,7 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
 
             {/* Vehicle Summary */}
             <div style={styles.confirmationVehicle}>
-              <div style={{ ...styles.confirmationThumb, background: vehicle.gradient }}>
+              <div style={{ ...styles.confirmationThumb, background: gradient }}>
                 <span style={styles.confirmationInitial}>{vehicle.model.charAt(0)}</span>
               </div>
               <div style={styles.confirmationVehicleInfo}>
@@ -104,7 +132,7 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
                   {vehicle.year} {vehicle.model}
                 </span>
                 <span style={styles.confirmationVehicleTrim}>{vehicle.trim}</span>
-                <span style={styles.confirmationStock}>Stock #{vehicle.stockNumber}</span>
+                <span style={styles.confirmationStock}>Stock #{stockNumber}</span>
               </div>
             </div>
 
@@ -190,11 +218,11 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
       <div style={styles.content}>
         {/* Left Column - Vehicle Image & Gallery */}
         <div style={styles.leftColumn}>
-          <div style={{ ...styles.mainImage, background: vehicle.gradient }}>
+          <div style={{ ...styles.mainImage, background: gradient }}>
             <span style={styles.imageInitial}>{vehicle.model.charAt(0)}</span>
             <div style={styles.statusBadge}>
               <span style={styles.statusDot} />
-              {vehicle.status}
+              {vehicle.status || 'In Stock'}
             </div>
           </div>
 
@@ -204,28 +232,28 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
               <span style={styles.specIcon}>🔧</span>
               <div>
                 <span style={styles.specLabel}>Engine</span>
-                <span style={styles.specValue}>{vehicle.engine}</span>
+                <span style={styles.specValue}>{vehicle.engine || 'N/A'}</span>
               </div>
             </div>
             <div style={styles.specItem}>
               <span style={styles.specIcon}>⚙️</span>
               <div>
                 <span style={styles.specLabel}>Transmission</span>
-                <span style={styles.specValue}>{vehicle.transmission}</span>
+                <span style={styles.specValue}>{vehicle.transmission || 'Automatic'}</span>
               </div>
             </div>
             <div style={styles.specItem}>
               <span style={styles.specIcon}>🚗</span>
               <div>
                 <span style={styles.specLabel}>Drivetrain</span>
-                <span style={styles.specValue}>{vehicle.drivetrain}</span>
+                <span style={styles.specValue}>{vehicle.drivetrain || 'N/A'}</span>
               </div>
             </div>
             <div style={styles.specItem}>
               <span style={styles.specIcon}>⛽</span>
               <div>
                 <span style={styles.specLabel}>Fuel Economy</span>
-                <span style={styles.specValue}>{vehicle.fuelEconomy}</span>
+                <span style={styles.specValue}>{vehicle.fuelEconomy || 'N/A'}</span>
               </div>
             </div>
           </div>
@@ -243,24 +271,24 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
             </div>
             <div style={styles.stockInfo}>
               <span style={styles.stockLabel}>Stock #</span>
-              <span style={styles.stockNumber}>{vehicle.stockNumber}</span>
+              <span style={styles.stockNumber}>{stockNumber}</span>
             </div>
           </div>
 
           {/* Colors */}
           <div style={styles.colorRow}>
             <div style={styles.colorItem}>
-              <div style={{ ...styles.colorSwatch, background: vehicle.gradient }} />
+              <div style={{ ...styles.colorSwatch, background: gradient }} />
               <div>
                 <span style={styles.colorLabel}>Exterior</span>
-                <span style={styles.colorValue}>{vehicle.exteriorColor}</span>
+                <span style={styles.colorValue}>{exteriorColor}</span>
               </div>
             </div>
             <div style={styles.colorItem}>
               <div style={{ ...styles.colorSwatch, background: '#1f2937' }} />
               <div>
                 <span style={styles.colorLabel}>Interior</span>
-                <span style={styles.colorValue}>{vehicle.interiorColor}</span>
+                <span style={styles.colorValue}>{interiorColor}</span>
               </div>
             </div>
           </div>
@@ -269,7 +297,7 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
           <div style={styles.pricingCard}>
             <div style={styles.priceRow}>
               <span style={styles.msrpLabel}>MSRP</span>
-              <span style={styles.msrpValue}>${vehicle.msrp.toLocaleString()}</span>
+              <span style={styles.msrpValue}>${(vehicle.msrp || 0).toLocaleString()}</span>
             </div>
             
             {/* Rebates */}
@@ -284,23 +312,25 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
             
             <div style={styles.priceRow}>
               <span style={styles.yourPriceLabel}>Your Price</span>
-              <span style={styles.yourPriceValue}>${vehicle.salePrice.toLocaleString()}</span>
+              <span style={styles.yourPriceValue}>${salePrice.toLocaleString()}</span>
             </div>
             
-            <div style={styles.savingsBadge}>
-              You Save ${vehicle.savings.toLocaleString()}!
-            </div>
+            {vehicle.savings && (
+              <div style={styles.savingsBadge}>
+                You Save ${vehicle.savings.toLocaleString()}!
+              </div>
+            )}
 
             {/* Estimated Payments */}
             <div style={styles.paymentsGrid}>
               <div style={styles.paymentOption}>
                 <span style={styles.paymentType}>Lease</span>
-                <span style={styles.paymentAmount}>${vehicle.monthlyLease}</span>
+                <span style={styles.paymentAmount}>${vehicle.monthlyLease || 0}</span>
                 <span style={styles.paymentTerm}>/mo for 39 mo</span>
               </div>
               <div style={styles.paymentOption}>
                 <span style={styles.paymentType}>Finance</span>
-                <span style={styles.paymentAmount}>${vehicle.monthlyFinance}</span>
+                <span style={styles.paymentAmount}>${vehicle.monthlyFinance || 0}</span>
                 <span style={styles.paymentTerm}>/mo for 72 mo</span>
               </div>
             </div>
@@ -310,7 +340,7 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
           <div style={styles.featuresSection}>
             <h3 style={styles.sectionTitle}>Key Features</h3>
             <div style={styles.featuresList}>
-              {vehicle.features.map((feature, idx) => (
+              {(vehicle.features || []).map((feature, idx) => (
                 <div key={idx} style={styles.featureItem}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2">
                     <polyline points="20 6 9 17 4 12"/>
@@ -361,7 +391,7 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
           {/* VIN */}
           <div style={styles.vinSection}>
             <span style={styles.vinLabel}>VIN:</span>
-            <span style={styles.vinValue}>{vehicle.vin}</span>
+            <span style={styles.vinValue}>{vehicle.vin || 'N/A'}</span>
           </div>
         </div>
       </div>
@@ -369,7 +399,7 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
   );
 };
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   container: {
     flex: 1,
     padding: '24px 40px',
