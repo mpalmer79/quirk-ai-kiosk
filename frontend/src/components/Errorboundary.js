@@ -1,20 +1,5 @@
 import React, { Component } from 'react';
 
-/**
- * ErrorBoundary Component
- * Catches JavaScript errors anywhere in the child component tree,
- * logs errors, and displays a fallback UI instead of crashing.
- * 
- * Usage:
- *   <ErrorBoundary>
- *     <YourComponent />
- *   </ErrorBoundary>
- * 
- * Or with custom fallback:
- *   <ErrorBoundary fallback={<CustomErrorUI />}>
- *     <YourComponent />
- *   </ErrorBoundary>
- */
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -26,56 +11,46 @@ class ErrorBoundary extends Component {
   }
 
   static getDerivedStateFromError(error) {
-    // Update state so the next render shows the fallback UI
     return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
-    // Log error details for debugging
     console.error('ErrorBoundary caught an error:', error);
     console.error('Component stack:', errorInfo.componentStack);
     
     this.setState({ errorInfo });
-
-    // TODO: Send to error reporting service (Sentry, LogRocket, etc.)
-    // if (typeof window !== 'undefined' && window.Sentry) {
-    //   window.Sentry.captureException(error, { extra: errorInfo });
-    // }
-
-    // Log to backend analytics if available
     this.logErrorToBackend(error, errorInfo);
   }
 
   logErrorToBackend = async (error, errorInfo) => {
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
-      await fetch(`${API_BASE_URL}/kiosk/analytics`, {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      
+      await fetch(`${API_BASE_URL}/api/v1/analytics/interaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          event: 'error_boundary_caught',
-          data: {
+          eventType: 'error_boundary_caught',
+          eventData: {
             error: error.toString(),
             componentStack: errorInfo?.componentStack,
             url: window.location.href,
             userAgent: navigator.userAgent,
           },
+          sessionId: sessionStorage.getItem('kiosk_session_id') || 'unknown',
           timestamp: new Date().toISOString(),
         }),
       });
     } catch (e) {
-      // Silently fail - don't cause another error
       console.warn('Failed to log error to backend:', e);
     }
   };
 
   handleRestart = () => {
-    // Clear error state and try to recover
     this.setState({ hasError: false, error: null, errorInfo: null });
   };
 
   handleFullRestart = () => {
-    // Full page reload as last resort
     window.location.href = '/';
   };
 
@@ -84,16 +59,13 @@ class ErrorBoundary extends Component {
     const { children, fallback } = this.props;
 
     if (hasError) {
-      // If custom fallback provided, use it
       if (fallback) {
         return fallback;
       }
 
-      // Default error UI
       return (
         <div style={styles.container}>
           <div style={styles.content}>
-            {/* Error Icon */}
             <div style={styles.iconContainer}>
               <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.5">
                 <circle cx="12" cy="12" r="10" />
@@ -102,13 +74,11 @@ class ErrorBoundary extends Component {
               </svg>
             </div>
 
-            {/* Error Message */}
             <h1 style={styles.title}>Something went wrong</h1>
             <p style={styles.subtitle}>
               We encountered an unexpected error. Don't worry - your information is safe.
             </p>
 
-            {/* Action Buttons */}
             <div style={styles.buttonGroup}>
               <button style={styles.primaryButton} onClick={this.handleRestart}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -126,7 +96,6 @@ class ErrorBoundary extends Component {
               </button>
             </div>
 
-            {/* Error Details (collapsed by default) */}
             <details style={styles.details}>
               <summary style={styles.summary}>Technical Details</summary>
               <div style={styles.errorDetails}>
@@ -141,7 +110,6 @@ class ErrorBoundary extends Component {
               </div>
             </details>
 
-            {/* Help Text */}
             <p style={styles.helpText}>
               If this problem persists, please notify a sales associate.
             </p>
@@ -170,7 +138,6 @@ const styles = {
   },
   iconContainer: {
     marginBottom: '24px',
-    animation: 'pulse 2s ease-in-out infinite',
   },
   title: {
     fontSize: '28px',
@@ -203,7 +170,6 @@ const styles = {
     fontSize: '16px',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
   },
   secondaryButton: {
     display: 'flex',
@@ -217,7 +183,6 @@ const styles = {
     fontSize: '16px',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'transform 0.2s ease, background 0.2s ease',
   },
   details: {
     marginBottom: '24px',
