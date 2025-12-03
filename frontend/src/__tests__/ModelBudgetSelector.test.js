@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-jest.mock('../components/api', () => ({
-  getInventory: jest.fn(),
-}));
-
-import api from '../components/api';
+import api from './api';                   
 
 // GM Official Color Library by Model (2025 Model Year)
 const GM_COLORS = {
