@@ -10,7 +10,9 @@ import VehicleDetail from './Vehicledetail';
 import PaymentCalculator from './Paymentcalculator';
 import TradeInEstimator from './TradeInestimator';
 import CustomerHandoff from './Customerhandoff';
+import TrafficLog from './Trafficlog';
 import ErrorBoundary from './Errorboundary';
+import api from './api';
 
 // Screen-level error boundary with recovery option
 const ScreenErrorBoundary = ({ children, onReset, screenName }) => {
@@ -131,7 +133,7 @@ const KioskApp = () => {
     let timeout;
     const resetTimer = () => {
       clearTimeout(timeout);
-      if (currentScreen !== 'welcome') {
+      if (currentScreen !== 'welcome' && currentScreen !== 'trafficLog') {
         timeout = setTimeout(() => {
           resetJourney();
         }, 180000); // 3 minutes
@@ -148,6 +150,79 @@ const KioskApp = () => {
     };
   }, [currentScreen, resetJourney]);
 
+  // Traffic logging - log session on key customer data changes
+  useEffect(() => {
+    // Skip logging for admin screens
+    if (currentScreen === 'trafficLog') return;
+    
+    // Only log if we have some meaningful data
+    const hasData = customerData.customerName || 
+                    customerData.path || 
+                    customerData.selectedVehicle || 
+                    customerData.tradeIn ||
+                    customerData.contactInfo;
+    
+    if (!hasData) return;
+
+    // Build session data for logging
+    const sessionData = {
+      customerName: customerData.customerName,
+      phone: customerData.contactInfo?.phone,
+      path: customerData.path,
+      vehicleRequested: !!customerData.vehicleRequested,
+      actions: [currentScreen],
+    };
+
+    // Add vehicle if selected
+    if (customerData.selectedVehicle) {
+      sessionData.vehicle = {
+        stockNumber: customerData.selectedVehicle.stockNumber,
+        year: customerData.selectedVehicle.year,
+        make: customerData.selectedVehicle.make,
+        model: customerData.selectedVehicle.model,
+        trim: customerData.selectedVehicle.trim,
+        msrp: customerData.selectedVehicle.msrp,
+        salePrice: customerData.selectedVehicle.salePrice,
+      };
+    }
+
+    // Add trade-in if provided
+    if (customerData.tradeIn) {
+      sessionData.tradeIn = {
+        year: customerData.tradeIn.year,
+        make: customerData.tradeIn.make,
+        model: customerData.tradeIn.model,
+        mileage: customerData.tradeIn.mileage,
+        condition: customerData.tradeIn.condition,
+        estimatedValue: customerData.tradeIn.estimatedValue,
+      };
+    }
+
+    // Add payment preference if set
+    if (customerData.paymentPreference) {
+      sessionData.payment = {
+        type: customerData.paymentPreference.type,
+        monthly: customerData.paymentPreference.monthly,
+        term: customerData.paymentPreference.term,
+        downPayment: customerData.paymentPreference.downPayment,
+      };
+    }
+
+    // Log to traffic API (fire and forget)
+    api.logTrafficSession(sessionData).catch(() => {
+      // Silent fail - don't disrupt user experience
+    });
+  }, [
+    currentScreen,
+    customerData.customerName,
+    customerData.path,
+    customerData.selectedVehicle,
+    customerData.tradeIn,
+    customerData.paymentPreference,
+    customerData.contactInfo,
+    customerData.vehicleRequested,
+  ]);
+
   // Screen components map
   const screens = {
     welcome: WelcomeScreen,
@@ -159,6 +234,7 @@ const KioskApp = () => {
     paymentCalculator: PaymentCalculator,
     tradeIn: TradeInEstimator,
     handoff: CustomerHandoff,
+    trafficLog: TrafficLog,
   };
 
   const CurrentScreenComponent = screens[currentScreen] || WelcomeScreen;
@@ -179,14 +255,24 @@ const KioskApp = () => {
           <span style={styles.logoText}>QUIRK</span>
           <span style={styles.logoAI}>AI</span>
         </div>
-        {currentScreen !== 'welcome' && (
-          <button style={styles.backButton} onClick={resetJourney}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-            </svg>
-            Start Over
-          </button>
-        )}
+        <div style={styles.headerRight}>
+          {currentScreen !== 'welcome' && currentScreen !== 'trafficLog' && (
+            <button style={styles.backButton} onClick={resetJourney}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+              </svg>
+              Start Over
+            </button>
+          )}
+          {currentScreen === 'welcome' && (
+            <button 
+              style={styles.adminLink} 
+              onClick={() => navigateTo('trafficLog')}
+            >
+              Admin
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -307,6 +393,21 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+  },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+  adminLink: {
+    background: 'transparent',
+    border: 'none',
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: '12px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    padding: '8px 12px',
+    transition: 'color 0.2s ease',
   },
   main: {
     flex: 1,
