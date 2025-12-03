@@ -5,7 +5,7 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sortBy, setSortBy] = useState('recommended');
+  const [sortBy, setSortBy] = useState(customerData?.sortBy || 'recommended');
 
   // Generate Quirk Chevy NH website URL for a vehicle
   const generateDealerUrl = (vehicle) => {
