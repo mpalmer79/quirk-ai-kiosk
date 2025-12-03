@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
+  const [vehicleRequested, setVehicleRequested] = useState(false);
+  
   const vehicle = customerData.selectedVehicle || {
     stockNumber: '24789',
     year: 2025,
@@ -41,8 +43,19 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
     ],
   };
 
-  const handleScheduleTestDrive = () => {
-    navigateTo('handoff');
+  const handleRequestVehicle = () => {
+    setVehicleRequested(true);
+    
+    // Update customer data with request info
+    updateCustomerData({
+      vehicleRequested: {
+        stockNumber: vehicle.stockNumber,
+        requestedAt: new Date().toISOString(),
+      },
+    });
+    
+    // TODO: Future - send notification to lot attendant/sales team
+    // api.requestVehicle(vehicle.stockNumber);
   };
 
   const handleCalculatePayment = () => {
@@ -52,6 +65,112 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
   const handleTradeIn = () => {
     navigateTo('tradeIn');
   };
+
+  const handleTalkToSales = () => {
+    navigateTo('handoff');
+  };
+
+  // Vehicle Requested Confirmation State
+  if (vehicleRequested) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.confirmationOverlay}>
+          <div style={styles.confirmationCard}>
+            {/* Success Icon */}
+            <div style={styles.confirmationIcon}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+            
+            <h1 style={styles.confirmationTitle}>Vehicle Requested!</h1>
+            <p style={styles.confirmationSubtitle}>
+              A team member will bring this vehicle to the front of the showroom shortly.
+            </p>
+
+            {/* Vehicle Summary */}
+            <div style={styles.confirmationVehicle}>
+              <div style={{ ...styles.confirmationThumb, background: vehicle.gradient }}>
+                <span style={styles.confirmationInitial}>{vehicle.model.charAt(0)}</span>
+              </div>
+              <div style={styles.confirmationVehicleInfo}>
+                <span style={styles.confirmationVehicleName}>
+                  {vehicle.year} {vehicle.model}
+                </span>
+                <span style={styles.confirmationVehicleTrim}>{vehicle.trim}</span>
+                <span style={styles.confirmationStock}>Stock #{vehicle.stockNumber}</span>
+              </div>
+            </div>
+
+            {/* What to Expect */}
+            <div style={styles.expectSection}>
+              <h4 style={styles.expectTitle}>What to Expect</h4>
+              <div style={styles.expectSteps}>
+                <div style={styles.expectStep}>
+                  <span style={styles.stepNumber}>1</span>
+                  <span style={styles.stepText}>Vehicle will be brought up front</span>
+                </div>
+                <div style={styles.expectStep}>
+                  <span style={styles.stepNumber}>2</span>
+                  <span style={styles.stepText}>A team member will meet you</span>
+                </div>
+                <div style={styles.expectStep}>
+                  <span style={styles.stepNumber}>3</span>
+                  <span style={styles.stepText}>Take it for a test drive!</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={styles.confirmationActions}>
+              <button 
+                style={styles.primaryButton}
+                onClick={handleTalkToSales}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                Connect with Sales Consultant
+              </button>
+              
+              <button 
+                style={styles.secondaryButton}
+                onClick={() => setVehicleRequested(false)}
+              >
+                Back to Vehicle Details
+              </button>
+              
+              <button 
+                style={styles.tertiaryButton}
+                onClick={() => navigateTo('inventory')}
+              >
+                Continue Browsing
+              </button>
+            </div>
+
+            {/* Estimated Time */}
+            <div style={styles.estimatedTime}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+              Estimated wait: 2-3 minutes
+            </div>
+          </div>
+        </div>
+
+        <style>{`
+          @keyframes checkmark {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -199,12 +318,15 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
 
           {/* Action Buttons */}
           <div style={styles.actionButtons}>
-            <button style={styles.primaryButton} onClick={handleScheduleTestDrive}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <path d="M16 2v4M8 2v4M3 10h18"/>
+            {/* Primary CTA - Request Vehicle */}
+            <button style={styles.requestButton} onClick={handleRequestVehicle}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
+                <circle cx="7" cy="17" r="2"/>
+                <path d="M9 17h6"/>
+                <circle cx="17" cy="17" r="2"/>
               </svg>
-              Schedule Test Drive
+              Request This Vehicle
             </button>
             
             <button style={styles.secondaryButton} onClick={handleCalculatePayment}>
@@ -220,6 +342,14 @@ const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
                 <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
               </svg>
               Value My Trade
+            </button>
+
+            <button style={styles.tertiaryButton} onClick={handleTalkToSales}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              Talk to a Sales Consultant
             </button>
           </div>
 
@@ -510,6 +640,22 @@ const styles = {
     flexDirection: 'column',
     gap: '12px',
   },
+  requestButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    padding: '20px 24px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    borderRadius: '12px',
+    color: '#ffffff',
+    fontSize: '18px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    boxShadow: '0 4px 15px rgba(27, 115, 64, 0.4)',
+    transition: 'all 0.2s ease',
+  },
   primaryButton: {
     display: 'flex',
     alignItems: 'center',
@@ -538,6 +684,20 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
   },
+  tertiaryButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    padding: '14px 24px',
+    background: 'none',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '12px',
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
   vinSection: {
     display: 'flex',
     alignItems: 'center',
@@ -555,6 +715,142 @@ const styles = {
     fontSize: '12px',
     fontFamily: 'monospace',
     color: 'rgba(255,255,255,0.6)',
+  },
+  // Confirmation State Styles
+  confirmationOverlay: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 'calc(100vh - 200px)',
+  },
+  confirmationCard: {
+    maxWidth: '500px',
+    width: '100%',
+    padding: '40px',
+    background: 'rgba(255,255,255,0.05)',
+    borderRadius: '24px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    textAlign: 'center',
+  },
+  confirmationIcon: {
+    width: '80px',
+    height: '80px',
+    borderRadius: '50%',
+    background: 'rgba(74, 222, 128, 0.2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#4ade80',
+    margin: '0 auto 24px',
+    animation: 'checkmark 0.5s ease',
+  },
+  confirmationTitle: {
+    fontSize: '32px',
+    fontWeight: '700',
+    color: '#ffffff',
+    margin: '0 0 8px 0',
+  },
+  confirmationSubtitle: {
+    fontSize: '16px',
+    color: 'rgba(255,255,255,0.6)',
+    margin: '0 0 24px 0',
+    lineHeight: '1.5',
+  },
+  confirmationVehicle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '16px',
+    background: 'rgba(0,0,0,0.2)',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    textAlign: 'left',
+  },
+  confirmationThumb: {
+    width: '60px',
+    height: '60px',
+    borderRadius: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  confirmationInitial: {
+    fontSize: '28px',
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.3)',
+  },
+  confirmationVehicleInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  confirmationVehicleName: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  confirmationVehicleTrim: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  confirmationStock: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: '4px',
+  },
+  expectSection: {
+    padding: '20px',
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    textAlign: 'left',
+  },
+  expectTitle: {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.8)',
+    margin: '0 0 16px 0',
+  },
+  expectSteps: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  expectStep: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  stepNumber: {
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    background: 'rgba(27, 115, 64, 0.3)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '13px',
+    fontWeight: '700',
+    color: '#4ade80',
+    flexShrink: 0,
+  },
+  stepText: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  confirmationActions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '20px',
+  },
+  estimatedTime: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.5)',
   },
 };
 
