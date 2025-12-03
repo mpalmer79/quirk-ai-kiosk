@@ -17,6 +17,9 @@ window.open = mockWindowOpen;
 const mockNavigateTo = jest.fn();
 const mockUpdateCustomerData = jest.fn();
 
+// Store original console.error
+const originalConsoleError = console.error;
+
 const mockVehicles = [
   {
     id: '1',
@@ -88,6 +91,16 @@ describe('InventoryResults Component', () => {
   });
 
   describe('Error State', () => {
+    beforeEach(() => {
+      // Suppress console.error for error state tests
+      console.error = jest.fn();
+    });
+
+    afterEach(() => {
+      // Restore console.error
+      console.error = originalConsoleError;
+    });
+
     test('displays error message when API fails', async () => {
       api.getInventory.mockRejectedValue(new Error('Network error'));
       renderInventoryResults();
