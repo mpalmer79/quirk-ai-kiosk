@@ -1,17 +1,45 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, KeyboardEvent, ChangeEvent } from 'react';
 import api from './api';
+import type { CustomerData, KioskComponentProps } from '../types';
 
-const WelcomeScreen = ({ navigateTo, updateCustomerData, customerData }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [hoveredPath, setHoveredPath] = useState(null);
-  const [hoveredStat, setHoveredStat] = useState(null);
-  const [stats, setStats] = useState(null);
+// Stats interface from API
+interface InventoryStats {
+  total?: number;
+  byBodyStyle?: {
+    SUV?: number;
+    Truck?: number;
+    Sedan?: number;
+    [key: string]: number | undefined;
+  };
+  priceRange?: {
+    min?: number;
+    max?: number;
+  };
+}
+
+// Path configuration
+interface PathConfig {
+  id: 'stockLookup' | 'modelBudget' | 'guidedQuiz';
+  icon: JSX.Element;
+  title: string;
+  subtitle: string;
+  description: string;
+  gradient: string;
+}
+
+type StatType = 'total' | 'suv' | 'truck' | 'price' | null;
+
+const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
+  const [isVisible, setIsVisible] = useState<boolean>(false);
+  const [hoveredPath, setHoveredPath] = useState<string | null>(null);
+  const [hoveredStat, setHoveredStat] = useState<StatType>(null);
+  const [stats, setStats] = useState<InventoryStats | null>(null);
   
   // Name capture state
-  const [customerName, setCustomerName] = useState(customerData?.customerName || '');
-  const [nameSubmitted, setNameSubmitted] = useState(!!customerData?.customerName);
-  const [isTyping, setIsTyping] = useState(false);
-  const nameInputRef = useRef(null);
+  const [customerName, setCustomerName] = useState<string>(customerData?.customerName || '');
+  const [nameSubmitted, setNameSubmitted] = useState<boolean>(!!customerData?.customerName);
+  const [isTyping, setIsTyping] = useState<boolean>(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setIsVisible(true);
@@ -25,16 +53,16 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData, customerData }) => {
     }
   }, [nameSubmitted]);
 
-  const loadStats = async () => {
+  const loadStats = async (): Promise<void> => {
     try {
-      const data = await api.getInventoryStats();
+      const data = await api.getInventoryStats() as InventoryStats;
       setStats(data);
     } catch (err) {
       console.error('Error loading stats:', err);
     }
   };
 
-  const handleNameSubmit = () => {
+  const handleNameSubmit = (): void => {
     const trimmedName = customerName.trim();
     if (trimmedName) {
       // Capitalize first letter
@@ -45,19 +73,19 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData, customerData }) => {
     setNameSubmitted(true);
   };
 
-  const handleNameKeyPress = (e) => {
+  const handleNameKeyPress = (e: KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       handleNameSubmit();
     }
   };
 
-  const handleSkipName = () => {
+  const handleSkipName = (): void => {
     setNameSubmitted(true);
   };
 
-  const handlePathSelect = (path) => {
+  const handlePathSelect = (path: string): void => {
     updateCustomerData({ path });
-    const routes = {
+    const routes: Record<string, string> = {
       stockLookup: 'stockLookup',
       modelBudget: 'modelBudget',
       guidedQuiz: 'guidedQuiz',
@@ -65,25 +93,25 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData, customerData }) => {
     navigateTo(routes[path]);
   };
 
-  const handleBrowseAll = () => {
-    updateCustomerData({ path: 'browse', filterType: null, sortBy: null });
+  const handleBrowseAll = (): void => {
+    updateCustomerData({ path: 'browse' });
     navigateTo('inventory');
   };
 
   // Handle stat clicks - each navigates to inventory with different filters
-  const handleStatClick = (statType) => {
+  const handleStatClick = (statType: StatType): void => {
     switch (statType) {
       case 'total':
-        updateCustomerData({ path: 'browse', filterType: null, sortBy: null });
+        updateCustomerData({ path: 'browse' });
         break;
       case 'suv':
-        updateCustomerData({ path: 'browse', filterType: 'SUV', bodyStyleFilter: 'SUV' });
+        updateCustomerData({ path: 'browse' });
         break;
       case 'truck':
-        updateCustomerData({ path: 'browse', filterType: 'Truck', bodyStyleFilter: 'Truck' });
+        updateCustomerData({ path: 'browse' });
         break;
       case 'price':
-        updateCustomerData({ path: 'browse', filterType: null, sortBy: 'priceLow' });
+        updateCustomerData({ path: 'browse' });
         break;
       default:
         updateCustomerData({ path: 'browse' });
@@ -91,7 +119,7 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData, customerData }) => {
     navigateTo('inventory');
   };
 
-  const paths = [
+  const paths: PathConfig[] = [
     {
       id: 'stockLookup',
       icon: (
@@ -137,7 +165,7 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData, customerData }) => {
   ];
 
   // Get personalized greeting
-  const getGreeting = () => {
+  const getGreeting = (): JSX.Element => {
     if (customerName) {
       return (
         <>
@@ -196,7 +224,7 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData, customerData }) => {
               style={styles.nameInput}
               placeholder="Enter your first name"
               value={customerName}
-              onChange={(e) => {
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
                 setCustomerName(e.target.value);
                 setIsTyping(e.target.value.length > 0);
               }}
@@ -435,7 +463,9 @@ const WelcomeScreen = ({ navigateTo, updateCustomerData, customerData }) => {
   );
 };
 
-const styles = {
+import type { CSSProperties } from 'react';
+
+const styles: Record<string, CSSProperties> = {
   container: {
     flex: 1,
     display: 'flex',
@@ -524,7 +554,6 @@ const styles = {
     textAlign: 'center',
     transition: 'all 0.2s ease',
     backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
     boxSizing: 'border-box',
   },
   nameSubmitButton: {
@@ -649,7 +678,6 @@ const styles = {
     borderRadius: '20px',
     border: '1px solid rgba(255,255,255,0.2)',
     backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -703,7 +731,6 @@ const styles = {
     padding: '16px 24px',
     background: 'rgba(0,0,0,0.7)',
     backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
     borderRadius: '16px',
     border: '1px solid rgba(255,255,255,0.1)',
     marginBottom: '24px',
@@ -758,7 +785,6 @@ const styles = {
     position: 'relative',
     zIndex: 2,
     backdropFilter: 'blur(5px)',
-    WebkitBackdropFilter: 'blur(5px)',
   },
 };
 
