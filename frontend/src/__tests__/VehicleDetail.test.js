@@ -210,9 +210,9 @@ describe('VehicleDetail Component', () => {
   });
 
   describe('Action Buttons', () => {
-    test('renders Schedule Test Drive button', () => {
+    test('renders Request This Vehicle button', () => {
       renderVehicleDetail();
-      expect(screen.getByText('Schedule Test Drive')).toBeInTheDocument();
+      expect(screen.getByText('Request This Vehicle')).toBeInTheDocument();
     });
 
     test('renders Calculate Payment button', () => {
@@ -225,11 +225,9 @@ describe('VehicleDetail Component', () => {
       expect(screen.getByText('Value My Trade')).toBeInTheDocument();
     });
 
-    test('Schedule Test Drive navigates to handoff', () => {
+    test('renders Talk to a Sales Consultant button', () => {
       renderVehicleDetail();
-      
-      fireEvent.click(screen.getByText('Schedule Test Drive'));
-      expect(mockNavigateTo).toHaveBeenCalledWith('handoff');
+      expect(screen.getByText('Talk to a Sales Consultant')).toBeInTheDocument();
     });
 
     test('Calculate Payment navigates to payment calculator', () => {
@@ -244,6 +242,97 @@ describe('VehicleDetail Component', () => {
       
       fireEvent.click(screen.getByText('Value My Trade'));
       expect(mockNavigateTo).toHaveBeenCalledWith('tradeIn');
+    });
+
+    test('Talk to a Sales Consultant navigates to handoff', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Talk to a Sales Consultant'));
+      expect(mockNavigateTo).toHaveBeenCalledWith('handoff');
+    });
+  });
+
+  describe('Request Vehicle Flow', () => {
+    test('Request This Vehicle shows confirmation screen', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Request This Vehicle'));
+      
+      expect(screen.getByText('Vehicle Requested!')).toBeInTheDocument();
+      expect(screen.getByText(/A team member will bring this vehicle/)).toBeInTheDocument();
+    });
+
+    test('confirmation screen shows vehicle details', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Request This Vehicle'));
+      
+      expect(screen.getByText('2025 Silverado 1500')).toBeInTheDocument();
+      expect(screen.getByText('LT Crew Cab 4WD')).toBeInTheDocument();
+      expect(screen.getByText('Stock #24789')).toBeInTheDocument();
+    });
+
+    test('confirmation screen shows expected steps', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Request This Vehicle'));
+      
+      expect(screen.getByText('What to Expect')).toBeInTheDocument();
+      expect(screen.getByText('Vehicle will be brought up front')).toBeInTheDocument();
+      expect(screen.getByText('A team member will meet you')).toBeInTheDocument();
+      expect(screen.getByText('Take it for a test drive!')).toBeInTheDocument();
+    });
+
+    test('confirmation screen shows estimated wait time', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Request This Vehicle'));
+      
+      expect(screen.getByText(/Estimated wait: 2-3 minutes/)).toBeInTheDocument();
+    });
+
+    test('updateCustomerData is called when vehicle is requested', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Request This Vehicle'));
+      
+      expect(mockUpdateCustomerData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vehicleRequested: expect.objectContaining({
+            stockNumber: '24789',
+          }),
+        })
+      );
+    });
+
+    test('Connect with Sales Consultant navigates to handoff from confirmation', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Request This Vehicle'));
+      fireEvent.click(screen.getByText('Connect with Sales Consultant'));
+      
+      expect(mockNavigateTo).toHaveBeenCalledWith('handoff');
+    });
+
+    test('Back to Vehicle Details returns to detail view', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Request This Vehicle'));
+      expect(screen.getByText('Vehicle Requested!')).toBeInTheDocument();
+      
+      fireEvent.click(screen.getByText('Back to Vehicle Details'));
+      
+      expect(screen.getByText('Request This Vehicle')).toBeInTheDocument();
+      expect(screen.queryByText('Vehicle Requested!')).not.toBeInTheDocument();
+    });
+
+    test('Continue Browsing navigates to inventory from confirmation', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Request This Vehicle'));
+      fireEvent.click(screen.getByText('Continue Browsing'));
+      
+      expect(mockNavigateTo).toHaveBeenCalledWith('inventory');
     });
   });
 });
@@ -317,9 +406,10 @@ describe('VehicleDetail Accessibility', () => {
   test('all action buttons are accessible', () => {
     renderVehicleDetail();
 
-    expect(screen.getByText('Schedule Test Drive').tagName).toBe('BUTTON');
+    expect(screen.getByText('Request This Vehicle').tagName).toBe('BUTTON');
     expect(screen.getByText('Calculate Payment').tagName).toBe('BUTTON');
     expect(screen.getByText('Value My Trade').tagName).toBe('BUTTON');
+    expect(screen.getByText('Talk to a Sales Consultant').tagName).toBe('BUTTON');
     expect(screen.getByText('Back to Results').tagName).toBe('BUTTON');
   });
 
@@ -330,5 +420,15 @@ describe('VehicleDetail Accessibility', () => {
     expect(screen.getByText('Transmission')).toBeInTheDocument();
     expect(screen.getByText('Drivetrain')).toBeInTheDocument();
     expect(screen.getByText('Fuel Economy')).toBeInTheDocument();
+  });
+
+  test('confirmation screen buttons are accessible', () => {
+    renderVehicleDetail();
+    
+    fireEvent.click(screen.getByText('Request This Vehicle'));
+
+    expect(screen.getByText('Connect with Sales Consultant').tagName).toBe('BUTTON');
+    expect(screen.getByText('Back to Vehicle Details').tagName).toBe('BUTTON');
+    expect(screen.getByText('Continue Browsing').tagName).toBe('BUTTON');
   });
 });
