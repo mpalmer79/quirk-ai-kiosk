@@ -201,7 +201,7 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
   const [selectedCab, setSelectedCab] = useState(null);
   const [colorChoices, setColorChoices] = useState({ first: '', second: '' });
   const [budgetRange, setBudgetRange] = useState({ min: 400, max: 900 });
-  const [downPayment, setDownPayment] = useState(3000);
+  const [downPaymentPercent, setDownPaymentPercent] = useState(10);
   const [hasTrade, setHasTrade] = useState(null);
   const [hasPayoff, setHasPayoff] = useState(null);
   const [payoffAmount, setPayoffAmount] = useState('');
@@ -304,7 +304,7 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
       selectedCab,
       colorPreferences: [colorChoices.first, colorChoices.second].filter(Boolean),
       budgetRange,
-      downPayment,
+      downPaymentPercent,
       hasTrade,
       hasPayoff,
       payoffAmount: hasPayoff ? parseFloat(payoffAmount) : null,
@@ -513,7 +513,15 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
     const estimatedLoan = calculateLoanAmount(budgetRange.max, 84);
     const term = estimatedLoan > 20000 ? 84 : 72;
     const loanAmount = calculateLoanAmount(budgetRange.max, term);
-    const totalBuyingPower = loanAmount + downPayment;
+    
+    // Calculate total buying power based on down payment percentage
+    // If loan covers (100% - downPaymentPercent) of vehicle, then:
+    // totalPrice = loanAmount / (1 - downPaymentPercent/100)
+    const downPaymentFraction = downPaymentPercent / 100;
+    const totalBuyingPower = downPaymentPercent === 0 
+      ? loanAmount 
+      : loanAmount / (1 - downPaymentFraction);
+    const downPaymentAmount = totalBuyingPower * downPaymentFraction;
     
     return (
       <div style={styles.stepContainer}>
@@ -536,7 +544,7 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
             <span style={styles.budgetLabel}>/month</span>
           </div>
           <div style={styles.sliderGroup}>
-            <label style={styles.sliderLabel}>Minimum: ${budgetRange.min.toLocaleString()}/mo</label>
+            <label style={styles.sliderLabel}>Target Budget: ${budgetRange.min.toLocaleString()}/mo</label>
             <input type="range" min="200" max="2000" step="50" value={budgetRange.min}
               onChange={(e) => {
                 const val = parseInt(e.target.value);
@@ -556,14 +564,16 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
             />
           </div>
           <div style={styles.downPaymentSection}>
-            <label style={styles.inputLabel}>Down Payment</label>
+            <label style={styles.inputLabel}>
+              Down Payment <span style={styles.downPaymentDisclaimer}>(MOST LENDERS PREFER AT LEAST 20% INITIAL INVESTMENT)</span>
+            </label>
             <div style={styles.downPaymentOptions}>
-              {[0, 2000, 3000, 5000, 10000].map((amount) => (
-                <button key={amount}
-                  style={{...styles.optionButton, ...(downPayment === amount ? styles.optionButtonActive : {})}}
-                  onClick={() => setDownPayment(amount)}
+              {[0, 5, 10, 15, 20].map((percent) => (
+                <button key={percent}
+                  style={{...styles.optionButton, ...(downPaymentPercent === percent ? styles.optionButtonActive : {})}}
+                  onClick={() => setDownPaymentPercent(percent)}
                 >
-                  ${amount.toLocaleString()}
+                  {percent === 0 ? '$0' : `${percent}.00%`}
                 </button>
               ))}
             </div>
@@ -577,7 +587,7 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
             <div style={styles.buyingPowerCard}>
               <h4 style={styles.buyingPowerTitle}>📊 Your Buying Power</h4>
               <ul style={styles.buyingPowerList}>
-                <li>Down payment: <strong>${downPayment.toLocaleString()}</strong></li>
+                <li>Down payment: <strong>{downPaymentPercent === 0 ? '$0' : `${downPaymentPercent}% (~$${Math.round(downPaymentAmount).toLocaleString()})`}</strong></li>
                 <li>Monthly payment: <strong>${budgetRange.max.toLocaleString()}</strong></li>
                 <li>Term: <strong>{term} months</strong></li>
                 <li>APR: <strong>7%</strong></li>
@@ -593,7 +603,10 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
               </div>
               
               <p style={styles.buyingPowerText}>
-                Add your ${downPayment.toLocaleString()} down payment:
+                {downPaymentPercent > 0 
+                  ? `Add your ${downPaymentPercent}% down payment (~$${Math.round(downPaymentAmount).toLocaleString()}):`
+                  : 'With $0 down payment:'
+                }
               </p>
               
               <div style={styles.buyingPowerTotal}>
@@ -607,7 +620,7 @@ const ModelBudgetSelector = ({ navigateTo, updateCustomerData, customerData }) =
               <ul style={styles.mathList}>
                 <li>Monthly rate = {(APR * 100).toFixed(0)}% / 12 = {(monthlyRate * 100).toFixed(4)}%</li>
                 <li>Payment factor over {term} months gives you ~${Math.round(loanAmount / 1000)}k in borrowing power.</li>
-                <li>Total buying power = loan amount + down payment.</li>
+                <li>Total buying power = loan amount {downPaymentPercent > 0 ? `+ ${downPaymentPercent}% down payment` : '(no down payment)'}.</li>
               </ul>
             </div>
           </div>
@@ -949,6 +962,14 @@ const styles = {
     color: 'rgba(255,255,255,0.5)',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
+  },
+  downPaymentDisclaimer: {
+    fontSize: '10px',
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.35)',
+    textTransform: 'none',
+    letterSpacing: '0',
+    marginLeft: '8px',
   },
   selectInput: {
     padding: '14px 16px',
