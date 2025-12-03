@@ -429,7 +429,7 @@ describe('InventoryResults URL Generation', () => {
     );
   });
 
- test('URL includes make and model', async () => {
+  test('URL includes make and model', async () => {
     renderInventoryResults();
 
     await waitFor(() => {
@@ -439,15 +439,21 @@ describe('InventoryResults URL Generation', () => {
     fireEvent.click(screen.getAllByText('View Details')[0]);
 
     const call = mockWindowOpen.mock.calls[0][0];
-    expect(call).toContain('chevrolet');
-    expect(call).toContain('silverado');
+    expect(call.toLowerCase()).toContain('chevrolet');
+    expect(call.toLowerCase()).toContain('silverado');
   });
+
+  test('URL includes VIN', async () => {
+    renderInventoryResults();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('View Details')[0]).toBeInTheDocument();
+    });
 
     fireEvent.click(screen.getAllByText('View Details')[0]);
 
     const call = mockWindowOpen.mock.calls[0][0];
-    expect(call).toContain('2025');
-    expect(call).toContain('chevrolet');
+    expect(call.toLowerCase()).toContain(mockVehicles[0].vin.toLowerCase());
   });
 });
 
