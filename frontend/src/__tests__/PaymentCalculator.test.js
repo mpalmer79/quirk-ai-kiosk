@@ -144,14 +144,14 @@ describe('PaymentCalculator Component', () => {
   });
 
   describe('Down Payment Controls', () => {
-    test('both calculators have down payment slider labels', () => {
+    test('both calculators have down payment slider labels plus finance result row', () => {
       renderPaymentCalculator();
-      // 2 slider labels + 1 result row in Finance = 3 total
+      // 2 slider labels + 1 result row in Finance section = 3 total
       const downPaymentLabels = screen.getAllByText('Down Payment');
       expect(downPaymentLabels.length).toBe(3);
     });
 
-    test('lease down payment slider exists', () => {
+    test('sliders are present for user input', () => {
       renderPaymentCalculator();
       const sliders = screen.getAllByRole('slider');
       expect(sliders.length).toBeGreaterThanOrEqual(2);
@@ -267,6 +267,10 @@ describe('PaymentCalculator Component', () => {
 });
 
 describe('PaymentCalculator Edge Cases', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   test('handles zero MSRP gracefully', () => {
     render(
       <PaymentCalculator
@@ -287,28 +291,48 @@ describe('PaymentCalculator Edge Cases', () => {
   });
 
   test('handles trade-in with amount owed', () => {
-    renderPaymentCalculator({
-      customerData: {
-        selectedVehicle: defaultVehicle,
-        tradeIn: { estimatedValue: 15000, amountOwed: 5000 },
-      },
-    });
+    render(
+      <PaymentCalculator
+        navigateTo={mockNavigateTo}
+        updateCustomerData={mockUpdateCustomerData}
+        customerData={{
+          selectedVehicle: defaultVehicle,
+          tradeIn: { estimatedValue: 15000, amountOwed: 5000 },
+        }}
+      />
+    );
     
     expect(screen.getByText('Trade-In Applied')).toBeInTheDocument();
   });
 });
 
 describe('PaymentCalculator Accessibility', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   test('sliders have associated labels', () => {
-    renderPaymentCalculator();
+    render(
+      <PaymentCalculator
+        navigateTo={mockNavigateTo}
+        updateCustomerData={mockUpdateCustomerData}
+        customerData={defaultCustomerData}
+      />
+    );
     
     expect(screen.getByText('Est. APR')).toBeInTheDocument();
     // 2 slider labels + 1 result display = 3 total "Down Payment" texts
     expect(screen.getAllByText('Down Payment').length).toBe(3);
   });
 
-  test('all interactive elements are buttons', () => {
-    renderPaymentCalculator();
+  test('all action buttons are accessible', () => {
+    render(
+      <PaymentCalculator
+        navigateTo={mockNavigateTo}
+        updateCustomerData={mockUpdateCustomerData}
+        customerData={defaultCustomerData}
+      />
+    );
     
     expect(screen.getByText('Select Lease').tagName).toBe('BUTTON');
     expect(screen.getByText('Select Finance').tagName).toBe('BUTTON');
