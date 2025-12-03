@@ -3,13 +3,17 @@ import api from './api';
 
 const CustomerHandoff = ({ navigateTo, updateCustomerData, customerData }) => {
   const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
+  // Pre-fill name from customerData if available
+  const [name, setName] = useState(customerData?.customerName || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [error, setError] = useState(null);
   const [waitTime, setWaitTime] = useState(null);
   const [leadId, setLeadId] = useState(null);
 
+  // Get customer name for personalization
+  const customerName = customerData?.customerName;
+  
   const vehicle = customerData.selectedVehicle;
   const payment = customerData.paymentPreference;
   const tradeIn = customerData.tradeIn;
@@ -227,7 +231,9 @@ const CustomerHandoff = ({ navigateTo, updateCustomerData, customerData }) => {
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
             </svg>
           </div>
-          <h1 style={styles.title}>Almost There!</h1>
+          <h1 style={styles.title}>
+            {customerName ? `Almost there, ${customerName}!` : 'Almost There!'}
+          </h1>
           <p style={styles.subtitle}>
             Enter your phone number and a team member will be right with you
           </p>
@@ -256,10 +262,10 @@ const CustomerHandoff = ({ navigateTo, updateCustomerData, customerData }) => {
 
         {/* Form */}
         <div style={styles.form}>
-          {/* Name (Optional) */}
+          {/* Name - Pre-filled if we have it, optional otherwise */}
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Your Name <span style={styles.optional}>(optional)</span>
+              Your Name {!customerName && <span style={styles.optional}>(optional)</span>}
             </label>
             <input
               type="text"
