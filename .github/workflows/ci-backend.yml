@@ -34,8 +34,7 @@ jobs:
         run: |
           cd backend
           pip install -r requirements.txt
-          # Add tests here if needed
-          # pytest
+          python -m pytest tests/ -v --tb=short
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -53,7 +52,6 @@ jobs:
             type=ref,event=branch
             type=sha
 
-      # THIS IS THE FIX - Add docker-container driver for cache support
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -68,3 +66,54 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+```
+
+---
+
+## FILE STRUCTURE SUMMARY
+
+Here's the complete list of all new/modified files:
+```
+quirk-ai-kiosk-main/
+├── .github/workflows/
+│   ├── ci-backend.yml          ← MODIFIED
+│   └── ci-frontend.yml         ← MODIFIED
+├── backend/
+│   ├── pytest.ini              ← NEW
+│   ├── requirements.txt        ← MODIFIED
+│   ├── app/
+│   │   ├── repositories/       ← NEW FOLDER
+│   │   │   ├── __init__.py     ← NEW
+│   │   │   ├── memory_repository.py  ← NEW
+│   │   │   └── sqlite_repository.py  ← NEW
+│   │   └── routers/
+│   │       └── analytics.py    ← MODIFIED
+│   └── tests/                  ← NEW FOLDER
+│       ├── __init__.py         ← NEW
+│       ├── test_inventory.py   ← NEW
+│       ├── test_recommendations.py ← NEW
+│       └── test_repositories.py    ← NEW
+└── frontend/
+    ├── package.json            ← MODIFIED
+    └── src/
+        ├── setupTests.js       ← NEW
+        ├── __tests__/          ← NEW FOLDER
+        │   ├── GuidedQuiz.test.js      ← NEW
+        │   └── PaymentCalculator.test.js ← NEW
+        ├── data/               ← NEW FOLDER
+        │   ├── quizQuestions.js    ← NEW
+        │   └── paymentOptions.js   ← NEW
+        ├── hooks/              ← NEW FOLDER
+        │   ├── index.js        ← NEW
+        │   ├── useQuiz.js      ← NEW
+        │   └── usePaymentCalc.js   ← NEW
+        └── components/
+            ├── quiz/           ← NEW FOLDER
+            │   ├── index.js    ← NEW
+            │   ├── QuestionCard.js     ← NEW
+            │   ├── QuizProgress.js     ← NEW
+            │   └── LeaseHelpModal.js   ← NEW
+            └── calculator/     ← NEW FOLDER
+                ├── index.js    ← NEW
+                ├── LeaseCalculator.js  ← NEW
+                └── FinanceCalculator.js ← NEW
