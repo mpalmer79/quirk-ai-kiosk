@@ -3,18 +3,143 @@
  * Handles all communication between frontend components and FastAPI backend
  */
 
+import type { Vehicle, InventoryResponse } from '../types';
+
 // Base API URL - configure based on environment
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL: string = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+interface RequestOptions extends RequestInit {
+  headers?: Record<string, string>;
+}
+
+interface InventoryFilters {
+  model?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  bodyType?: string;
+  drivetrain?: string;
+  cabType?: string;
+  condition?: string;
+  sortBy?: string;
+  limit?: number;
+}
+
+interface TradeInVehicleData {
+  vin?: string;
+  year: number;
+  make: string;
+  model: string;
+  trim?: string;
+  mileage: number;
+  condition: 'excellent' | 'good' | 'fair' | 'poor';
+}
+
+interface TradeInEstimate {
+  estimatedValue: number;
+  range: { low: number; high: number };
+  adjustments: Record<string, number>;
+}
+
+interface LeaseParams {
+  vehiclePrice: number;
+  downPayment: number;
+  tradeInValue?: number;
+  term: number;
+  moneyFactor: number;
+  residualPercent: number;
+}
+
+interface FinanceParams {
+  vehiclePrice: number;
+  downPayment: number;
+  tradeInValue?: number;
+  term: number;
+  apr: number;
+}
+
+interface PaymentResult {
+  monthlyPayment: number;
+  totalCost: number;
+  downPayment: number;
+  term: number;
+}
+
+interface LeadData {
+  customerName: string;
+  phone: string;
+  email?: string;
+  vehicleInterest?: Vehicle;
+  tradeIn?: TradeInVehicleData;
+  paymentPreference?: PaymentResult;
+  notes?: string;
+}
+
+interface TestDriveData {
+  customerName: string;
+  phone: string;
+  email?: string;
+  vehicleStockNumber: string;
+  preferredDate?: string;
+  preferredTime?: string;
+}
+
+interface AnalyticsData {
+  event: string;
+  data: Record<string, unknown>;
+  timestamp: string;
+  sessionId: string;
+}
+
+interface TrafficSessionData {
+  sessionId?: string;
+  customerName?: string | null;
+  phone?: string;
+  path?: string | null;
+  vehicleRequested?: boolean;
+  actions?: string[];
+  vehicle?: Partial<Vehicle>;
+  tradeIn?: Partial<TradeInVehicleData & { estimatedValue?: number }>;
+  payment?: {
+    type?: string;
+    monthly?: number;
+    term?: number;
+    downPayment?: number;
+  };
+}
+
+interface TrafficLogEntry {
+  id: number;
+  sessionId: string;
+  timestamp: string;
+  customerName?: string;
+  vehicleViewed?: string;
+  actions: string[];
+}
+
+interface TrafficStats {
+  totalSessions: number;
+  todaySessions: number;
+  averageSessionLength: number;
+  topVehiclesViewed: Array<{ stockNumber: string; views: number }>;
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
 // Helper function for API requests
-const apiRequest = async (endpoint, options = {}) => {
+const apiRequest = async <T = unknown>(endpoint: string, options: RequestOptions = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  const defaultHeaders = {
+  const defaultHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
-  const config = {
+  const config: RequestInit = {
     ...options,
     headers: {
       ...defaultHeaders,
@@ -30,11 +155,23 @@ const apiRequest = async (endpoint, options = {}) => {
       throw new Error(errorData.detail || `API Error: ${response.status}`);
     }
     
-    return await response.json();
+    return await response.json() as T;
   } catch (error) {
     console.error(`API Request Failed: ${endpoint}`, error);
     throw error;
   }
+};
+
+/**
+ * Get or create session ID
+ */
+const getSessionId = (): string => {
+  let sessionId = sessionStorage.getItem('kiosk_session_id');
+  if (!sessionId) {
+    sessionId = `K${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    sessionStorage.setItem('kiosk_session_id', sessionId);
+  }
+  return sessionId;
 };
 
 // ============================================
@@ -44,44 +181,44 @@ const apiRequest = async (endpoint, options = {}) => {
 /**
  * Get all inventory with optional filters
  */
-export const getInventory = async (filters = {}) => {
+export const getInventory = async (filters: InventoryFilters = {}): Promise<InventoryResponse | Vehicle[]> => {
   const params = new URLSearchParams();
   
   if (filters.model) params.append('model', filters.model);
-  if (filters.minPrice) params.append('min_price', filters.minPrice);
-  if (filters.maxPrice) params.append('max_price', filters.maxPrice);
+  if (filters.minPrice) params.append('min_price', String(filters.minPrice));
+  if (filters.maxPrice) params.append('max_price', String(filters.maxPrice));
   if (filters.bodyType) params.append('body_type', filters.bodyType);
   if (filters.drivetrain) params.append('drivetrain', filters.drivetrain);
   if (filters.cabType) params.append('cab_type', filters.cabType);
   if (filters.condition) params.append('condition', filters.condition);
   if (filters.sortBy) params.append('sort_by', filters.sortBy);
-  if (filters.limit) params.append('limit', filters.limit);
+  if (filters.limit) params.append('limit', String(filters.limit));
   
   const queryString = params.toString();
   const endpoint = `/inventory${queryString ? `?${queryString}` : ''}`;
   
-  return apiRequest(endpoint);
+  return apiRequest<InventoryResponse | Vehicle[]>(endpoint);
 };
 
 /**
  * Get vehicle by stock number
  */
-export const getVehicleByStock = async (stockNumber) => {
-  return apiRequest(`/inventory/stock/${stockNumber}`);
+export const getVehicleByStock = async (stockNumber: string): Promise<Vehicle> => {
+  return apiRequest<Vehicle>(`/inventory/stock/${stockNumber}`);
 };
 
 /**
  * Get vehicle by VIN
  */
-export const getVehicleByVin = async (vin) => {
-  return apiRequest(`/inventory/vin/${vin}`);
+export const getVehicleByVin = async (vin: string): Promise<Vehicle> => {
+  return apiRequest<Vehicle>(`/inventory/vin/${vin}`);
 };
 
 /**
  * Search inventory with quiz-based preferences
  */
-export const searchByPreferences = async (preferences) => {
-  return apiRequest('/inventory/search', {
+export const searchByPreferences = async (preferences: Record<string, unknown>): Promise<Vehicle[]> => {
+  return apiRequest<Vehicle[]>('/inventory/search', {
     method: 'POST',
     body: JSON.stringify(preferences),
   });
@@ -90,8 +227,8 @@ export const searchByPreferences = async (preferences) => {
 /**
  * Get inventory statistics
  */
-export const getInventoryStats = async () => {
-  return apiRequest('/inventory/stats');
+export const getInventoryStats = async (): Promise<Record<string, unknown>> => {
+  return apiRequest<Record<string, unknown>>('/inventory/stats');
 };
 
 // ============================================
@@ -101,8 +238,8 @@ export const getInventoryStats = async () => {
 /**
  * Get trade-in estimate
  */
-export const getTradeInEstimate = async (vehicleData) => {
-  return apiRequest('/trade-in/estimate', {
+export const getTradeInEstimate = async (vehicleData: TradeInVehicleData): Promise<TradeInEstimate> => {
+  return apiRequest<TradeInEstimate>('/trade-in/estimate', {
     method: 'POST',
     body: JSON.stringify(vehicleData),
   });
@@ -111,15 +248,15 @@ export const getTradeInEstimate = async (vehicleData) => {
 /**
  * Decode VIN for trade-in
  */
-export const decodeTradeInVin = async (vin) => {
-  return apiRequest(`/trade-in/decode/${vin}`);
+export const decodeTradeInVin = async (vin: string): Promise<Partial<TradeInVehicleData>> => {
+  return apiRequest<Partial<TradeInVehicleData>>(`/trade-in/decode/${vin}`);
 };
 
 /**
  * Request in-person appraisal
  */
-export const requestAppraisal = async (tradeInData) => {
-  return apiRequest('/trade-in/appraisal', {
+export const requestAppraisal = async (tradeInData: TradeInVehicleData & { customerPhone: string }): Promise<{ success: boolean; appointmentId?: string }> => {
+  return apiRequest<{ success: boolean; appointmentId?: string }>('/trade-in/appraisal', {
     method: 'POST',
     body: JSON.stringify(tradeInData),
   });
@@ -132,8 +269,8 @@ export const requestAppraisal = async (tradeInData) => {
 /**
  * Calculate lease payment
  */
-export const calculateLease = async (params) => {
-  return apiRequest('/payments/lease', {
+export const calculateLease = async (params: LeaseParams): Promise<PaymentResult> => {
+  return apiRequest<PaymentResult>('/payments/lease', {
     method: 'POST',
     body: JSON.stringify(params),
   });
@@ -142,8 +279,8 @@ export const calculateLease = async (params) => {
 /**
  * Calculate finance payment
  */
-export const calculateFinance = async (params) => {
-  return apiRequest('/payments/finance', {
+export const calculateFinance = async (params: FinanceParams): Promise<PaymentResult> => {
+  return apiRequest<PaymentResult>('/payments/finance', {
     method: 'POST',
     body: JSON.stringify(params),
   });
@@ -152,8 +289,8 @@ export const calculateFinance = async (params) => {
 /**
  * Get current rebates and incentives for a vehicle
  */
-export const getRebates = async (vehicleId) => {
-  return apiRequest(`/payments/rebates/${vehicleId}`);
+export const getRebates = async (vehicleId: string): Promise<Array<{ name: string; amount: number }>> => {
+  return apiRequest<Array<{ name: string; amount: number }>>(`/payments/rebates/${vehicleId}`);
 };
 
 // ============================================
@@ -163,8 +300,8 @@ export const getRebates = async (vehicleId) => {
 /**
  * Submit customer lead and notify sales team
  */
-export const submitLead = async (leadData) => {
-  return apiRequest('/leads/handoff', {
+export const submitLead = async (leadData: LeadData): Promise<{ success: boolean; leadId?: string }> => {
+  return apiRequest<{ success: boolean; leadId?: string }>('/leads/handoff', {
     method: 'POST',
     body: JSON.stringify(leadData),
   });
@@ -173,8 +310,8 @@ export const submitLead = async (leadData) => {
 /**
  * Schedule test drive
  */
-export const scheduleTestDrive = async (appointmentData) => {
-  return apiRequest('/leads/test-drive', {
+export const scheduleTestDrive = async (appointmentData: TestDriveData): Promise<{ success: boolean; appointmentId?: string }> => {
+  return apiRequest<{ success: boolean; appointmentId?: string }>('/leads/test-drive', {
     method: 'POST',
     body: JSON.stringify(appointmentData),
   });
@@ -183,8 +320,8 @@ export const scheduleTestDrive = async (appointmentData) => {
 /**
  * Send deal summary to customer
  */
-export const sendDealSummary = async (phone, dealData) => {
-  return apiRequest('/leads/send-summary', {
+export const sendDealSummary = async (phone: string, dealData: Record<string, unknown>): Promise<{ success: boolean }> => {
+  return apiRequest<{ success: boolean }>('/leads/send-summary', {
     method: 'POST',
     body: JSON.stringify({ phone, dealData }),
   });
@@ -197,22 +334,22 @@ export const sendDealSummary = async (phone, dealData) => {
 /**
  * Get available makes
  */
-export const getMakes = async () => {
-  return apiRequest('/vehicles/makes');
+export const getMakes = async (): Promise<string[]> => {
+  return apiRequest<string[]>('/vehicles/makes');
 };
 
 /**
  * Get models for a make
  */
-export const getModels = async (make) => {
-  return apiRequest(`/vehicles/models/${make}`);
+export const getModels = async (make: string): Promise<string[]> => {
+  return apiRequest<string[]>(`/vehicles/models/${make}`);
 };
 
 /**
  * Get trims for a model
  */
-export const getTrims = async (make, model, year) => {
-  return apiRequest(`/vehicles/trims?make=${make}&model=${model}&year=${year}`);
+export const getTrims = async (make: string, model: string, year: number): Promise<string[]> => {
+  return apiRequest<string[]>(`/vehicles/trims?make=${make}&model=${model}&year=${year}`);
 };
 
 // ============================================
@@ -222,33 +359,21 @@ export const getTrims = async (make, model, year) => {
 /**
  * Log kiosk analytics event
  */
-export const logAnalytics = async (event, data = {}) => {
+export const logAnalytics = async (event: string, data: Record<string, unknown> = {}): Promise<void> => {
   try {
-    return apiRequest('/kiosk/analytics', {
+    await apiRequest<void>('/kiosk/analytics', {
       method: 'POST',
       body: JSON.stringify({
         event,
         data,
         timestamp: new Date().toISOString(),
         sessionId: getSessionId(),
-      }),
+      } as AnalyticsData),
     });
   } catch (error) {
     // Don't throw on analytics failures
     console.warn('Analytics logging failed:', error);
   }
-};
-
-/**
- * Get or create session ID
- */
-const getSessionId = () => {
-  let sessionId = sessionStorage.getItem('kiosk_session_id');
-  if (!sessionId) {
-    sessionId = `K${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
-    sessionStorage.setItem('kiosk_session_id', sessionId);
-  }
-  return sessionId;
 };
 
 /**
@@ -259,8 +384,8 @@ export const getKioskSessionId = getSessionId;
 /**
  * Health check
  */
-export const healthCheck = async () => {
-  return apiRequest('/health');
+export const healthCheck = async (): Promise<{ status: string }> => {
+  return apiRequest<{ status: string }>('/health');
 };
 
 // ============================================
@@ -270,9 +395,9 @@ export const healthCheck = async () => {
 /**
  * Log or update a kiosk session
  */
-export const logTrafficSession = async (sessionData) => {
+export const logTrafficSession = async (sessionData: TrafficSessionData): Promise<void> => {
   try {
-    return apiRequest('/v1/traffic/session', {
+    await apiRequest<void>('/v1/traffic/session', {
       method: 'POST',
       body: JSON.stringify({
         sessionId: getSessionId(),
@@ -288,22 +413,22 @@ export const logTrafficSession = async (sessionData) => {
 /**
  * Get traffic log entries (admin)
  */
-export const getTrafficLog = async (limit = 50, offset = 0) => {
-  return apiRequest(`/v1/traffic/log?limit=${limit}&offset=${offset}`);
+export const getTrafficLog = async (limit: number = 50, offset: number = 0): Promise<TrafficLogEntry[]> => {
+  return apiRequest<TrafficLogEntry[]>(`/v1/traffic/log?limit=${limit}&offset=${offset}`);
 };
 
 /**
  * Get traffic statistics (admin)
  */
-export const getTrafficStats = async () => {
-  return apiRequest('/v1/traffic/stats');
+export const getTrafficStats = async (): Promise<TrafficStats> => {
+  return apiRequest<TrafficStats>('/v1/traffic/stats');
 };
 
 /**
  * Get single session details (admin)
  */
-export const getTrafficSession = async (sessionId) => {
-  return apiRequest(`/v1/traffic/log/${sessionId}`);
+export const getTrafficSession = async (sessionId: string): Promise<TrafficLogEntry> => {
+  return apiRequest<TrafficLogEntry>(`/v1/traffic/log/${sessionId}`);
 };
 
 // ============================================
