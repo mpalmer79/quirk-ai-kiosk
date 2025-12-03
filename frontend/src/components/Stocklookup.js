@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import api from './api';
 
 const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
@@ -6,9 +6,24 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState(null);
   const [error, setError] = useState(null);
+  const inputRef = useRef(null);
 
   // Stock numbers always start with M
   const STOCK_PREFIX = 'M';
+
+  // Auto-focus the hidden input on mount (desktop keyboard support)
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  // Re-focus after search result is cleared
+  useEffect(() => {
+    if (!searchResult && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [searchResult]);
 
   const handleKeyPress = (key) => {
     if (key === 'clear') {
@@ -20,6 +35,26 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
       setError(null);
     } else if (stockNumber.length < 8) {
       setStockNumber(prev => prev + key);
+      setError(null);
+    }
+  };
+
+  // Handle keyboard input from the hidden input field
+  const handleKeyboardInput = (e) => {
+    const value = e.target.value;
+    // Only allow numbers, max 8 digits
+    const numbersOnly = value.replace(/\D/g, '').slice(0, 8);
+    setStockNumber(numbersOnly);
+    setError(null);
+  };
+
+  // Handle keyboard shortcuts (Enter to search, Escape to clear)
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && stockNumber.length >= 4 && !isSearching) {
+      handleSearch();
+    } else if (e.key === 'Escape') {
+      setStockNumber('');
+      setSearchResult(null);
       setError(null);
     }
   };
@@ -84,7 +119,22 @@ const StockLookup = ({ navigateTo, updateCustomerData, customerData }) => {
 
         {/* Input Display */}
         <div style={styles.inputSection}>
-          <div style={styles.inputDisplay}>
+          <div 
+            style={styles.inputDisplay}
+            onClick={() => inputRef.current?.focus()}
+          >
+            {/* Hidden input for keyboard support on desktop */}
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={stockNumber}
+              onChange={handleKeyboardInput}
+              onKeyDown={handleKeyDown}
+              style={styles.hiddenInput}
+              aria-label="Stock number input"
+            />
             <span style={styles.inputPrefix}>STK#</span>
             <span style={styles.mPrefix}>M</span>
             <span style={styles.inputValue}>
@@ -318,6 +368,22 @@ const styles = {
     fontSize: '32px',
     fontWeight: '700',
     fontFamily: 'monospace',
+    position: 'relative',
+    cursor: 'text',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: '100%',
+    height: '100%',
+    opacity: 0,
+    border: 'none',
+    background: 'transparent',
+    fontSize: '32px',
+    caretColor: 'transparent',
+    color: 'transparent',
+    outline: 'none',
   },
   inputPrefix: {
     color: 'rgba(255,255,255,0.4)',
