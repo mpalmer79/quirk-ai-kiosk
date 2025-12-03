@@ -1,7 +1,6 @@
 name: CI/CD - Frontend Kiosk UI
 
 on:
-  # Triggers the workflow on push or pull request events for the frontend directory
   push:
     branches:
       - main
@@ -27,7 +26,7 @@ jobs:
       - name: 🛠️ Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Recommended stable Node.js version for React
+          node-version: '20'
 
       - name: 📦 Install Dependencies
         run: |
@@ -37,25 +36,18 @@ jobs:
       - name: 🔬 Run Unit and Integration Tests
         run: |
           cd frontend
-          # Placeholder: Run Jest/Testing Library tests
-          # npm run test -- --ci
-          echo "Skipping tests for MVP, but they belong here!"
-        # continue-on-error: false # Uncomment in production
+          npm run test -- --ci --watchAll=false --passWithNoTests
+        env:
+          CI: true
 
       - name: 🏗️ Build Frontend Application
         run: |
           cd frontend
-          # This command compiles the React application into static files (HTML, CSS, JS)
           npm run build 
 
       - name: ⬆️ Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: kiosk-ui-build-${{ github.sha }}
-          # The 'build' directory is the default output for a React app
           path: frontend/build
           retention-days: 7
-          
-      # --- Deployment Stage (Future Step) ---
-      # This artifact is now ready to be picked up by a specialized
-      # Device Management Platform (DMP) and deployed to the physical Kiosks.
