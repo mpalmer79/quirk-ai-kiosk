@@ -1,21 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, CSSProperties } from 'react';
+import type { Vehicle, KioskComponentProps } from '../types';
 
-const ProtectionPackages = ({ navigateTo, updateCustomerData, customerData }) => {
-  const vehicle = customerData.selectedVehicle;
+// Package selection state
+interface PackageSelections {
+  serviceContract: boolean;
+  deficiencyBalance: boolean;
+  tireWheel: boolean;
+}
+
+// Package definition
+interface ProtectionPackage {
+  id: keyof PackageSelections;
+  name: string;
+  tagline: string;
+  price: number;
+  monthlyEstimate: number;
+  duration?: string;
+  icon: JSX.Element;
+  color: string;
+  highlights: string[];
+  details: string;
+}
+
+// Packages collection type
+type PackagesMap = Record<keyof PackageSelections, ProtectionPackage>;
+
+const ProtectionPackages: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
+  const vehicle = customerData?.selectedVehicle as Vehicle | undefined;
   const customerName = customerData?.customerName;
   
   // Protection package selections
-  const [selectedPackages, setSelectedPackages] = useState({
+  const [selectedPackages, setSelectedPackages] = useState<PackageSelections>({
     serviceContract: false,
     deficiencyBalance: false,
     tireWheel: false,
   });
   
   // Expanded info sections
-  const [expandedPackage, setExpandedPackage] = useState(null);
+  const [expandedPackage, setExpandedPackage] = useState<keyof PackageSelections | null>(null);
 
   // Package definitions with pricing
-  const packages = {
+  const packages: PackagesMap = {
     serviceContract: {
       id: 'serviceContract',
       name: 'Service Contract',
@@ -86,11 +111,11 @@ const ProtectionPackages = ({ navigateTo, updateCustomerData, customerData }) =>
   };
 
   // Calculate totals
-  const calculateTotals = () => {
+  const calculateTotals = (): { totalPrice: number; totalMonthly: number } => {
     let totalPrice = 0;
     let totalMonthly = 0;
     
-    Object.keys(selectedPackages).forEach(key => {
+    (Object.keys(selectedPackages) as Array<keyof PackageSelections>).forEach(key => {
       if (selectedPackages[key]) {
         totalPrice += packages[key].price;
         totalMonthly += packages[key].monthlyEstimate;
@@ -103,21 +128,21 @@ const ProtectionPackages = ({ navigateTo, updateCustomerData, customerData }) =>
   const { totalPrice, totalMonthly } = calculateTotals();
   const selectedCount = Object.values(selectedPackages).filter(Boolean).length;
 
-  const togglePackage = (packageId) => {
+  const togglePackage = (packageId: keyof PackageSelections): void => {
     setSelectedPackages(prev => ({
       ...prev,
       [packageId]: !prev[packageId],
     }));
   };
 
-  const toggleExpanded = (packageId) => {
+  const toggleExpanded = (packageId: keyof PackageSelections): void => {
     setExpandedPackage(expandedPackage === packageId ? null : packageId);
   };
 
-  const handleContinue = () => {
+  const handleContinue = (): void => {
     // Save selected packages to customer data
-    const selectedProtection = [];
-    Object.keys(selectedPackages).forEach(key => {
+    const selectedProtection: Array<{ id: string; name: string; price: number }> = [];
+    (Object.keys(selectedPackages) as Array<keyof PackageSelections>).forEach(key => {
       if (selectedPackages[key]) {
         selectedProtection.push({
           id: key,
@@ -136,13 +161,16 @@ const ProtectionPackages = ({ navigateTo, updateCustomerData, customerData }) =>
     navigateTo('handoff');
   };
 
-  const handleSkip = () => {
+  const handleSkip = (): void => {
     updateCustomerData({
       protectionPackages: [],
       protectionTotal: 0,
     });
     navigateTo('handoff');
   };
+
+  // Get gradient for vehicle display
+  const vehicleGradient = (vehicle as Vehicle & { gradient?: string })?.gradient || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
 
   return (
     <div style={styles.container}>
@@ -168,7 +196,7 @@ const ProtectionPackages = ({ navigateTo, updateCustomerData, customerData }) =>
       {/* Vehicle Context */}
       {vehicle && (
         <div style={styles.vehicleContext}>
-          <div style={{ ...styles.vehicleThumb, background: vehicle.gradient || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)' }}>
+          <div style={{ ...styles.vehicleThumb, background: vehicleGradient }}>
             <span style={styles.vehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
           </div>
           <div style={styles.vehicleInfo}>
@@ -324,7 +352,7 @@ const ProtectionPackages = ({ navigateTo, updateCustomerData, customerData }) =>
   );
 };
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   container: {
     flex: 1,
     display: 'flex',
