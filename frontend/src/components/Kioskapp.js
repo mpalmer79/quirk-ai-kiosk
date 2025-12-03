@@ -3,7 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 // Import all customer journey components (using actual filenames)
 import WelcomeScreen from './Welcomescreen';
 import StockLookup from './Stocklookup';
-import ModelBudgetSelector from './Modelbudgetselector';
+import ModelBudgetSelector from './ModelBudgetSelector';
 import GuidedQuiz from './Guidedquiz';
 import InventoryResults from './Inventoryresults';
 import VehicleDetail from './Vehicledetail';
