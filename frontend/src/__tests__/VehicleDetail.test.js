@@ -334,6 +334,31 @@ describe('VehicleDetail Component', () => {
       
       expect(mockNavigateTo).toHaveBeenCalledWith('inventory');
     });
+
+    test('shows personalized confirmation when customer name is provided', () => {
+      render(
+        <VehicleDetail
+          navigateTo={mockNavigateTo}
+          updateCustomerData={mockUpdateCustomerData}
+          customerData={{ 
+            selectedVehicle: defaultVehicle,
+            customerName: 'John'
+          }}
+        />
+      );
+      
+      fireEvent.click(screen.getByText('Request This Vehicle'));
+      
+      expect(screen.getByText('Great choice, John!')).toBeInTheDocument();
+    });
+
+    test('shows generic confirmation when no customer name', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Request This Vehicle'));
+      
+      expect(screen.getByText('Vehicle Requested!')).toBeInTheDocument();
+    });
   });
 });
 
