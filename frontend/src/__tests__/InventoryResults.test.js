@@ -25,6 +25,7 @@ const mockVehicles = [
     trim: 'LT Crew Cab',
     exteriorColor: 'Summit White',
     price: 47495,
+    msrp: 48969,
     status: 'In Stock',
     matchScore: 95,
     features: ['Trailering Package', 'Heated Seats', 'Apple CarPlay'],
@@ -38,6 +39,7 @@ const mockVehicles = [
     trim: 'RST Crew Cab',
     exteriorColor: 'Black',
     price: 52995,
+    msrp: 54634,
     status: 'In Stock',
     matchScore: 88,
     features: ['Sport Package', 'Sunroof'],
@@ -51,6 +53,7 @@ const mockVehicles = [
     trim: 'Z71',
     exteriorColor: 'Red',
     price: 62995,
+    msrp: 64943,
     status: 'In Transit',
     matchScore: 75,
     features: [],
@@ -173,12 +176,32 @@ describe('InventoryResults Component', () => {
       });
     });
 
-    test('displays vehicle prices', async () => {
+    test('displays vehicle prices (Your Price)', async () => {
       renderInventoryResults();
 
       await waitFor(() => {
         expect(screen.getByText('$47,495')).toBeInTheDocument();
         expect(screen.getByText('$52,995')).toBeInTheDocument();
+      });
+    });
+
+    test('displays MSRP values', async () => {
+      renderInventoryResults();
+
+      await waitFor(() => {
+        expect(screen.getByText('$48,969')).toBeInTheDocument();
+        expect(screen.getByText('$54,634')).toBeInTheDocument();
+      });
+    });
+
+    test('displays MSRP and Your Price labels', async () => {
+      renderInventoryResults();
+
+      await waitFor(() => {
+        const msrpLabels = screen.getAllByText('MSRP');
+        const yourPriceLabels = screen.getAllByText('Your Price');
+        expect(msrpLabels.length).toBeGreaterThan(0);
+        expect(yourPriceLabels.length).toBeGreaterThan(0);
       });
     });
 
@@ -197,14 +220,6 @@ describe('InventoryResults Component', () => {
       await waitFor(() => {
         const inStockElements = screen.getAllByText('In Stock');
         expect(inStockElements.length).toBeGreaterThan(0);
-      });
-    });
-
-    test('displays estimated monthly payment', async () => {
-      renderInventoryResults();
-
-      await waitFor(() => {
-        expect(screen.getByText('$660/mo')).toBeInTheDocument();
       });
     });
   });
