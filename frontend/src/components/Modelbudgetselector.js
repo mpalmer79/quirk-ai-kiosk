@@ -742,10 +742,11 @@ const styles = {
     flexDirection: 'column',
     padding: '20px',
     paddingTop: '80px',
+    paddingBottom: '40px',
     overflow: 'auto',
     overflowX: 'hidden',
     WebkitOverflowScrolling: 'touch',
-    minHeight: '100vh',
+    minHeight: 0,
     boxSizing: 'border-box',
   },
   loadingContainer: {
