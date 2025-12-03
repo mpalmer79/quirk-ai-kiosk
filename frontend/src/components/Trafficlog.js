@@ -89,6 +89,20 @@ const TrafficLog = ({ navigateTo }) => {
     );
   }
 
+  if (error) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loadingState}>
+          <div style={styles.errorIcon}>⚠️</div>
+          <p style={styles.errorText}>{error}</p>
+          <button style={styles.retryButton} onClick={loadData}>
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.container}>
       {/* Header */}
@@ -484,6 +498,25 @@ const styles = {
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
     marginBottom: '16px',
+  },
+  errorIcon: {
+    fontSize: '48px',
+    marginBottom: '16px',
+  },
+  errorText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: '16px',
+    marginBottom: '16px',
+  },
+  retryButton: {
+    padding: '10px 24px',
+    background: 'rgba(27, 115, 64, 0.2)',
+    border: '1px solid rgba(27, 115, 64, 0.3)',
+    borderRadius: '8px',
+    color: '#4ade80',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
   },
   header: {
     display: 'flex',
