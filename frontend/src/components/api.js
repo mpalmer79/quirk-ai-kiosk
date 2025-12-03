@@ -245,17 +245,65 @@ export const logAnalytics = async (event, data = {}) => {
 const getSessionId = () => {
   let sessionId = sessionStorage.getItem('kiosk_session_id');
   if (!sessionId) {
-    sessionId = `kiosk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    sessionId = `K${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
     sessionStorage.setItem('kiosk_session_id', sessionId);
   }
   return sessionId;
 };
 
 /**
+ * Export session ID getter for components
+ */
+export const getKioskSessionId = getSessionId;
+
+/**
  * Health check
  */
 export const healthCheck = async () => {
   return apiRequest('/health');
+};
+
+// ============================================
+// TRAFFIC LOG ENDPOINTS
+// ============================================
+
+/**
+ * Log or update a kiosk session
+ */
+export const logTrafficSession = async (sessionData) => {
+  try {
+    return apiRequest('/v1/traffic/session', {
+      method: 'POST',
+      body: JSON.stringify({
+        sessionId: getSessionId(),
+        ...sessionData,
+      }),
+    });
+  } catch (error) {
+    // Don't throw on traffic log failures
+    console.warn('Traffic logging failed:', error);
+  }
+};
+
+/**
+ * Get traffic log entries (admin)
+ */
+export const getTrafficLog = async (limit = 50, offset = 0) => {
+  return apiRequest(`/v1/traffic/log?limit=${limit}&offset=${offset}`);
+};
+
+/**
+ * Get traffic statistics (admin)
+ */
+export const getTrafficStats = async () => {
+  return apiRequest('/v1/traffic/stats');
+};
+
+/**
+ * Get single session details (admin)
+ */
+export const getTrafficSession = async (sessionId) => {
+  return apiRequest(`/v1/traffic/log/${sessionId}`);
 };
 
 // ============================================
@@ -293,6 +341,13 @@ const api = {
   // Utilities
   logAnalytics,
   healthCheck,
+  getKioskSessionId,
+  
+  // Traffic Log
+  logTrafficSession,
+  getTrafficLog,
+  getTrafficStats,
+  getTrafficSession,
 };
 
 export default api;
