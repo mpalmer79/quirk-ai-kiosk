@@ -1,21 +1,45 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, CSSProperties, ReactNode } from 'react';
 
-// Import all customer journey components (using actual filenames)
-import WelcomeScreen from './Welcomescreen';
-import StockLookup from './Stocklookup';
+// Import all customer journey components (using corrected PascalCase filenames)
+import WelcomeScreen from './WelcomeScreen';
+import StockLookup from './StockLookup';
 import ModelBudgetSelector from './ModelBudgetSelector';
 import GuidedQuiz from './Guidedquiz';
-import InventoryResults from './Inventoryresults';
-import VehicleDetail from './Vehicledetail';
+import InventoryResults from './InventoryResults';
+import VehicleDetail from './VehicleDetail';
 import PaymentCalculator from './Paymentcalculator';
 import TradeInEstimator from './TradeInestimator';
 import CustomerHandoff from './Customerhandoff';
+import ProtectionPackages from './ProtectionPackages';
 import TrafficLog from './Trafficlog';
 import ErrorBoundary from './Errorboundary';
 import api from './api';
 
+import type { Vehicle, CustomerData, KioskComponentProps } from '../types';
+
+// Screen names type
+type ScreenName = 
+  | 'welcome'
+  | 'stockLookup'
+  | 'modelBudget'
+  | 'guidedQuiz'
+  | 'inventory'
+  | 'vehicleDetail'
+  | 'paymentCalculator'
+  | 'tradeIn'
+  | 'handoff'
+  | 'protectionPackages'
+  | 'trafficLog';
+
+// Screen error boundary props
+interface ScreenErrorBoundaryProps {
+  children: ReactNode;
+  onReset: () => void;
+  screenName: string;
+}
+
 // Screen-level error boundary with recovery option
-const ScreenErrorBoundary = ({ children, onReset, screenName }) => {
+const ScreenErrorBoundary: React.FC<ScreenErrorBoundaryProps> = ({ children, onReset, screenName }) => {
   return (
     <ErrorBoundary
       fallback={
@@ -39,7 +63,7 @@ const ScreenErrorBoundary = ({ children, onReset, screenName }) => {
   );
 };
 
-const screenErrorStyles = {
+const screenErrorStyles: Record<string, CSSProperties> = {
   container: {
     flex: 1,
     display: 'flex',
@@ -81,57 +105,48 @@ const screenErrorStyles = {
   },
 };
 
-// Main Kiosk Application - Customer Journey Controller
-const KioskApp = () => {
-  const [currentScreen, setCurrentScreen] = useState('welcome');
-  const [customerData, setCustomerData] = useState({
-    customerName: null,
-    path: null,
-    stockNumber: null,
-    selectedModel: null,
-    budgetRange: { min: 300, max: 800 },
-    downPayment: 3000,
-    quizAnswers: {},
-    selectedVehicle: null,
-    tradeIn: null,
-    paymentPreference: null,
-    contactInfo: null,
-  });
-  const [isTransitioning, setIsTransitioning] = useState(false);
+// Initial customer data state
+const initialCustomerData: CustomerData = {
+  customerName: undefined,
+  path: undefined,
+  stockNumber: undefined,
+  selectedModel: undefined,
+  budgetRange: { min: 300, max: 800 },
+  downPayment: 3000,
+  quizAnswers: {},
+  selectedVehicle: undefined,
+  tradeIn: undefined,
+  paymentPreference: undefined,
+  contactInfo: undefined,
+};
 
-  const updateCustomerData = useCallback((updates) => {
+// Main Kiosk Application - Customer Journey Controller
+const KioskApp: React.FC = () => {
+  const [currentScreen, setCurrentScreen] = useState<ScreenName>('welcome');
+  const [customerData, setCustomerData] = useState<CustomerData>(initialCustomerData);
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
+
+  const updateCustomerData = useCallback((updates: Partial<CustomerData>): void => {
     setCustomerData(prev => ({ ...prev, ...updates }));
   }, []);
 
-  const navigateTo = useCallback((screen) => {
+  const navigateTo = useCallback((screen: string): void => {
     setIsTransitioning(true);
     setTimeout(() => {
-      setCurrentScreen(screen);
+      setCurrentScreen(screen as ScreenName);
       setIsTransitioning(false);
     }, 150);
   }, []);
 
-  const resetJourney = useCallback(() => {
-    setCustomerData({
-      customerName: null,
-      path: null,
-      stockNumber: null,
-      selectedModel: null,
-      budgetRange: { min: 300, max: 800 },
-      downPayment: 3000,
-      quizAnswers: {},
-      selectedVehicle: null,
-      tradeIn: null,
-      paymentPreference: null,
-      contactInfo: null,
-    });
+  const resetJourney = useCallback((): void => {
+    setCustomerData(initialCustomerData);
     setCurrentScreen('welcome');
   }, []);
 
   // Idle timeout - return to welcome after 3 minutes of inactivity
   useEffect(() => {
-    let timeout;
-    const resetTimer = () => {
+    let timeout: ReturnType<typeof setTimeout>;
+    const resetTimer = (): void => {
       clearTimeout(timeout);
       if (currentScreen !== 'welcome' && currentScreen !== 'trafficLog') {
         timeout = setTimeout(() => {
@@ -140,7 +155,7 @@ const KioskApp = () => {
       }
     };
 
-    const events = ['touchstart', 'click', 'mousemove', 'keypress'];
+    const events: string[] = ['touchstart', 'click', 'mousemove', 'keypress'];
     events.forEach(event => window.addEventListener(event, resetTimer));
     resetTimer();
 
@@ -165,46 +180,49 @@ const KioskApp = () => {
     if (!hasData) return;
 
     // Build session data for logging
-    const sessionData = {
+    const sessionData: Record<string, unknown> = {
       customerName: customerData.customerName,
       phone: customerData.contactInfo?.phone,
       path: customerData.path,
-      vehicleRequested: !!customerData.vehicleRequested,
+      vehicleRequested: !!(customerData as CustomerData & { vehicleRequested?: unknown }).vehicleRequested,
       actions: [currentScreen],
     };
 
     // Add vehicle if selected
     if (customerData.selectedVehicle) {
+      const vehicle = customerData.selectedVehicle;
       sessionData.vehicle = {
-        stockNumber: customerData.selectedVehicle.stockNumber,
-        year: customerData.selectedVehicle.year,
-        make: customerData.selectedVehicle.make,
-        model: customerData.selectedVehicle.model,
-        trim: customerData.selectedVehicle.trim,
-        msrp: customerData.selectedVehicle.msrp,
-        salePrice: customerData.selectedVehicle.salePrice,
+        stockNumber: vehicle.stockNumber || vehicle.stock_number,
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        trim: vehicle.trim,
+        msrp: vehicle.msrp,
+        salePrice: vehicle.salePrice || vehicle.sale_price,
       };
     }
 
     // Add trade-in if provided
     if (customerData.tradeIn) {
+      const tradeIn = customerData.tradeIn;
       sessionData.tradeIn = {
-        year: customerData.tradeIn.year,
-        make: customerData.tradeIn.make,
-        model: customerData.tradeIn.model,
-        mileage: customerData.tradeIn.mileage,
-        condition: customerData.tradeIn.condition,
-        estimatedValue: customerData.tradeIn.estimatedValue,
+        year: tradeIn.year,
+        make: tradeIn.make,
+        model: tradeIn.model,
+        mileage: tradeIn.mileage,
+        condition: tradeIn.condition,
+        estimatedValue: tradeIn.estimatedValue,
       };
     }
 
     // Add payment preference if set
     if (customerData.paymentPreference) {
+      const payment = customerData.paymentPreference;
       sessionData.payment = {
-        type: customerData.paymentPreference.type,
-        monthly: customerData.paymentPreference.monthly,
-        term: customerData.paymentPreference.term,
-        downPayment: customerData.paymentPreference.downPayment,
+        type: payment.type,
+        monthly: payment.monthly,
+        term: payment.term,
+        downPayment: payment.downPayment,
       };
     }
 
@@ -220,11 +238,11 @@ const KioskApp = () => {
     customerData.tradeIn,
     customerData.paymentPreference,
     customerData.contactInfo,
-    customerData.vehicleRequested,
+    customerData,
   ]);
 
   // Screen components map
-  const screens = {
+  const screens: Record<ScreenName, React.FC<KioskComponentProps>> = {
     welcome: WelcomeScreen,
     stockLookup: StockLookup,
     modelBudget: ModelBudgetSelector,
@@ -234,13 +252,14 @@ const KioskApp = () => {
     paymentCalculator: PaymentCalculator,
     tradeIn: TradeInEstimator,
     handoff: CustomerHandoff,
+    protectionPackages: ProtectionPackages,
     trafficLog: TrafficLog,
   };
 
   const CurrentScreenComponent = screens[currentScreen] || WelcomeScreen;
 
   // Props passed to all screen components
-  const screenProps = {
+  const screenProps: KioskComponentProps = {
     customerData,
     updateCustomerData,
     navigateTo,
@@ -338,7 +357,7 @@ const KioskApp = () => {
   );
 };
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   container: {
     minHeight: '100vh',
     display: 'flex',
@@ -356,7 +375,6 @@ const styles = {
     borderBottom: '1px solid rgba(255,255,255,0.1)',
     background: 'rgba(0,0,0,0.3)',
     backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
     zIndex: 100,
   },
   logo: {
