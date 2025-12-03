@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 const VehicleDetail = ({ navigateTo, updateCustomerData, customerData }) => {
-  const [activeTab, setActiveTab] = useState('overview');
   const vehicle = customerData.selectedVehicle || {
     stockNumber: '24789',
     year: 2025,
