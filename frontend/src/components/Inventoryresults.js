@@ -166,6 +166,11 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
       || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
   };
 
+  // Format price without decimals
+  const formatPrice = (price) => {
+    return Math.round(price || 0).toLocaleString();
+  };
+
   // Apply additional client-side filtering as a safety net
   const filteredVehicles = vehicles.filter(vehicle => {
     if (!customerData.selectedModel) return true; // No filter if no model selected
@@ -307,16 +312,16 @@ const InventoryResults = ({ navigateTo, updateCustomerData, customerData }) => {
                   </div>
                 )}
 
-                {/* Pricing */}
+                {/* Pricing - MSRP on left, Your Price on right */}
                 <div style={styles.pricingSection}>
                   <div style={styles.priceColumn}>
-                    <span style={styles.priceLabel}>Your Price</span>
-                    <span style={styles.priceValue}>${(vehicle.price || 0).toLocaleString()}</span>
+                    <span style={styles.priceLabel}>MSRP</span>
+                    <span style={styles.msrpValue}>${formatPrice(vehicle.msrp || vehicle.price)}</span>
                   </div>
                   <div style={styles.paymentColumn}>
-                    <span style={styles.priceLabel}>Est. Payment</span>
+                    <span style={styles.priceLabel}>Your Price</span>
                     <span style={styles.paymentValue}>
-                      ${Math.round((vehicle.price || 40000) / 72)}/mo
+                      ${formatPrice(vehicle.price)}
                     </span>
                   </div>
                 </div>
@@ -594,13 +599,13 @@ const styles = {
     color: 'rgba(255,255,255,0.4)',
     textTransform: 'uppercase',
   },
-  priceValue: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: '#ffffff',
+  msrpValue: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
   },
   paymentValue: {
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: '700',
     color: '#4ade80',
   },
