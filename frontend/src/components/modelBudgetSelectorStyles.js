@@ -1,4 +1,6 @@
-const styles = {
+import type { CSSProperties } from 'react';
+
+const styles: Record<string, CSSProperties> = {
   container: {
     flex: 1,
     display: 'flex',
