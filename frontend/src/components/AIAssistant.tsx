@@ -453,7 +453,6 @@ const styles: Record<string, CSSProperties> = {
     margin: '0 auto',
     width: '100%',
     boxSizing: 'border-box',
-    height: '100%',
     minHeight: 0,
     overflow: 'hidden',
   },
