@@ -1,5 +1,11 @@
-import React, { useState, CSSProperties } from 'react';
+import React, { useState } from 'react';
 import type { Vehicle, KioskComponentProps } from '../types';
+import { vehicleDetailStyles as styles } from '../styles/VehicleDetailStyles';
+import { 
+  decodeGMTruckVIN, 
+  getVehicleImageCandidates, 
+  getColorGradient 
+} from '../utils/vehicleHelpers';
 
 // Extended vehicle with additional detail fields
 interface DetailedVehicle extends Vehicle {
@@ -49,8 +55,6 @@ const defaultVehicle: DetailedVehicle = {
     'Remote Start',
     'LED Headlamps',
     'Spray-On Bedliner',
-    '20" Painted Aluminum Wheels',
-    'Rear Vision Camera',
   ],
   rebates: [
     { name: 'Customer Cash', amount: 2500 },
@@ -59,196 +63,49 @@ const defaultVehicle: DetailedVehicle = {
   ],
 };
 
-// GM Truck VIN Decoder - extracts cab type and drive type for Silverado models
-interface TruckVINInfo {
-  cabType: string;
-  driveType: string;
-}
-
-const decodeGMTruckVIN = (vin: string, model: string): TruckVINInfo | null => {
-  if (!vin || vin.length !== 17) return null;
-  
-  // Only decode for Silverado models
-  const modelLower = (model || '').toLowerCase();
-  if (!modelLower.includes('silverado')) return null;
-  
-  const vinUpper = vin.toUpperCase();
-  
-  // GM Silverado VIN Structure (2019+):
-  // Position 6 (index 5) - Cab type
-  // Position 7 (index 6) - Drive type
-  const cabCode = vinUpper[5];
-  const driveCode = vinUpper[6];
-  
-  // Cab type mapping for Silverado
-  let cabType = '';
-  switch (cabCode) {
-    case 'A':
-    case 'B':
-      cabType = 'Regular Cab';
-      break;
-    case 'C':
-    case 'D':
-      cabType = 'Double Cab';
-      break;
-    case 'K':
-    case 'U':
-    case 'G':
-      cabType = 'Crew Cab';
-      break;
-    default:
-      // Try to infer from other positions or leave empty
-      cabType = '';
-  }
-  
-  // Drive type mapping for GM trucks
-  // Position 7 encodes drivetrain info
-  let driveType = '';
-  switch (driveCode) {
-    case 'E':
-    case 'K':
-    case 'G':
-    case 'J':
-      driveType = '4WD';
-      break;
-    case 'A':
-    case 'D':
-    case 'C':
-    case 'B':
-      driveType = '2WD';
-      break;
-    default:
-      driveType = '';
-  }
-  
-  // Only return if we decoded at least one piece of info
-  if (cabType || driveType) {
-    return { cabType, driveType };
-  }
-  
-  return null;
-};
-
 const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
   const [vehicleRequested, setVehicleRequested] = useState<boolean>(false);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [allImagesFailed, setAllImagesFailed] = useState<boolean>(false);
   
-  // Get customer name for personalization
   const customerName = customerData?.customerName;
-  
   const vehicle: DetailedVehicle = (customerData?.selectedVehicle as DetailedVehicle) || defaultVehicle;
   
-  // Normalize vehicle properties (handle both camelCase and snake_case)
+  // Normalize vehicle properties
   const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
   const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
   const interiorColor = vehicle.interiorColor || vehicle.interior_color || '';
   const salePrice = vehicle.salePrice || vehicle.sale_price || vehicle.price || 0;
-  const gradient = vehicle.gradient || 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)';
+  const gradient = vehicle.gradient || getColorGradient(exteriorColor);
   
-  // Decode VIN for Silverado trucks to get cab type and drive type
+  // Decode VIN for Silverado trucks
   const truckVINInfo = decodeGMTruckVIN(vehicle.vin || '', vehicle.model || '');
   const vinCabType = truckVINInfo?.cabType || '';
   const vinDriveType = truckVINInfo?.driveType || vehicle.drivetrain || '';
   
-  // Build image candidates in priority order for fallback chain
-  // Priority: 1) API imageUrl, 2) Stock-specific, 3) Model+Color, 4) Base Model+Color, 5) Model-only
-  const getImageCandidates = (): string[] => {
-    const candidates: string[] = [];
-    
-    // 1. First check API-provided URLs
-    if (vehicle.imageUrl) candidates.push(vehicle.imageUrl);
-    if (vehicle.image_url) candidates.push(vehicle.image_url);
-    if (vehicle.images && vehicle.images.length > 0) {
-      candidates.push(...vehicle.images);
-    }
-    
-    // Normalize model for file matching
-    const fullModel = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    // Get base model without EV/HD/etc suffixes for fallback (equinox-ev -> equinox)
-    const baseModel = fullModel.replace(/-ev$/, '').replace(/-hd$/, '').replace(/\d+$/, '');
-    const color = (exteriorColor || '').toLowerCase();
-    
-    // Map color descriptions to base color categories
-    const getColorCategory = (colorDesc: string): string => {
-      if (colorDesc.includes('black')) return 'black';
-      if (colorDesc.includes('white') || colorDesc.includes('summit') || colorDesc.includes('arctic') || colorDesc.includes('polar')) return 'white';
-      if (colorDesc.includes('red') || colorDesc.includes('cherry') || colorDesc.includes('cajun') || colorDesc.includes('radiant')) return 'red';
-      if (colorDesc.includes('blue') || colorDesc.includes('northsky') || colorDesc.includes('glacier') || colorDesc.includes('reef')) return 'blue';
-      if (colorDesc.includes('silver') || colorDesc.includes('sterling')) return 'silver';
-      if (colorDesc.includes('gray') || colorDesc.includes('grey') || colorDesc.includes('shadow')) return 'gray';
-      if (colorDesc.includes('green') || colorDesc.includes('woodland')) return 'green';
-      if (colorDesc.includes('orange') || colorDesc.includes('tangier')) return 'orange';
-      if (colorDesc.includes('yellow') || colorDesc.includes('accelerate')) return 'yellow';
-      if (colorDesc.includes('brown') || colorDesc.includes('harvest')) return 'brown';
-      return '';
-    };
-    
-    const colorCategory = getColorCategory(color);
-    
-    // 2. Stock-specific image (for featured/special vehicles)
-    // Images stored in: frontend/public/images/vehicles/
-    if (stockNumber) {
-      candidates.push(`/images/vehicles/${stockNumber}.jpg`);
-    }
-    
-    // 3. Full Model + Color combination (e.g., equinox-ev-gray.jpg)
-    if (fullModel && colorCategory) {
-      candidates.push(`/images/vehicles/${fullModel}-${colorCategory}.jpg`);
-    }
-    
-    // 4. Base Model + Color (e.g., equinox-gray.jpg for Equinox EV)
-    if (baseModel && baseModel !== fullModel && colorCategory) {
-      candidates.push(`/images/vehicles/${baseModel}-${colorCategory}.jpg`);
-    }
-    
-    // 5. Model-only fallback (e.g., equinox.jpg)
-    if (fullModel) {
-      candidates.push(`/images/vehicles/${fullModel}.jpg`);
-    }
-    if (baseModel && baseModel !== fullModel) {
-      candidates.push(`/images/vehicles/${baseModel}.jpg`);
-    }
-    
-    return candidates;
-  };
-  
-  const imageCandidates = getImageCandidates();
+  // Get image candidates for fallback chain
+  const imageCandidates = getVehicleImageCandidates(vehicle, exteriorColor);
 
   const handleRequestVehicle = (): void => {
     setVehicleRequested(true);
-    
-    // Update customer data with request info
     updateCustomerData({
       vehicleRequested: {
         stockNumber: stockNumber,
         requestedAt: new Date().toISOString(),
       },
     });
-    
-    // TODO: Future - send notification to lot attendant/sales team
-    // api.requestVehicle(vehicle.stockNumber);
   };
 
-  const handleCalculatePayment = (): void => {
-    navigateTo('paymentCalculator');
-  };
+  const handleCalculatePayment = (): void => navigateTo('paymentCalculator');
+  const handleTradeIn = (): void => navigateTo('tradeIn');
+  const handleTalkToSales = (): void => navigateTo('handoff');
 
-  const handleTradeIn = (): void => {
-    navigateTo('tradeIn');
-  };
-
-  const handleTalkToSales = (): void => {
-    navigateTo('handoff');
-  };
-
-  // Vehicle Requested Confirmation State
+  // Vehicle Requested Confirmation
   if (vehicleRequested) {
     return (
       <div style={styles.container}>
         <div style={styles.confirmationOverlay}>
           <div style={styles.confirmationCard}>
-            {/* Success Icon */}
             <div style={styles.confirmationIcon}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -263,68 +120,18 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
               A team member will bring this vehicle to the front of the showroom shortly.
             </p>
 
-            {/* Vehicle Summary */}
             <div style={styles.confirmationVehicle}>
               <div style={{ ...styles.confirmationThumb, background: gradient }}>
                 <span style={styles.confirmationInitial}>{(vehicle.model || 'V').charAt(0)}</span>
               </div>
               <div style={styles.confirmationVehicleInfo}>
-                <span style={styles.confirmationVehicleName}>
+                <p style={styles.confirmationVehicleName}>
                   {vehicle.year} {vehicle.model}
-                </span>
-                <span style={styles.confirmationVehicleTrim}>{vehicle.trim}</span>
-                <span style={styles.confirmationStock}>Stock #{stockNumber}</span>
+                </p>
+                <p style={styles.confirmationStock}>Stock #{stockNumber}</p>
               </div>
             </div>
 
-            {/* What to Expect */}
-            <div style={styles.expectSection}>
-              <h4 style={styles.expectTitle}>What to Expect</h4>
-              <div style={styles.expectSteps}>
-                <div style={styles.expectStep}>
-                  <span style={styles.stepNumber}>1</span>
-                  <span style={styles.stepText}>Vehicle will be brought up front</span>
-                </div>
-                <div style={styles.expectStep}>
-                  <span style={styles.stepNumber}>2</span>
-                  <span style={styles.stepText}>A team member will meet you</span>
-                </div>
-                <div style={styles.expectStep}>
-                  <span style={styles.stepNumber}>3</span>
-                  <span style={styles.stepText}>Take it for a test drive!</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div style={styles.confirmationActions}>
-              <button 
-                style={styles.primaryButton}
-                onClick={handleTalkToSales}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
-                </svg>
-                Connect with Sales Consultant
-              </button>
-              
-              <button 
-                style={styles.secondaryButton}
-                onClick={() => setVehicleRequested(false)}
-              >
-                Back to Vehicle Details
-              </button>
-              
-              <button 
-                style={styles.tertiaryButton}
-                onClick={() => navigateTo('inventory')}
-              >
-                Continue Browsing
-              </button>
-            </div>
-
-            {/* Estimated Time */}
             <div style={styles.estimatedTime}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"/>
@@ -334,14 +141,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
             </div>
           </div>
         </div>
-
-        <style>{`
-          @keyframes checkmark {
-            0% { transform: scale(0); opacity: 0; }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); opacity: 1; }
-          }
-        `}</style>
+        <style>{`@keyframes checkmark { 0% { transform: scale(0); opacity: 0; } 50% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }`}</style>
       </div>
     );
   }
@@ -357,7 +157,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       </button>
 
       <div style={styles.content}>
-        {/* Left Column - Vehicle Image & Gallery */}
+        {/* Left Column - Vehicle Image */}
         <div style={styles.leftColumn}>
           <div style={{ 
             ...styles.mainImage, 
@@ -369,19 +169,15 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
                 alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
                 style={styles.vehicleImage}
                 onError={() => {
-                  // Try next image candidate
                   if (currentImageIndex < imageCandidates.length - 1) {
                     setCurrentImageIndex(currentImageIndex + 1);
                   } else {
-                    // All candidates failed, show placeholder
                     setAllImagesFailed(true);
                   }
                 }}
               />
             ) : (
-              <span style={styles.imageInitial}>
-                {(vehicle.model || 'V').charAt(0)}
-              </span>
+              <span style={styles.imageInitial}>{(vehicle.model || 'V').charAt(0)}</span>
             )}
             <div style={styles.statusBadge}>
               <span style={styles.statusDot} />
@@ -424,7 +220,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
 
         {/* Right Column - Details */}
         <div style={styles.rightColumn}>
-          {/* Header */}
+          {/* Header with VIN-decoded cab/drive info */}
           <div style={styles.vehicleHeader}>
             <div style={styles.titleBlock}>
               <h1 style={styles.vehicleTitle}>
@@ -469,8 +265,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
               <span style={styles.msrpValue}>${(vehicle.msrp || 0).toLocaleString()}</span>
             </div>
             
-            {/* Rebates */}
-            {vehicle.rebates && vehicle.rebates.map((rebate, idx) => (
+            {vehicle.rebates?.map((rebate, idx) => (
               <div key={idx} style={styles.rebateRow}>
                 <span style={styles.rebateName}>{rebate.name}</span>
                 <span style={styles.rebateAmount}>-${rebate.amount.toLocaleString()}</span>
@@ -485,12 +280,10 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
             </div>
             
             {vehicle.savings && (
-              <div style={styles.savingsBadge}>
-                You Save ${vehicle.savings.toLocaleString()}!
-              </div>
+              <div style={styles.savingsBadge}>You Save ${vehicle.savings.toLocaleString()}!</div>
             )}
 
-            {/* Estimated Payments */}
+            {/* Payments */}
             <div style={styles.paymentsGrid}>
               <div style={styles.paymentOption}>
                 <span style={styles.paymentType}>Lease</span>
@@ -506,49 +299,45 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
           </div>
 
           {/* Features */}
-          <div style={styles.featuresSection}>
-            <h3 style={styles.sectionTitle}>Key Features</h3>
-            <div style={styles.featuresList}>
-              {(vehicle.features || []).map((feature, idx) => (
-                <div key={idx} style={styles.featureItem}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                  {feature}
-                </div>
-              ))}
+          {vehicle.features && vehicle.features.length > 0 && (
+            <div style={styles.featuresCard}>
+              <h3 style={styles.featuresTitle}>Key Features</h3>
+              <div style={styles.featuresGrid}>
+                {vehicle.features.slice(0, 8).map((feature, idx) => (
+                  <div key={idx} style={styles.featureItem}>
+                    <span style={styles.featureCheck}>✓</span>
+                    {feature}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Action Buttons */}
-          <div style={styles.actionButtons}>
-            {/* Primary CTA - Request Vehicle */}
-            <button style={styles.requestButton} onClick={handleRequestVehicle}>
+          <div style={styles.actionsColumn}>
+            <button style={styles.primaryButton} onClick={handleRequestVehicle}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
-                <circle cx="7" cy="17" r="2"/>
-                <path d="M9 17h6"/>
-                <circle cx="17" cy="17" r="2"/>
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
               </svg>
               Request This Vehicle
             </button>
-            
             <button style={styles.secondaryButton} onClick={handleCalculatePayment}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="4" y="2" width="16" height="20" rx="2"/>
-                <path d="M8 6h8M8 10h8M8 14h4"/>
+                <line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/>
+                <line x1="8" y1="14" x2="12" y2="14"/>
               </svg>
               Calculate Payment
             </button>
-            
             <button style={styles.secondaryButton} onClick={handleTradeIn}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
+                <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
               </svg>
               Value My Trade
             </button>
-
-            <button style={styles.tertiaryButton} onClick={handleTalkToSales}>
+            <button style={styles.secondaryButton} onClick={handleTalkToSales}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                 <circle cx="12" cy="7" r="4"/>
@@ -558,7 +347,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
           </div>
 
           {/* VIN */}
-          <div style={styles.vinSection}>
+          <div style={styles.vinRow}>
             <span style={styles.vinLabel}>VIN:</span>
             <span style={styles.vinValue}>{vehicle.vin || 'N/A'}</span>
           </div>
@@ -566,523 +355,6 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       </div>
     </div>
   );
-};
-
-const styles: Record<string, CSSProperties> = {
-  container: {
-    flex: 1,
-    padding: '24px 40px',
-    overflow: 'auto',
-  },
-  backButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    background: 'none',
-    border: 'none',
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    marginBottom: '24px',
-    padding: 0,
-  },
-  content: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '40px',
-    maxWidth: '1200px',
-    margin: '0 auto',
-  },
-  leftColumn: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-  },
-  mainImage: {
-    height: '360px',
-    borderRadius: '20px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  vehicleImage: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    borderRadius: '20px',
-  },
-  imageInitial: {
-    fontSize: '120px',
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.2)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusBadge: {
-    position: 'absolute',
-    top: '16px',
-    right: '16px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 16px',
-    background: 'rgba(0,0,0,0.7)',
-    borderRadius: '20px',
-    color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  statusDot: {
-    width: '10px',
-    height: '10px',
-    borderRadius: '50%',
-    background: '#4ade80',
-  },
-  quickSpecs: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '12px',
-  },
-  specItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '16px',
-    background: 'rgba(255,255,255,0.05)',
-    borderRadius: '12px',
-  },
-  specIcon: {
-    fontSize: '24px',
-  },
-  specLabel: {
-    display: 'block',
-    fontSize: '11px',
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
-    textTransform: 'uppercase',
-  },
-  specValue: {
-    display: 'block',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  rightColumn: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-  },
-  vehicleHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  titleBlock: {
-    flex: 1,
-  },
-  vehicleTitle: {
-    fontSize: '32px',
-    fontWeight: '700',
-    color: '#ffffff',
-    margin: 0,
-    lineHeight: 1.2,
-  },
-  titleSeparator: {
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: '400',
-  },
-  subtitleRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: '8px',
-  },
-  vehicleTrim: {
-    fontSize: '16px',
-    color: 'rgba(255,255,255,0.6)',
-    margin: 0,
-    textTransform: 'uppercase',
-  },
-  stockInfo: {
-    textAlign: 'right' as const,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-  },
-  stockLabel: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
-    textTransform: 'uppercase',
-  },
-  stockNumber: {
-    fontSize: '16px',
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  colorRow: {
-    display: 'flex',
-    gap: '24px',
-  },
-  colorItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  colorSwatch: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '10px',
-    border: '2px solid rgba(255,255,255,0.2)',
-  },
-  colorLabel: {
-    display: 'block',
-    fontSize: '11px',
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
-    textTransform: 'uppercase',
-  },
-  colorValue: {
-    display: 'block',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  pricingCard: {
-    padding: '24px',
-    background: 'rgba(27, 115, 64, 0.1)',
-    borderRadius: '16px',
-    border: '1px solid rgba(27, 115, 64, 0.3)',
-  },
-  priceRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '8px',
-  },
-  msrpLabel: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  msrpValue: {
-    fontSize: '16px',
-    color: 'rgba(255,255,255,0.5)',
-    textDecoration: 'line-through',
-  },
-  rebateRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '4px',
-  },
-  rebateName: {
-    fontSize: '13px',
-    color: 'rgba(255,255,255,0.6)',
-  },
-  rebateAmount: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#4ade80',
-  },
-  priceDivider: {
-    height: '1px',
-    background: 'rgba(255,255,255,0.1)',
-    margin: '12px 0',
-  },
-  yourPriceLabel: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  yourPriceValue: {
-    fontSize: '32px',
-    fontWeight: '700',
-    color: '#4ade80',
-  },
-  savingsBadge: {
-    textAlign: 'center',
-    padding: '10px',
-    background: 'rgba(74, 222, 128, 0.2)',
-    borderRadius: '8px',
-    color: '#4ade80',
-    fontSize: '14px',
-    fontWeight: '700',
-    marginTop: '12px',
-  },
-  paymentsGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '12px',
-    marginTop: '16px',
-  },
-  paymentOption: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '16px',
-    background: 'rgba(0,0,0,0.2)',
-    borderRadius: '12px',
-  },
-  paymentType: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
-    textTransform: 'uppercase',
-    marginBottom: '4px',
-  },
-  paymentAmount: {
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  paymentTerm: {
-    fontSize: '12px',
-    color: 'rgba(255,255,255,0.4)',
-  },
-  featuresSection: {
-    padding: '20px',
-    background: 'rgba(255,255,255,0.05)',
-    borderRadius: '16px',
-  },
-  sectionTitle: {
-    fontSize: '16px',
-    fontWeight: '700',
-    color: '#ffffff',
-    margin: '0 0 16px 0',
-  },
-  featuresList: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '10px',
-  },
-  featureItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '13px',
-    color: 'rgba(255,255,255,0.8)',
-  },
-  actionButtons: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-  },
-  requestButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '12px',
-    padding: '20px 24px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
-    border: 'none',
-    borderRadius: '12px',
-    color: '#ffffff',
-    fontSize: '18px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    boxShadow: '0 4px 15px rgba(27, 115, 64, 0.4)',
-    transition: 'all 0.2s ease',
-  },
-  primaryButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-    padding: '18px 24px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
-    border: 'none',
-    borderRadius: '12px',
-    color: '#ffffff',
-    fontSize: '16px',
-    fontWeight: '700',
-    cursor: 'pointer',
-  },
-  secondaryButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-    padding: '14px 24px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: '12px',
-    color: '#ffffff',
-    fontSize: '15px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  tertiaryButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-    padding: '14px 24px',
-    background: 'none',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '12px',
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  vinSection: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '12px',
-    background: 'rgba(255,255,255,0.03)',
-    borderRadius: '8px',
-  },
-  vinLabel: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
-  },
-  vinValue: {
-    fontSize: '12px',
-    fontFamily: 'monospace',
-    color: 'rgba(255,255,255,0.6)',
-  },
-  // Confirmation State Styles
-  confirmationOverlay: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 'calc(100vh - 200px)',
-  },
-  confirmationCard: {
-    maxWidth: '500px',
-    width: '100%',
-    padding: '40px',
-    background: 'rgba(255,255,255,0.05)',
-    borderRadius: '24px',
-    border: '1px solid rgba(255,255,255,0.1)',
-    textAlign: 'center',
-  },
-  confirmationIcon: {
-    width: '80px',
-    height: '80px',
-    borderRadius: '50%',
-    background: 'rgba(74, 222, 128, 0.2)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#4ade80',
-    margin: '0 auto 24px',
-    animation: 'checkmark 0.5s ease',
-  },
-  confirmationTitle: {
-    fontSize: '32px',
-    fontWeight: '700',
-    color: '#ffffff',
-    margin: '0 0 8px 0',
-  },
-  confirmationSubtitle: {
-    fontSize: '16px',
-    color: 'rgba(255,255,255,0.6)',
-    margin: '0 0 24px 0',
-    lineHeight: '1.5',
-  },
-  confirmationVehicle: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    padding: '16px',
-    background: 'rgba(0,0,0,0.2)',
-    borderRadius: '12px',
-    marginBottom: '24px',
-    textAlign: 'left',
-  },
-  confirmationThumb: {
-    width: '60px',
-    height: '60px',
-    borderRadius: '10px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  confirmationInitial: {
-    fontSize: '28px',
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.3)',
-  },
-  confirmationVehicleInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  confirmationVehicleName: {
-    fontSize: '18px',
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  confirmationVehicleTrim: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.6)',
-  },
-  confirmationStock: {
-    fontSize: '12px',
-    color: 'rgba(255,255,255,0.4)',
-    marginTop: '4px',
-  },
-  expectSection: {
-    padding: '20px',
-    background: 'rgba(255,255,255,0.03)',
-    borderRadius: '12px',
-    marginBottom: '24px',
-    textAlign: 'left',
-  },
-  expectTitle: {
-    fontSize: '14px',
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.8)',
-    margin: '0 0 16px 0',
-  },
-  expectSteps: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-  },
-  expectStep: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  stepNumber: {
-    width: '28px',
-    height: '28px',
-    borderRadius: '50%',
-    background: 'rgba(27, 115, 64, 0.3)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '13px',
-    fontWeight: '700',
-    color: '#4ade80',
-    flexShrink: 0,
-  },
-  stepText: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.7)',
-  },
-  confirmationActions: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    marginBottom: '20px',
-  },
-  estimatedTime: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
-  },
 };
 
 export default VehicleDetail;
