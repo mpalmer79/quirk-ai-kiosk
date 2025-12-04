@@ -125,7 +125,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
             {/* Vehicle Summary */}
             <div style={styles.confirmationVehicle}>
               <div style={{ ...styles.confirmationThumb, background: gradient }}>
-                <span style={styles.confirmationInitial}>{vehicle.model.charAt(0)}</span>
+                <span style={styles.confirmationInitial}>{(vehicle.model || 'V').charAt(0)}</span>
               </div>
               <div style={styles.confirmationVehicleInfo}>
                 <span style={styles.confirmationVehicleName}>
@@ -219,7 +219,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
         {/* Left Column - Vehicle Image & Gallery */}
         <div style={styles.leftColumn}>
           <div style={{ ...styles.mainImage, background: gradient }}>
-            <span style={styles.imageInitial}>{vehicle.model.charAt(0)}</span>
+            <span style={styles.imageInitial}>{(vehicle.model || 'V').charAt(0)}</span>
             <div style={styles.statusBadge}>
               <span style={styles.statusDot} />
               {vehicle.status || 'In Stock'}
