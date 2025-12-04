@@ -137,6 +137,7 @@ export interface ApiError {
 // Component Props Types
 export interface NavigationProps {
   navigateTo: (screen: string) => void;
+  resetJourney?: () => void;
 }
 
 export interface CustomerDataProps {
