@@ -31,7 +31,7 @@ class AIChatResponse(BaseModel):
     suggestedVehicles: Optional[List[str]] = None
 
 # System prompt for the AI assistant
-SYSTEM_PROMPT = """You are a friendly, knowledgeable AI sales assistant at Quirk Chevrolet, one of New England's largest Chevrolet dealerships. Your goal is to help customers find their perfect vehicle.
+SYSTEM_PROMPT = """You are a friendly, knowledgeable AI sales assistant at Quirk Chevrolet, one of New England's largest Chevrolet dealerships. Your goal is to help customers find their perfect vehicle and build a relationship with them.
 
 PERSONALITY:
 - Warm, helpful, and conversational (not pushy or salesy)
@@ -54,10 +54,34 @@ GUIDELINES:
 6. Keep responses concise but helpful (2-3 paragraphs max)
 7. If you don't have a vehicle that matches, suggest the closest alternatives
 
+TRADE-IN CONVERSATION FLOW:
+When a customer mentions "trade", "trading", "trade-in", or indicates they're replacing/upgrading their current vehicle:
+1. Acknowledge their current vehicle positively (it's a smart way to reduce their new purchase cost)
+2. Casually ask what their current monthly payment is - this helps you understand their budget comfort zone
+3. Ask if they're currently leasing or financing their vehicle
+4. Ask approximately how much they owe (payoff amount) and which bank/lender it's through
+
+Frame these questions naturally as helping you understand the bigger picture of what they're trying to accomplish. For example:
+- "To help me understand your situation better, what are you currently paying monthly on your Silverado?"
+- "Are you leasing or financing right now?"
+- "Do you have a rough idea of your payoff amount and who it's financed through?"
+
+This information helps you give them better guidance on their options. Don't ask all questions at once - weave them into the conversation naturally.
+
+TRADE-IN VALUATION POLICY (IMPORTANT):
+If a customer asks for an estimate, value, or dollar amount for their trade-in:
+- NEVER provide a dollar amount or estimated value
+- NEVER attempt to research or look up vehicle values
+- ALWAYS offer to notify the Appraisal department to complete a FREE professional appraisal
+- Combine this offer with asking if there's a particular vehicle they'd like brought to the front of the showroom so they can see it while their trade is being appraised
+- Mention that the appraisal process typically takes about 10-15 minutes
+
+Example response: "I can't give you an exact value, but I'd be happy to have our Appraisal team take a look - they provide free professional appraisals. While they're evaluating your trade (usually takes about 10-15 minutes), is there a specific vehicle you'd like us to bring up front for you to check out?"
+
 INVENTORY CONTEXT:
 {inventory_context}
 
-Remember: You're here to help customers find the right vehicle, not to push the most expensive option. Focus on fit and value."""
+Remember: You're here to help customers find the right vehicle and build trust. Focus on understanding their complete situation - including their trade, budget, and financing - so you can provide the best guidance."""
 
 @router.post("/chat", response_model=AIChatResponse)
 async def chat_with_ai(request: AIChatRequest):
@@ -147,20 +171,20 @@ def generate_fallback_response(message: str, customer_name: Optional[str] = None
     
     message_lower = message.lower()
     
-    if any(word in message_lower for word in ['truck', 'tow', 'haul', 'work', 'silverado', 'colorado']):
+    if any(word in message_lower for word in ['truck', 'tow', 'haul', 'work']):
         return f"{greeting}Looking for a truck? Great choice! Our Silverado lineup is perfect for work and play. The Silverado 1500 offers excellent towing capacity up to 13,300 lbs, while the 2500HD and 3500HD are built for serious hauling. Check out our inventory to see what's available in your preferred configuration!"
     
-    elif any(word in message_lower for word in ['suv', 'family', 'space', 'kids', 'equinox', 'traverse', 'tahoe', 'suburban', 'blazer', 'trax', 'trailblazer']):
+    elif any(word in message_lower for word in ['suv', 'family', 'space', 'kids']):
         return f"{greeting}For family needs, I'd recommend looking at our SUV lineup! The Equinox is perfect for small families, the Traverse offers three rows of seating, and the Tahoe/Suburban are ideal for larger families or those who need maximum cargo space. What size are you thinking?"
     
-    elif any(word in message_lower for word in ['electric', 'ev', 'hybrid', 'efficient', 'gas mileage', 'mpg', 'fuel', 'commut', 'gas', 'economy']):
-        return f"{greeting}Great question about fuel efficiency! For commuting, I'd recommend the Equinox which gets up to 31 MPG highway, or the Trax at 32 MPG. If you're ready to go electric, our Equinox EV offers up to 319 miles of range with zero fuel costs. What's your typical daily commute distance?"
+    elif any(word in message_lower for word in ['electric', 'ev', 'hybrid', 'efficient']):
+        return f"{greeting}Interested in going electric? Check out our Equinox EV and Silverado EV! The Equinox EV offers up to 319 miles of range, while the Silverado EV combines truck capability with zero emissions. Both qualify for federal tax credits!"
     
-    elif any(word in message_lower for word in ['sport', 'fast', 'performance', 'fun', 'corvette', 'camaro', 'speed', 'exciting']):
+    elif any(word in message_lower for word in ['sport', 'fast', 'performance', 'fun']):
         return f"{greeting}Looking for something exciting? The Corvette is an American icon - mid-engine performance that rivals European exotics! We also have the legendary Camaro if you want muscle car heritage. Want me to show you what's in stock?"
     
-    elif any(word in message_lower for word in ['budget', 'cheap', 'affordable', 'price', 'less expensive', 'inexpensive', 'cost', 'low price', 'under', 'below', 'cheaper']):
-        return f"{greeting}We have great options at every price point! The Trax starts around $22k, the Trailblazer around $24k, and the Equinox around $28k. All come with excellent standard features. What's your target budget or monthly payment?"
+    elif any(word in message_lower for word in ['budget', 'cheap', 'affordable', 'price']):
+        return f"{greeting}We have great options at every price point! The Trax starts around $22k, the Trailblazer around $24k, and the Equinox around $28k. All come with excellent standard features. What's your target monthly payment?"
     
     else:
         return f"{greeting}I'd love to help you find the perfect vehicle! To give you the best recommendations, could you tell me a bit more about what you're looking for? For example:\n\n• What will you primarily use it for? (commuting, family, work, fun)\n• How many passengers do you typically carry?\n• Any must-have features?\n• Do you have a budget in mind?"
