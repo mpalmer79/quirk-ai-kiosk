@@ -170,10 +170,29 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
         if (customerData?.selectedCab) {
           const targetCab = customerData.selectedCab.toLowerCase();
           vehicleList = vehicleList.filter((vehicle: Vehicle) => {
-            const cab = (vehicle.cabType || vehicle.bodyStyle || vehicle.body_style || '').toLowerCase();
-            // Match first word: "crew" from "Crew Cab"
-            const cabKeyword = targetCab.split(' ')[0];
-            return cab.includes(cabKeyword);
+            // Check multiple possible field names for cab/body info
+            const cab = (
+              vehicle.cabType || 
+              vehicle.bodyStyle || 
+              vehicle.body_style || 
+              (vehicle as Record<string, unknown>).body ||
+              (vehicle as Record<string, unknown>).Body ||
+              ''
+            ).toString().toLowerCase();
+            
+            // Handle abbreviation mapping: "Regular" → also match "Reg"
+            const cabMappings: Record<string, string[]> = {
+              'regular': ['regular', 'reg'],
+              'double': ['double', 'dbl'],
+              'crew': ['crew'],
+              'extended': ['extended', 'ext'],
+            };
+            
+            const cabKeyword = targetCab.split(' ')[0]; // "regular" from "Regular Cab"
+            const keywords = cabMappings[cabKeyword] || [cabKeyword];
+            
+            // Check if any keyword variant matches
+            return keywords.some(kw => cab.includes(kw));
           });
         }
         
