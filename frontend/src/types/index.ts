@@ -103,7 +103,7 @@ export interface CustomerData {
   hasTrade?: boolean | null;
   hasPayoff?: boolean | null;
   payoffAmount?: number | null;
-  path?: 'modelBudget' | 'stockLookup' | 'inventory' | 'browse' | 'aiChat' | 'guidedQuiz' | 'aiAssistant';
+  path?: 'modelBudget' | 'stockLookup' | 'inventory' | 'browse' | 'aiChat' | 'aiAssistant';
   selectedVehicle?: Vehicle;
   protectionPackages?: Array<string | { id: string; name: string; price: number }>;
   protectionTotal?: number;
