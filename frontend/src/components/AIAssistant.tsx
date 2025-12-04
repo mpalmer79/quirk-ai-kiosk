@@ -263,7 +263,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       </div>
 
       {/* Messages Container */}
-      <div style={styles.messagesContainer}>
+      <div style={styles.messagesContainer} className="ai-messages-container">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -423,6 +423,21 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
           0%, 100% { opacity: 0.4; }
           50% { opacity: 1; }
         }
+        
+        /* Scrollbar styling for webkit browsers */
+        .ai-messages-container::-webkit-scrollbar {
+          width: 8px;
+        }
+        .ai-messages-container::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .ai-messages-container::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.3);
+          border-radius: 4px;
+        }
+        .ai-messages-container::-webkit-scrollbar-thumb:hover {
+          background: rgba(255,255,255,0.5);
+        }
       `}</style>
     </div>
   );
@@ -438,6 +453,9 @@ const styles: Record<string, CSSProperties> = {
     margin: '0 auto',
     width: '100%',
     boxSizing: 'border-box',
+    height: '100%',
+    minHeight: 0,
+    overflow: 'hidden',
   },
   header: {
     display: 'flex',
@@ -471,10 +489,14 @@ const styles: Record<string, CSSProperties> = {
   messagesContainer: {
     flex: 1,
     overflowY: 'auto',
-    padding: '20px 0',
+    overflowX: 'hidden',
+    padding: '20px 10px 20px 0',
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
+    minHeight: 0,
+    scrollbarWidth: 'thin',
+    scrollbarColor: 'rgba(255,255,255,0.3) transparent',
   },
   messageWrapper: {
     display: 'flex',
