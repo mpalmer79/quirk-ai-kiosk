@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, KeyboardEvent, ChangeEvent, CSSProperties } from 'react';
 import api from './api';
-import type { CustomerData, KioskComponentProps } from '../types';
+import type { KioskComponentProps } from '../types';
 
 // Stats interface from API
 interface InventoryStats {
