@@ -29,6 +29,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [inventory, setInventory] = useState<Vehicle[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -227,6 +228,12 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     }
   };
 
+  // Handle microphone button - visual only for now
+  const handleMicrophoneClick = () => {
+    setIsListening(!isListening);
+    // TODO: Implement speech-to-text functionality
+  };
+
   const handleVehicleClick = (vehicle: Vehicle) => {
     updateCustomerData({ selectedVehicle: vehicle, path: 'aiChat' });
     navigateTo('vehicleDetail');
@@ -356,12 +363,34 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
           ref={inputRef}
           type="text"
           style={styles.input}
-          placeholder="Describe your ideal vehicle..."
+          placeholder={isListening ? "Listening..." : "Describe your ideal vehicle..."}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyPress={handleKeyPress}
-          disabled={isLoading}
+          disabled={isLoading || isListening}
         />
+        <button
+          style={{
+            ...styles.micButton,
+            ...(isListening ? styles.micButtonActive : {}),
+          }}
+          onClick={handleMicrophoneClick}
+          disabled={isLoading}
+          aria-label={isListening ? "Stop listening" : "Start voice input"}
+        >
+          {isListening ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          )}
+        </button>
         <button
           style={{
             ...styles.sendButton,
@@ -606,6 +635,24 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s ease',
+  },
+  micButton: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '12px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: '#ffffff',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+  },
+  micButtonActive: {
+    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+    border: '1px solid #ef4444',
+    animation: 'pulse 1s infinite',
   },
   startOverContainer: {
     display: 'flex',
