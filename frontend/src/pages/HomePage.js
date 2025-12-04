@@ -28,7 +28,8 @@ function HomePage() {
       if (appliedFilters.maxPrice) params.maxPrice = appliedFilters.maxPrice;
 
       const data = await api.getInventory(params);
-      setVehicles(data?.vehicles || data || []);
+      const vehicleList = Array.isArray(data) ? data : data?.vehicles || [];
+      setVehicles(vehicleList);
       setError(null);
     } catch (err) {
       console.error('Error loading inventory:', err);
