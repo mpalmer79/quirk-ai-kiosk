@@ -394,6 +394,12 @@ const styles: Record<string, CSSProperties> = {
     gap: '16px',
     marginTop: '16px',
   },
+  tradeVehicleGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: '12px',
+    marginBottom: '16px',
+  },
   payoffFieldGroup: {
     display: 'flex',
     flexDirection: 'column',
@@ -435,6 +441,18 @@ const styles: Record<string, CSSProperties> = {
     outline: 'none',
     minWidth: 0,
     width: '100%',
+  },
+  textInputStandalone: {
+    padding: '14px 16px',
+    background: 'rgba(0,0,0,0.3)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: '10px',
+    color: '#ffffff',
+    fontSize: '15px',
+    width: '100%',
+    boxSizing: 'border-box',
+    outline: 'none',
+    marginTop: '8px',
   },
   searchButton: {
     display: 'flex',
