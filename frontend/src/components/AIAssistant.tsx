@@ -66,6 +66,25 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Save conversation log to customer data
+  useEffect(() => {
+    // Skip the initial welcome message only
+    if (messages.length <= 1) return;
+    
+    const conversationLog = messages.map(m => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp.toISOString(),
+      vehicles: m.vehicles?.map(v => ({
+        stockNumber: v.stockNumber || v.stock_number,
+        model: v.model,
+        price: v.salePrice || v.sale_price || v.price,
+      })),
+    }));
+    
+    updateCustomerData({ conversationLog });
+  }, [messages, updateCustomerData]);
+
   // Focus input on mount
   useEffect(() => {
     inputRef.current?.focus();
