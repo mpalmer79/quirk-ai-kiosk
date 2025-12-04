@@ -310,7 +310,8 @@ const KioskApp: React.FC = () => {
                     customerData.path || 
                     customerData.selectedVehicle || 
                     customerData.tradeIn ||
-                    customerData.contactInfo;
+                    customerData.contactInfo ||
+                    customerData.conversationLog;
     
     if (!hasData) return;
 
@@ -361,6 +362,11 @@ const KioskApp: React.FC = () => {
       };
     }
 
+    // Add AI conversation log if present
+    if (customerData.conversationLog && customerData.conversationLog.length > 0) {
+      sessionData.conversationLog = customerData.conversationLog;
+    }
+
     // Log to traffic API (fire and forget)
     api.logTrafficSession(sessionData).catch(() => {
       // Silent fail - don't disrupt user experience
@@ -373,6 +379,7 @@ const KioskApp: React.FC = () => {
     customerData.tradeIn,
     customerData.paymentPreference,
     customerData.contactInfo,
+    customerData.conversationLog,
     customerData,
   ]);
 
