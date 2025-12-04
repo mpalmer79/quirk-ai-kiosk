@@ -19,7 +19,7 @@ interface InventoryStats {
 
 // Path configuration
 interface PathConfig {
-  id: 'stockLookup' | 'modelBudget' | 'guidedQuiz';
+  id: 'stockLookup' | 'modelBudget' | 'guidedQuiz' | 'aiAssistant';
   icon: JSX.Element;
   title: string;
   subtitle: string;
@@ -89,6 +89,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       stockLookup: 'stockLookup',
       modelBudget: 'modelBudget',
       guidedQuiz: 'guidedQuiz',
+      aiAssistant: 'aiAssistant',
     };
     navigateTo(routes[path]);
   };
@@ -147,6 +148,21 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       subtitle: 'Browse by model & budget',
       description: 'Select your preferred model and set your budget to see matching vehicles in stock.',
       gradient: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+    },
+    {
+      id: 'aiAssistant',
+      icon: (
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="10" r="1" fill="currentColor"/>
+          <circle cx="8" cy="10" r="1" fill="currentColor"/>
+          <circle cx="16" cy="10" r="1" fill="currentColor"/>
+        </svg>
+      ),
+      title: 'Chat with AI',
+      subtitle: 'Natural language search',
+      description: 'Tell me what you need in plain English and I\'ll find the perfect vehicle for you.',
+      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
     },
     {
       id: 'guidedQuiz',
