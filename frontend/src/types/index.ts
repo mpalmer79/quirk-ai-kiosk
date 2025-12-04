@@ -105,7 +105,7 @@ export interface CustomerData {
   payoffAmount?: number | null;
   path?: 'modelBudget' | 'stockLookup' | 'inventory' | 'browse' | 'aiChat';
   selectedVehicle?: Vehicle;
-  protectionPackages?: string[];
+  protectionPackages?: Array<string | { id: string; name: string; price: number }>;
   protectionTotal?: number;
   sortBy?: SortOption;
   stockNumber?: string;
