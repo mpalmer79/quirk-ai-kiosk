@@ -99,6 +99,7 @@ export interface CustomerData {
   colorPreferences?: string[];
   budgetRange?: BudgetRange;
   downPaymentPercent?: number;
+  downPayment?: number;
   hasTrade?: boolean | null;
   hasPayoff?: boolean | null;
   payoffAmount?: number | null;
@@ -107,6 +108,7 @@ export interface CustomerData {
   protectionPackages?: string[];
   protectionTotal?: number;
   sortBy?: SortOption;
+  stockNumber?: string;
   preferences?: {
     bodyStyle?: string;
     [key: string]: unknown;
