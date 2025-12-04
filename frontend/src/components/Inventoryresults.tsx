@@ -1,414 +1,765 @@
-"""
-Tests for Inventory Router functions
-Tests the actual functions in app/routers/inventory.py
+import React, { useState, useEffect, ChangeEvent, CSSProperties, MouseEvent } from 'react';
+import api from './api';
+import type { Vehicle, KioskComponentProps } from '../types';
 
-Note: Tests focus on function behavior, not internal data structures.
-"""
-import pytest
-from app.routers.inventory import (
-    parse_model_code,
-    get_image_url,
-    get_body_style,
-    get_fuel_type,
-    get_engine,
-    get_transmission,
-    parse_drivetrain,
-    get_features,
-    VEHICLE_IMAGES,
-)
+type SortOption = 'recommended' | 'priceLow' | 'priceHigh' | 'newest';
 
+// Generate Quirk Chevy NH website URL for a vehicle
+const generateDealerUrl = (vehicle: Vehicle): string => {
+  const baseUrl = 'https://www.quirkchevynh.com/inventory/';
+  
+  // Helper to slugify text (lowercase, replace spaces with hyphens)
+  const slugify = (text?: string): string => {
+    if (!text) return '';
+    return text.toString().toLowerCase()
+      .replace(/\s+/g, '-')           // Replace spaces with hyphens
+      .replace(/[^\w-]/g, '')         // Remove special characters except hyphens
+      .replace(/--+/g, '-')           // Replace multiple hyphens with single
+      .replace(/^-+/, '')             // Trim hyphens from start
+      .replace(/-+$/, '');            // Trim hyphens from end
+  };
+  
+  // Build URL components
+  const condition = 'new'; // All inventory appears to be new
+  const year = String(vehicle.year || '2026');
+  const make = 'chevrolet';
+  const model = slugify(vehicle.model || '');
+  const trim = slugify(vehicle.trim || '');
+  const drivetrain = slugify(vehicle.drivetrain || '4wd');
+  const bodyType = slugify(vehicle.cabType || vehicle.bodyStyle || vehicle.body_style || '');
+  const vin = (vehicle.vin || '').toLowerCase();
+  
+  // Construct URL: new-year-chevrolet-model-trim-drivetrain-bodytype-vin
+  const urlParts = [condition, year, make, model, trim, drivetrain, bodyType, vin]
+    .filter(part => part && part.length > 0); // Remove empty parts
+  
+  return baseUrl + urlParts.join('-') + '/';
+};
 
-class TestParseModelCode:
-    """
-    Test GM model code parsing.
+// Generate gradient based on color
+const getGradient = (color?: string): string => {
+  const colorMap: Record<string, string> = {
+    'white': 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
+    'black': 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+    'red': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+    'blue': 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+    'silver': 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
+    'gray': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+    'beige': 'linear-gradient(135deg, #d4b896 0%, #a78b6c 100%)',
+    'cypress': 'linear-gradient(135deg, #4a5568 0%, #2d3748 100%)',
+    'polar': 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)',
+  };
+  const lowerColor = (color || '').toLowerCase();
+  return Object.entries(colorMap).find(([key]) => lowerColor.includes(key))?.[1] 
+    || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
+};
+
+// Format price without decimals
+const formatPrice = (price?: number): string => {
+  return Math.round(price || 0).toLocaleString();
+};
+
+// Map color descriptions to base color categories
+const getColorCategory = (colorDesc: string): string => {
+  const c = colorDesc.toLowerCase();
+  if (c.includes('black')) return 'black';
+  if (c.includes('white') || c.includes('summit') || c.includes('arctic') || c.includes('polar')) return 'white';
+  if (c.includes('red') || c.includes('cherry') || c.includes('cajun') || c.includes('radiant')) return 'red';
+  if (c.includes('blue') || c.includes('northsky') || c.includes('glacier') || c.includes('reef')) return 'blue';
+  if (c.includes('silver') || c.includes('sterling')) return 'silver';
+  if (c.includes('gray') || c.includes('grey') || c.includes('shadow')) return 'gray';
+  if (c.includes('green') || c.includes('woodland')) return 'green';
+  if (c.includes('orange') || c.includes('tangier')) return 'orange';
+  if (c.includes('yellow') || c.includes('accelerate')) return 'yellow';
+  if (c.includes('brown') || c.includes('harvest')) return 'brown';
+  return '';
+};
+
+// Get vehicle image URL based on model and color rules
+const getVehicleImageUrl = (vehicle: Vehicle): string | null => {
+  if (vehicle.imageUrl) return vehicle.imageUrl;
+  if (vehicle.image_url) return vehicle.image_url;
+  if (vehicle.images && vehicle.images.length > 0) return vehicle.images[0];
+  
+  const fullModel = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const baseModel = fullModel.replace(/-ev$/, '').replace(/-hd$/, '').replace(/\d+$/, '');
+  const exteriorColor = (vehicle.exteriorColor || vehicle.exterior_color || '').toLowerCase();
+  const colorCategory = getColorCategory(exteriorColor);
+  const modelForImage = baseModel || fullModel;
+  
+  if (modelForImage && colorCategory) return `/images/vehicles/${modelForImage}-${colorCategory}.jpg`;
+  if (modelForImage) return `/images/vehicles/${modelForImage}.jpg`;
+  return null;
+};
+
+const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>((customerData?.sortBy as SortOption) || 'recommended');
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+  // Handle image load error - mark image as failed so placeholder shows
+  const handleImageError = (vehicleId: string) => {
+    setFailedImages(prev => new Set(prev).add(vehicleId));
+  };
+
+  // Handle vehicle card click - open dealership website
+  const handleVehicleClick = (vehicle: Vehicle): void => {
+    const dealerUrl = generateDealerUrl(vehicle);
+    window.open(dealerUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  useEffect(() => {
+    const fetchVehicles = async (): Promise<void> => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Build filter params based on customer selections
+        const params: Record<string, string | number> = {};
+        
+        if (customerData?.selectedModel) {
+          params.model = customerData.selectedModel;
+        }
+        
+        if (customerData?.budgetRange) {
+          // Convert monthly payment to rough vehicle price
+          params.minPrice = customerData.budgetRange.min * 60;
+          params.maxPrice = customerData.budgetRange.max * 80;
+        }
+        
+        if (customerData?.selectedCab) {
+          params.cabType = customerData.selectedCab;
+        }
+        
+        if (customerData?.preferences?.bodyStyle) {
+          params.bodyType = customerData.preferences.bodyStyle;
+        }
+        
+        const data = await api.getInventory(params);
+        
+        // Handle different response formats
+        let vehicleList: Vehicle[] = Array.isArray(data) ? data : (data as { vehicles?: Vehicle[] })?.vehicles || [];
+        
+        // CLIENT-SIDE EXACT MODEL FILTERING
+        // Backend may do partial/fuzzy matching, so we enforce strict model match here
+        if (customerData?.selectedModel) {
+          const targetModel = customerData.selectedModel.toLowerCase().trim();
+          
+          vehicleList = vehicleList.filter((vehicle: Vehicle) => {
+            // Get vehicle model - try various field names
+            const rawModel = vehicle.model || '';
+            const vehicleModel = rawModel.toLowerCase().trim();
+            
+            // Check for exact match or model at start of string
+            // "Silverado 1500" should match "Silverado 1500" and "Silverado 1500 LT"
+            // but NOT "Silverado 2500HD" or "Tahoe"
+            if (vehicleModel === targetModel) return true;
+            if (vehicleModel.startsWith(targetModel + ' ')) return true;
+            if (vehicleModel.startsWith(targetModel)) {
+              // Make sure next char isn't a digit (to prevent 1500 matching 15000)
+              const nextChar = vehicleModel.charAt(targetModel.length);
+              return !nextChar || nextChar === ' ' || !/\d/.test(nextChar);
+            }
+            return false;
+          });
+        }
+        
+        // Filter by cab type if specified
+        if (customerData?.selectedCab) {
+          const targetCab = customerData.selectedCab.toLowerCase();
+          vehicleList = vehicleList.filter((vehicle: Vehicle) => {
+            // Check multiple possible field names for cab/body info
+            const cab = (
+              vehicle.cabType || 
+              vehicle.bodyStyle || 
+              vehicle.body_style || 
+              (vehicle as Record<string, unknown>).body ||
+              (vehicle as Record<string, unknown>).Body ||
+              ''
+            ).toString().toLowerCase();
+            
+            // Handle abbreviation mapping: "Regular" → also match "Reg"
+            const cabMappings: Record<string, string[]> = {
+              'regular': ['regular', 'reg'],
+              'double': ['double', 'dbl'],
+              'crew': ['crew'],
+              'extended': ['extended', 'ext'],
+            };
+            
+            const cabKeyword = targetCab.split(' ')[0]; // "regular" from "Regular Cab"
+            const keywords = cabMappings[cabKeyword] || [cabKeyword];
+            
+            // Check if any keyword variant matches
+            return keywords.some(kw => cab.includes(kw));
+          });
+        }
+        
+        // Sort by color preferences if provided (1st choice best, then 2nd, then 3rd)
+        if (customerData?.colorPreferences && customerData.colorPreferences.length > 0) {
+          const colorPrefs = customerData.colorPreferences.map((c: string) => c.toLowerCase());
+          vehicleList = vehicleList.sort((a: Vehicle, b: Vehicle) => {
+            const aColor = (a.exteriorColor || a.exterior_color || '').toLowerCase();
+            const bColor = (b.exteriorColor || b.exterior_color || '').toLowerCase();
+            
+            // Find which preference each color matches (0=1st, 1=2nd, 2=3rd, -1=no match)
+            const getMatchIndex = (color: string): number => {
+              for (let i = 0; i < colorPrefs.length; i++) {
+                // Match first word of color preference
+                const keyword = colorPrefs[i].split(' ')[0];
+                if (color.includes(keyword)) return i;
+              }
+              return 999; // No match goes to end
+            };
+            
+            return getMatchIndex(aColor) - getMatchIndex(bColor);
+          });
+        }
+        
+        setVehicles(vehicleList);
+      } catch (err) {
+        console.error('Failed to fetch vehicles:', err);
+        setError('Unable to load inventory. Please try again.');
+        setVehicles([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVehicles();
+  }, [customerData]);
+
+  // Apply additional client-side filtering as a safety net
+  const filteredVehicles = vehicles.filter((vehicle: Vehicle) => {
+    if (!customerData?.selectedModel) return true; // No filter if no model selected
     
-    GM Model Code Format: [Drive][Series][Body]
-    - Drive: CC = 2WD, CK = 4WD
-    - Series: 10 = 1500, 20 = 2500, 30 = 3500, 54/55/56 = Medium Duty
-    - Body: 3-digit code for cab/bed configuration
-    """
-
-    # ==========================================================================
-    # Light-Duty Trucks (1500/2500/3500 Series)
-    # ==========================================================================
-
-    def test_crew_cab_short_bed_4wd(self):
-        """CK10543: 4WD 1500 series, Crew Cab Short Bed"""
-        result = parse_model_code('CK10543')
-        assert result['cab'] == 'Crew Cab'
-        assert result['bed'] == 'Short Bed'
-        assert result['drive'] == '4WD'
-
-    def test_crew_cab_standard_bed_4wd(self):
-        """CK10743: 4WD 1500 series, Crew Cab Standard Bed"""
-        result = parse_model_code('CK10743')
-        assert result['cab'] == 'Crew Cab'
-        assert result['bed'] == 'Standard Bed'
-        assert result['drive'] == '4WD'
-
-    def test_crew_cab_long_bed_4wd(self):
-        """CK20943: 4WD 2500 series, Crew Cab Long Bed"""
-        result = parse_model_code('CK20943')
-        assert result['cab'] == 'Crew Cab'
-        assert result['bed'] == 'Long Bed'
-        assert result['drive'] == '4WD'
-
-    def test_double_cab_standard_bed_2wd(self):
-        """CC10753: 2WD 1500 series, Double Cab Standard Bed"""
-        result = parse_model_code('CC10753')
-        assert result['cab'] == 'Double Cab'
-        assert result['bed'] == 'Standard Bed'
-        assert result['drive'] == '2WD'
-
-    def test_double_cab_long_bed_4wd(self):
-        """CK30953: 4WD 3500 series, Double Cab Long Bed"""
-        result = parse_model_code('CK30953')
-        assert result['cab'] == 'Double Cab'
-        assert result['bed'] == 'Long Bed'
-        assert result['drive'] == '4WD'
-
-    def test_regular_cab_standard_bed_2wd(self):
-        """CC10703: 2WD 1500 series, Regular Cab Standard Bed"""
-        result = parse_model_code('CC10703')
-        assert result['cab'] == 'Regular Cab'
-        assert result['bed'] == 'Standard Bed'
-        assert result['drive'] == '2WD'
-
-    def test_regular_cab_long_bed_4wd(self):
-        """CK20903: 4WD 2500 series, Regular Cab Long Bed"""
-        result = parse_model_code('CK20903')
-        assert result['cab'] == 'Regular Cab'
-        assert result['bed'] == 'Long Bed'
-        assert result['drive'] == '4WD'
-
-    # ==========================================================================
-    # Medium-Duty Trucks (4500/5500/6500 Series)
-    # ==========================================================================
-
-    def test_medium_duty_regular_cab_2wd(self):
-        """CC56403: 2WD Medium Duty (5500/6500), Regular Cab Chassis"""
-        result = parse_model_code('CC56403')
-        assert result['cab'] == 'Regular Cab'
-        assert result['bed'] == 'Chassis Cab'
-        assert result['drive'] == '2WD'
-
-    def test_medium_duty_regular_cab_4wd(self):
-        """CK56403: 4WD Medium Duty, Regular Cab Chassis"""
-        result = parse_model_code('CK56403')
-        assert result['cab'] == 'Regular Cab'
-        assert result['bed'] == 'Chassis Cab'
-        assert result['drive'] == '4WD'
-
-    def test_medium_duty_crew_cab_2wd(self):
-        """CC56443: 2WD Medium Duty, Crew Cab Chassis"""
-        result = parse_model_code('CC56443')
-        assert result['cab'] == 'Crew Cab'
-        assert result['bed'] == 'Chassis Cab'
-        assert result['drive'] == '2WD'
-
-    def test_medium_duty_crew_cab_4wd(self):
-        """CK54543: 4WD Medium Duty (4500), Crew Cab Chassis"""
-        result = parse_model_code('CK54543')
-        assert result['cab'] == 'Crew Cab'
-        assert result['bed'] == 'Chassis Cab'
-        assert result['drive'] == '4WD'
-
-    # ==========================================================================
-    # Drive Type Tests (CC = 2WD, CK = 4WD)
-    # ==========================================================================
-
-    def test_cc_prefix_is_2wd(self):
-        """CC prefix should always return 2WD"""
-        result = parse_model_code('CC10543')
-        assert result['drive'] == '2WD'
-
-    def test_ck_prefix_is_4wd(self):
-        """CK prefix should always return 4WD"""
-        result = parse_model_code('CK10543')
-        assert result['drive'] == '4WD'
-
-    # ==========================================================================
-    # Edge Cases & Invalid Inputs
-    # ==========================================================================
-
-    def test_empty_string_returns_none(self):
-        """Empty string should return all None values"""
-        result = parse_model_code('')
-        assert result['cab'] is None
-        assert result['bed'] is None
-        assert result['drive'] is None
-
-    def test_none_input_returns_none(self):
-        """None input should return all None values"""
-        result = parse_model_code(None)
-        assert result['cab'] is None
-        assert result['bed'] is None
-        assert result['drive'] is None
-
-    def test_non_gm_model_returns_none(self):
-        """Non-GM model codes should return None for cab/bed"""
-        result = parse_model_code('F-150 XLT')
-        assert result['cab'] is None
-        assert result['bed'] is None
-        assert result['drive'] is None
-
-    def test_invalid_body_code_returns_none_for_cab(self):
-        """Valid prefix but invalid body code should return None for cab/bed"""
-        result = parse_model_code('CK10999')  # 999 is not a valid body code
-        assert result['drive'] == '4WD'  # Drive should still be parsed
-        assert result['cab'] is None
-        assert result['bed'] is None
-
-    def test_lowercase_input_is_handled(self):
-        """Lowercase input should be handled correctly"""
-        result = parse_model_code('ck10543')
-        assert result['cab'] == 'Crew Cab'
-        assert result['drive'] == '4WD'
-
-    def test_whitespace_is_trimmed(self):
-        """Whitespace should be trimmed"""
-        result = parse_model_code('  CK10543  ')
-        assert result['cab'] == 'Crew Cab'
-        assert result['drive'] == '4WD'
-
-
-class TestGetImageUrl:
-    """Test vehicle image URL selection"""
-
-    def test_corvette_image(self):
-        url = get_image_url('Corvette Stingray')
-        assert 'corvette' in url.lower() or url == VEHICLE_IMAGES['corvette']
-
-    def test_silverado_1500_image(self):
-        url = get_image_url('Silverado 1500 LT')
-        assert url == VEHICLE_IMAGES['silverado']
-
-    def test_silverado_2500hd_image(self):
-        url = get_image_url('Silverado 2500HD High Country')
-        assert url == VEHICLE_IMAGES['silverado_hd']
-
-    def test_silverado_ev_image(self):
-        url = get_image_url('Silverado EV RST')
-        assert url == VEHICLE_IMAGES['silverado_ev']
-
-    def test_tahoe_image(self):
-        url = get_image_url('Tahoe Z71')
-        assert url == VEHICLE_IMAGES['tahoe']
-
-    def test_equinox_image(self):
-        url = get_image_url('Equinox RS')
-        assert url == VEHICLE_IMAGES['equinox']
-
-    def test_equinox_ev_image(self):
-        url = get_image_url('Equinox EV')
-        assert url == VEHICLE_IMAGES['equinox_ev']
-
-    def test_unknown_model_returns_default(self):
-        url = get_image_url('Unknown Model XYZ')
-        assert url == VEHICLE_IMAGES['default']
-
-
-class TestGetBodyStyle:
-    """Test body style classification"""
-
-    def test_silverado_is_truck(self):
-        result = get_body_style('PKUP', 'Silverado 1500', None)
-        assert result == 'Truck'
-
-    def test_colorado_is_truck(self):
-        result = get_body_style('', 'Colorado ZR2', None)
-        assert result == 'Truck'
-
-    def test_tahoe_is_suv(self):
-        result = get_body_style('', 'Tahoe', None)
-        assert result == 'SUV'
-
-    def test_corvette_is_coupe(self):
-        result = get_body_style('COUPE', 'Corvette Stingray', None)
-        assert result == 'Coupe'
-
-    def test_malibu_is_sedan(self):
-        result = get_body_style('', 'Malibu LT', None)
-        assert result == 'Sedan'
-
-    def test_express_is_van(self):
-        result = get_body_style('', 'Express', None)
-        assert result == 'Van'
-
-
-class TestGetFuelType:
-    """Test fuel type detection"""
-
-    def test_ev_model(self):
-        assert get_fuel_type('Silverado EV') == 'Electric'
-        assert get_fuel_type('Equinox EV') == 'Electric'
-        assert get_fuel_type('Bolt EV') == 'Electric'
-
-    def test_eray_is_hybrid(self):
-        assert get_fuel_type('Corvette E-Ray') == 'Hybrid'
-
-    def test_regular_model_is_gasoline(self):
-        assert get_fuel_type('Silverado 1500') == 'Gasoline'
-        assert get_fuel_type('Tahoe') == 'Gasoline'
-
-
-class TestGetEngine:
-    """Test engine derivation"""
-
-    def test_ev_engine(self):
-        assert get_engine(0, 'Silverado EV') == 'Electric Motor'
-
-    def test_corvette_engine(self):
-        assert get_engine(8, 'Corvette Stingray') == '6.2L V8'
-
-    def test_corvette_eray_engine(self):
-        assert get_engine(8, 'Corvette E-Ray') == '6.2L V8 + Electric Motor'
-
-    def test_v8_hd_truck(self):
-        assert get_engine(8, 'Silverado 2500HD') == '6.6L V8'
-
-    def test_v6_engine(self):
-        assert get_engine(6, 'Traverse') == '3.6L V6'
-
-    def test_turbo_four(self):
-        assert get_engine(4, 'Equinox') == '2.0L Turbo I4'
-
-
-class TestGetTransmission:
-    """Test transmission derivation"""
-
-    def test_ev_transmission(self):
-        assert get_transmission('Silverado EV') == 'Single-Speed Direct Drive'
-
-    def test_corvette_transmission(self):
-        assert get_transmission('Corvette') == '8-Speed Dual Clutch'
-
-    def test_truck_transmission(self):
-        assert get_transmission('Silverado 1500') == '10-Speed Automatic'
-
-    def test_default_transmission(self):
-        assert get_transmission('Equinox') == '9-Speed Automatic'
-
-
-class TestParseDrivetrain:
-    """Test drivetrain parsing"""
-
-    def test_ck_model_is_4wd(self):
-        assert parse_drivetrain('', 'CK10543') == '4WD'
-
-    def test_corvette_is_rwd(self):
-        assert parse_drivetrain('', 'Corvette Stingray') == 'RWD'
-
-    def test_corvette_eray_is_awd(self):
-        assert parse_drivetrain('', 'Corvette E-Ray') == 'AWD'
-
-    def test_4wd_in_body(self):
-        assert parse_drivetrain('4WD CREW', '') == '4WD'
-
-    def test_awd_in_body(self):
-        assert parse_drivetrain('AWD SUV', '') == 'AWD'
-
-    def test_default_is_fwd(self):
-        assert parse_drivetrain('', 'Equinox') == 'FWD'
-
-
-class TestGetFeatures:
-    """Test feature generation"""
-
-    def test_base_features_always_present(self):
-        features = get_features('LS', 'Silverado')
-        assert 'Apple CarPlay' in features
-        assert 'Android Auto' in features
-        assert 'Backup Camera' in features
-
-    def test_lt_trim_adds_features(self):
-        features = get_features('LT', 'Equinox')
-        assert 'Heated Seats' in features
-        assert 'Remote Start' in features
-
-    def test_z71_trim_adds_offroad(self):
-        features = get_features('Z71', 'Tahoe')
-        assert 'Z71 Off-Road Package' in features
-
-    def test_high_country_adds_premium(self):
-        features = get_features('High Country', 'Silverado')
-        assert 'Leather Seats' in features
-        assert 'Bose Audio' in features
-
-    def test_ev_adds_ev_features(self):
-        features = get_features('RST', 'Silverado EV')
-        assert 'One-Pedal Driving' in features
-        assert 'DC Fast Charging' in features
-
-
-class TestParseModelCodeBehavior:
-    """
-    Test parse_model_code behavior comprehensively.
+    const targetModel = customerData.selectedModel.toLowerCase().trim();
+    const vehicleModel = (vehicle.model || '').toLowerCase().trim();
     
-    These tests verify the function produces valid outputs for all supported
-    configurations without testing internal data structures.
-    """
+    // Must match the selected model exactly (or with trim suffix)
+    // "silverado 1500" matches "silverado 1500" or "silverado 1500 lt"
+    // but NOT "silverado 2500hd" or "tahoe"
+    return vehicleModel === targetModel || 
+           vehicleModel.startsWith(targetModel + ' ') ||
+           (vehicleModel.startsWith(targetModel) && !/\d/.test(vehicleModel.charAt(targetModel.length)));
+  });
 
-    def test_all_light_duty_cab_types_supported(self):
-        """Verify all light-duty cab types can be parsed"""
-        # Regular Cab
-        result = parse_model_code('CK10703')
-        assert result['cab'] == 'Regular Cab'
-        
-        # Double Cab
-        result = parse_model_code('CK10753')
-        assert result['cab'] == 'Double Cab'
-        
-        # Crew Cab
-        result = parse_model_code('CK10543')
-        assert result['cab'] == 'Crew Cab'
+  const sortedVehicles = [...filteredVehicles].sort((a: Vehicle, b: Vehicle) => {
+    switch (sortBy) {
+      case 'priceLow': return (a.price || 0) - (b.price || 0);
+      case 'priceHigh': return (b.price || 0) - (a.price || 0);
+      case 'newest': return (b.year || 0) - (a.year || 0);
+      default: return ((b as Vehicle & { matchScore?: number }).matchScore || 50) - ((a as Vehicle & { matchScore?: number }).matchScore || 50);
+    }
+  });
 
-    def test_all_light_duty_bed_types_supported(self):
-        """Verify all light-duty bed lengths can be parsed"""
-        # Short Bed (Crew Cab only)
-        result = parse_model_code('CK10543')
-        assert result['bed'] == 'Short Bed'
-        
-        # Standard Bed
-        result = parse_model_code('CK10703')
-        assert result['bed'] == 'Standard Bed'
-        
-        # Long Bed
-        result = parse_model_code('CK10903')
-        assert result['bed'] == 'Long Bed'
+  // Get the appropriate title based on path
+  const getTitle = (): string => {
+    if (customerData?.path === 'browse') return 'All Inventory';
+    if (customerData?.quizAnswers && Object.keys(customerData.quizAnswers).length > 0) {
+      return 'Recommended For You';
+    }
+    if (customerData?.selectedModel) return `${customerData.selectedModel} Inventory`;
+    return 'All Inventory';
+  };
 
-    def test_medium_duty_chassis_cab_supported(self):
-        """Verify medium-duty chassis cab configurations are supported"""
-        result = parse_model_code('CC56403')
-        assert result['cab'] == 'Regular Cab'
-        assert result['bed'] == 'Chassis Cab'
+  const handleSortChange = (e: ChangeEvent<HTMLSelectElement>): void => {
+    setSortBy(e.target.value as SortOption);
+  };
 
-    def test_all_series_supported(self):
-        """Verify 1500, 2500, 3500 series are all supported"""
-        # 1500 series
-        result = parse_model_code('CK10543')
-        assert result['cab'] is not None
-        
-        # 2500 series
-        result = parse_model_code('CK20543')
-        assert result['cab'] is not None
-        
-        # 3500 series
-        result = parse_model_code('CK30543')
-        assert result['cab'] is not None
+  if (loading) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingSpinner} />
+        <p style={styles.loadingText}>Loading inventory...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
+  if (error) {
+    return (
+      <div style={styles.errorContainer}>
+        <div style={styles.errorIcon}>⚠️</div>
+        <p style={styles.errorText}>{error}</p>
+        <button style={styles.retryButton} onClick={() => window.location.reload()}>
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
-class TestVehicleImages:
-    """Test vehicle images mapping"""
+  return (
+    <div style={styles.container}>
+      {/* Header */}
+      <div style={styles.header}>
+        <div style={styles.headerLeft}>
+          <h1 style={styles.title}>
+            {getTitle()}
+            <span style={styles.matchCount}> ({filteredVehicles.length})</span>
+          </h1>
+          <p style={styles.subtitle}>
+            {customerData?.path === 'browse' 
+              ? 'Browse our complete inventory' 
+              : 'Sorted by best match based on your preferences'
+            }
+          </p>
+        </div>
 
-    def test_all_urls_are_https(self):
-        for model, url in VEHICLE_IMAGES.items():
-            assert url.startswith('https://'), f"{model} URL not HTTPS"
+        <div style={styles.headerRight}>
+          <select 
+            style={styles.sortSelect}
+            value={sortBy}
+            onChange={handleSortChange}
+          >
+            <option value="recommended">Best Match</option>
+            <option value="priceLow">Price: Low to High</option>
+            <option value="priceHigh">Price: High to Low</option>
+            <option value="newest">Newest First</option>
+          </select>
+        </div>
+      </div>
 
-    def test_default_image_exists(self):
-        assert 'default' in VEHICLE_IMAGES
+      {/* Vehicle Grid */}
+      {sortedVehicles.length > 0 ? (
+        <div style={styles.vehicleGrid}>
+          {sortedVehicles.map((vehicle, index) => {
+            const vehicleWithScore = vehicle as Vehicle & { matchScore?: number };
+            const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
+            const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
+            const vehicleId = String(vehicle.id || stockNumber || index);
+            const imageUrl = getVehicleImageUrl(vehicle);
+            const showImage = imageUrl && !failedImages.has(vehicleId);
+            
+            return (
+              <div 
+                key={vehicleId}
+                style={styles.vehicleCard}
+                onClick={() => handleVehicleClick(vehicle)}
+                title="View on QuirkChevyNH.com"
+              >
+                {/* Match Score - only show if from quiz */}
+                {vehicleWithScore.matchScore && customerData?.quizAnswers && (
+                  <div style={styles.matchBadge}>
+                    <span style={styles.matchScore}>{vehicleWithScore.matchScore}%</span>
+                    <span style={styles.matchLabel}>Match</span>
+                  </div>
+                )}
 
-    def test_key_models_have_images(self):
-        required = ['corvette', 'silverado', 'tahoe', 'equinox', 'colorado']
-        for model in required:
-            assert model in VEHICLE_IMAGES
+                {/* Vehicle Image */}
+                <div style={{ 
+                  ...styles.vehicleImage, 
+                  background: showImage ? '#1a1a1a' : getGradient(exteriorColor) 
+                }}>
+                  {showImage ? (
+                    <img 
+                      src={imageUrl}
+                      alt={`${vehicle.year} ${vehicle.make || 'Chevrolet'} ${vehicle.model}`}
+                      style={styles.vehicleImg}
+                      onError={() => handleImageError(vehicleId)}
+                    />
+                  ) : (
+                    <span style={styles.vehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
+                  )}
+                  <div style={styles.statusBadge}>
+                    <span style={{
+                      ...styles.statusDot,
+                      background: vehicle.status === 'In Stock' ? '#4ade80' : '#fbbf24',
+                    }} />
+                    {vehicle.status || 'In Stock'}
+                  </div>
+                </div>
+
+                {/* Vehicle Info */}
+                <div style={styles.vehicleInfo}>
+                  <div style={styles.vehicleHeader}>
+                    <div>
+                      <h3 style={styles.vehicleName}>{vehicle.year} {vehicle.model}</h3>
+                      <p style={styles.vehicleTrim}>{vehicle.trim}</p>
+                    </div>
+                    <span style={styles.stockNumber}>STK# {stockNumber}</span>
+                  </div>
+
+                  <div style={styles.vehicleColor}>
+                    <div style={{ ...styles.colorSwatch, background: getGradient(exteriorColor) }} />
+                    {exteriorColor}
+                  </div>
+
+                  {/* Features */}
+                  {vehicle.features && vehicle.features.length > 0 && (
+                    <div style={styles.featureTags}>
+                      {vehicle.features.slice(0, 3).map((feature, idx) => (
+                        <span key={idx} style={styles.featureTag}>{feature}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Pricing - MSRP on left, Your Price on right */}
+                  <div style={styles.pricingSection}>
+                    <div style={styles.priceColumn}>
+                      <span style={styles.priceLabel}>MSRP</span>
+                      <span style={styles.msrpValue}>${formatPrice(vehicle.msrp || vehicle.price)}</span>
+                    </div>
+                    <div style={styles.paymentColumn}>
+                      <span style={styles.priceLabel}>Your Price</span>
+                      <span style={styles.paymentValue}>
+                        ${formatPrice(vehicle.price)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button 
+                    style={styles.viewDetailsButton}
+                    onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                      e.stopPropagation();
+                      handleVehicleClick(vehicle);
+                    }}
+                  >
+                    View Details
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div style={styles.noResults}>
+          <div style={styles.noResultsIcon}>🔍</div>
+          <h3 style={styles.noResultsTitle}>No vehicles match your criteria</h3>
+          <p style={styles.noResultsText}>Try adjusting your filters or preferences</p>
+        </div>
+      )}
+
+      {/* Refine Search */}
+      <div style={styles.refineSection}>
+        <p style={styles.refineText}>Not seeing what you're looking for?</p>
+        <button style={styles.refineButton} onClick={() => navigateTo('welcome')}>
+          Start Over
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const styles: Record<string, CSSProperties> = {
+  container: {
+    minHeight: '100vh',
+    maxHeight: '100vh',
+    padding: '32px 40px',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    boxSizing: 'border-box',
+  },
+  loadingContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '24px',
+  },
+  loadingSpinner: {
+    width: '48px',
+    height: '48px',
+    border: '4px solid rgba(255,255,255,0.1)',
+    borderTopColor: '#1B7340',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  loadingText: {
+    fontSize: '18px',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  errorContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+  },
+  errorIcon: {
+    fontSize: '48px',
+  },
+  errorText: {
+    fontSize: '18px',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  retryButton: {
+    padding: '12px 24px',
+    background: '#1B7340',
+    border: 'none',
+    borderRadius: '8px',
+    color: '#ffffff',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '32px',
+    flexWrap: 'wrap',
+    gap: '16px',
+  },
+  headerLeft: {},
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  title: {
+    fontSize: '28px',
+    fontWeight: '700',
+    color: '#ffffff',
+    margin: '0 0 4px 0',
+  },
+  matchCount: {
+    color: '#4ade80',
+    fontWeight: '500',
+  },
+  subtitle: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.5)',
+    margin: 0,
+  },
+  sortSelect: {
+    padding: '10px 16px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    color: '#ffffff',
+    fontSize: '14px',
+    cursor: 'pointer',
+  },
+  vehicleGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+    gap: '24px',
+    marginBottom: '40px',
+  },
+  vehicleCard: {
+    background: 'rgba(255,255,255,0.05)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    position: 'relative',
+  },
+  matchBadge: {
+    position: 'absolute',
+    top: '12px',
+    left: '12px',
+    zIndex: 10,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '8px 12px',
+    background: 'rgba(0,0,0,0.7)',
+    borderRadius: '10px',
+    backdropFilter: 'blur(8px)',
+  },
+  matchScore: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#4ade80',
+  },
+  matchLabel: {
+    fontSize: '10px',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+    textTransform: 'uppercase',
+  },
+  vehicleImage: {
+    height: '160px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  vehicleImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  vehicleInitial: {
+    fontSize: '72px',
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.2)',
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: '12px',
+    right: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '6px 12px',
+    background: 'rgba(0,0,0,0.7)',
+    borderRadius: '20px',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  statusDot: {
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+  },
+  vehicleInfo: {
+    padding: '20px',
+  },
+  vehicleHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '12px',
+  },
+  vehicleName: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#ffffff',
+    margin: 0,
+  },
+  vehicleTrim: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+    margin: '2px 0 0 0',
+  },
+  stockNumber: {
+    fontSize: '11px',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  vehicleColor: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: '12px',
+  },
+  colorSwatch: {
+    width: '16px',
+    height: '16px',
+    borderRadius: '50%',
+    border: '2px solid rgba(255,255,255,0.2)',
+  },
+  featureTags: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px',
+    marginBottom: '16px',
+  },
+  featureTag: {
+    padding: '4px 10px',
+    background: 'rgba(27, 115, 64, 0.2)',
+    borderRadius: '12px',
+    fontSize: '11px',
+    fontWeight: '600',
+    color: '#4ade80',
+  },
+  pricingSection: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '12px',
+    background: 'rgba(0,0,0,0.2)',
+    borderRadius: '10px',
+    marginBottom: '16px',
+  },
+  priceColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  paymentColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+  },
+  priceLabel: {
+    fontSize: '11px',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.4)',
+    textTransform: 'uppercase',
+  },
+  msrpValue: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  paymentValue: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#4ade80',
+  },
+  viewDetailsButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    width: '100%',
+    padding: '12px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    borderRadius: '10px',
+    color: '#ffffff',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  noResults: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '60px 20px',
+    textAlign: 'center',
+  },
+  noResultsIcon: {
+    fontSize: '48px',
+    marginBottom: '16px',
+  },
+  noResultsTitle: {
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#ffffff',
+    margin: '0 0 8px 0',
+  },
+  noResultsText: {
+    fontSize: '16px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  refineSection: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    padding: '24px',
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: '12px',
+  },
+  refineText: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.5)',
+    margin: 0,
+  },
+  refineButton: {
+    padding: '10px 20px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '8px',
+    color: '#ffffff',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+};
+
+export default InventoryResults;
