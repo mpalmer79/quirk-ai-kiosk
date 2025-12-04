@@ -409,7 +409,7 @@ export const healthCheck = async (): Promise<{ status: string }> => {
  */
 export const logTrafficSession = async (sessionData: TrafficSessionData): Promise<void> => {
   try {
-    await apiRequest<void>('/v1/traffic/session', {
+    await apiRequest<void>('/traffic/session', {
       method: 'POST',
       body: JSON.stringify({
         sessionId: getSessionId(),
@@ -426,21 +426,21 @@ export const logTrafficSession = async (sessionData: TrafficSessionData): Promis
  * Get traffic log entries (admin)
  */
 export const getTrafficLog = async (limit: number = 50, offset: number = 0): Promise<TrafficLogEntry[]> => {
-  return apiRequest<TrafficLogEntry[]>(`/v1/traffic/log?limit=${limit}&offset=${offset}`);
+  return apiRequest<TrafficLogEntry[]>(`/traffic/log?limit=${limit}&offset=${offset}`);
 };
 
 /**
  * Get traffic statistics (admin)
  */
 export const getTrafficStats = async (): Promise<TrafficStats> => {
-  return apiRequest<TrafficStats>('/v1/traffic/stats');
+  return apiRequest<TrafficStats>('/traffic/stats');
 };
 
 /**
  * Get single session details (admin)
  */
 export const getTrafficSession = async (sessionId: string): Promise<TrafficLogEntry> => {
-  return apiRequest<TrafficLogEntry>(`/v1/traffic/log/${sessionId}`);
+  return apiRequest<TrafficLogEntry>(`/traffic/log/${sessionId}`);
 };
 
 // ============================================
@@ -451,7 +451,7 @@ export const getTrafficSession = async (sessionId: string): Promise<TrafficLogEn
  * Chat with AI assistant for vehicle recommendations
  */
 export const chatWithAI = async (request: AIChatRequest): Promise<AIChatResponse> => {
-  return apiRequest<AIChatResponse>('/v1/ai/chat', {
+  return apiRequest<AIChatResponse>('/ai/chat', {
     method: 'POST',
     body: JSON.stringify(request),
   });
