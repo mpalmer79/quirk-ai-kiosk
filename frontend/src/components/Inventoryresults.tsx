@@ -59,11 +59,63 @@ const formatPrice = (price?: number): string => {
   return Math.round(price || 0).toLocaleString();
 };
 
+// Get vehicle image URL based on model and color rules
+const getVehicleImageUrl = (vehicle: Vehicle): string | null => {
+  // Check for API-provided URLs first
+  if (vehicle.imageUrl) return vehicle.imageUrl;
+  if (vehicle.image_url) return vehicle.image_url;
+  if (vehicle.images && vehicle.images.length > 0) return vehicle.images[0];
+  
+  // Normalize model for file matching
+  const fullModel = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  // Also get base model without EV/HD/etc suffixes for fallback
+  const baseModel = fullModel.replace(/-ev$/, '').replace(/-hd$/, '').replace(/\d+$/, '');
+  
+  const exteriorColor = (vehicle.exteriorColor || vehicle.exterior_color || '').toLowerCase();
+  
+  // Map color descriptions to base color categories
+  const getColorCategory = (colorDesc: string): string => {
+    if (colorDesc.includes('black')) return 'black';
+    if (colorDesc.includes('white') || colorDesc.includes('summit') || colorDesc.includes('arctic') || colorDesc.includes('polar')) return 'white';
+    if (colorDesc.includes('red') || colorDesc.includes('cherry') || colorDesc.includes('cajun') || colorDesc.includes('radiant')) return 'red';
+    if (colorDesc.includes('blue') || colorDesc.includes('northsky') || colorDesc.includes('glacier') || colorDesc.includes('reef')) return 'blue';
+    if (colorDesc.includes('silver') || colorDesc.includes('sterling')) return 'silver';
+    if (colorDesc.includes('gray') || colorDesc.includes('grey') || colorDesc.includes('shadow')) return 'gray';
+    if (colorDesc.includes('green') || colorDesc.includes('woodland')) return 'green';
+    if (colorDesc.includes('orange') || colorDesc.includes('tangier')) return 'orange';
+    if (colorDesc.includes('yellow') || colorDesc.includes('accelerate')) return 'yellow';
+    if (colorDesc.includes('brown') || colorDesc.includes('harvest')) return 'brown';
+    return '';
+  };
+  
+  const colorCategory = getColorCategory(exteriorColor);
+  
+  // For Equinox EV, Silverado EV, etc. - use base model name since images are named equinox-*.jpg not equinox-ev-*.jpg
+  // This way equinox-ev will use equinox-gray.jpg, etc.
+  const modelForImage = baseModel || fullModel;
+  
+  // Build image path - model+color combination
+  if (modelForImage && colorCategory) {
+    return `/images/vehicles/${modelForImage}-${colorCategory}.jpg`;
+  }
+  if (modelForImage) {
+    return `/images/vehicles/${modelForImage}.jpg`;
+  }
+  
+  return null;
+};
+
 const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>((customerData?.sortBy as SortOption) || 'recommended');
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+  // Handle image load error - mark image as failed so placeholder shows
+  const handleImageError = (vehicleId: string) => {
+    setFailedImages(prev => new Set(prev).add(vehicleId));
+  };
 
   // Handle vehicle card click - open dealership website
   const handleVehicleClick = (vehicle: Vehicle): void => {
@@ -270,10 +322,13 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
             const vehicleWithScore = vehicle as Vehicle & { matchScore?: number };
             const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
             const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
+            const vehicleId = vehicle.id || stockNumber || String(index);
+            const imageUrl = getVehicleImageUrl(vehicle);
+            const showImage = imageUrl && !failedImages.has(vehicleId);
             
             return (
               <div 
-                key={vehicle.id || stockNumber || index}
+                key={vehicleId}
                 style={styles.vehicleCard}
                 onClick={() => handleVehicleClick(vehicle)}
                 title="View on QuirkChevyNH.com"
@@ -287,8 +342,20 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
                 )}
 
                 {/* Vehicle Image */}
-                <div style={{ ...styles.vehicleImage, background: getGradient(exteriorColor) }}>
-                  <span style={styles.vehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
+                <div style={{ 
+                  ...styles.vehicleImage, 
+                  background: showImage ? '#1a1a1a' : getGradient(exteriorColor) 
+                }}>
+                  {showImage ? (
+                    <img 
+                      src={imageUrl}
+                      alt={`${vehicle.year} ${vehicle.make || 'Chevrolet'} ${vehicle.model}`}
+                      style={styles.vehicleImg}
+                      onError={() => handleImageError(vehicleId)}
+                    />
+                  ) : (
+                    <span style={styles.vehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
+                  )}
                   <div style={styles.statusBadge}>
                     <span style={{
                       ...styles.statusDot,
@@ -509,6 +576,12 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  vehicleImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
   },
   vehicleInitial: {
     fontSize: '72px',
