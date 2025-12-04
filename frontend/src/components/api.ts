@@ -94,6 +94,13 @@ interface AnalyticsData {
   sessionId: string;
 }
 
+// Chat message for AI conversation history
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: string;
+}
+
 interface TrafficSessionData {
   sessionId?: string;
   customerName?: string | null;
@@ -109,22 +116,51 @@ interface TrafficSessionData {
     term?: number;
     downPayment?: number;
   };
+  chatHistory?: ChatMessage[];  // AI chat conversation history
 }
 
 interface TrafficLogEntry {
-  id: number;
   sessionId: string;
-  timestamp: string;
+  createdAt: string;
+  updatedAt: string;
   customerName?: string;
-  vehicleViewed?: string;
+  phone?: string;
+  path?: string;
+  vehicle?: Partial<Vehicle>;
+  tradeIn?: Partial<TradeInVehicleData & { estimatedValue?: number }>;
+  payment?: {
+    type?: string;
+    monthly?: number;
+    term?: number;
+    downPayment?: number;
+  };
+  vehicleRequested?: boolean;
   actions: string[];
+  chatHistory?: ChatMessage[];  // AI chat conversation history
+}
+
+interface TrafficLogResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  sessions: TrafficLogEntry[];
+  timezone: string;
+  server_time: string;
 }
 
 interface TrafficStats {
-  totalSessions: number;
-  todaySessions: number;
-  averageSessionLength: number;
-  topVehiclesViewed: Array<{ stockNumber: string; views: number }>;
+  total_sessions: number;
+  today: number;
+  today_date: string;
+  by_path: Record<string, number>;
+  with_vehicle_selected: number;
+  with_trade_in: number;
+  vehicle_requests: number;
+  completed_handoffs: number;
+  with_ai_chat: number;
+  conversion_rate: number;
+  timezone: string;
+  server_time: string;
 }
 
 interface AIChatRequest {
@@ -409,7 +445,7 @@ export const healthCheck = async (): Promise<{ status: string }> => {
  */
 export const logTrafficSession = async (sessionData: TrafficSessionData): Promise<void> => {
   try {
-    await apiRequest<void>('/traffic/session', {
+    await apiRequest<void>('/v1/traffic/session', {
       method: 'POST',
       body: JSON.stringify({
         sessionId: getSessionId(),
@@ -424,23 +460,36 @@ export const logTrafficSession = async (sessionData: TrafficSessionData): Promis
 
 /**
  * Get traffic log entries (admin)
+ * @param limit - Number of entries to return
+ * @param offset - Pagination offset
+ * @param filterToday - If true, filter to today's sessions only
  */
-export const getTrafficLog = async (limit: number = 50, offset: number = 0): Promise<TrafficLogEntry[]> => {
-  return apiRequest<TrafficLogEntry[]>(`/traffic/log?limit=${limit}&offset=${offset}`);
+export const getTrafficLog = async (
+  limit: number = 50, 
+  offset: number = 0,
+  filterToday: boolean = false
+): Promise<TrafficLogResponse> => {
+  const params = new URLSearchParams();
+  params.append('limit', String(limit));
+  params.append('offset', String(offset));
+  if (filterToday) {
+    params.append('filter_today', 'true');
+  }
+  return apiRequest<TrafficLogResponse>(`/v1/traffic/log?${params.toString()}`);
 };
 
 /**
  * Get traffic statistics (admin)
  */
 export const getTrafficStats = async (): Promise<TrafficStats> => {
-  return apiRequest<TrafficStats>('/traffic/stats');
+  return apiRequest<TrafficStats>('/v1/traffic/stats');
 };
 
 /**
  * Get single session details (admin)
  */
 export const getTrafficSession = async (sessionId: string): Promise<TrafficLogEntry> => {
-  return apiRequest<TrafficLogEntry>(`/traffic/log/${sessionId}`);
+  return apiRequest<TrafficLogEntry>(`/v1/traffic/log/${sessionId}`);
 };
 
 // ============================================
@@ -451,7 +500,7 @@ export const getTrafficSession = async (sessionId: string): Promise<TrafficLogEn
  * Chat with AI assistant for vehicle recommendations
  */
 export const chatWithAI = async (request: AIChatRequest): Promise<AIChatResponse> => {
-  return apiRequest<AIChatResponse>('/ai/chat', {
+  return apiRequest<AIChatResponse>('/v1/ai/chat', {
     method: 'POST',
     body: JSON.stringify(request),
   });
