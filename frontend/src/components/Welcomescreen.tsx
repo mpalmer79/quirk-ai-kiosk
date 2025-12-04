@@ -1,399 +1,479 @@
-import React, { useState, useRef, useEffect, KeyboardEvent, CSSProperties } from 'react';
+import React, { useState, useEffect, useRef, KeyboardEvent, ChangeEvent, CSSProperties } from 'react';
 import api from './api';
-import type { Vehicle, KioskComponentProps } from '../types';
+import type { KioskComponentProps } from '../types';
 
-// Message types
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  vehicles?: Vehicle[];
-  timestamp: Date;
+// Stats interface from API
+interface InventoryStats {
+  total?: number;
+  byBodyStyle?: {
+    SUV?: number;
+    Truck?: number;
+    Sedan?: number;
+    [key: string]: number | undefined;
+  };
+  priceRange?: {
+    min?: number;
+    max?: number;
+  };
 }
 
-// Suggested prompts for users
-const SUGGESTED_PROMPTS = [
-  "I need a truck that can tow a boat",
-  "What's the best family SUV under $50k?",
-  "Show me something fuel efficient for commuting",
-  "I want a sporty car with good tech features",
-  "What electric vehicles do you have?",
-];
+// Path configuration
+interface PathConfig {
+  id: 'stockLookup' | 'modelBudget' | 'guidedQuiz' | 'aiAssistant';
+  icon: JSX.Element;
+  title: string;
+  subtitle: string;
+  description: string;
+  gradient: string;
+}
 
-const AIAssistant: React.FC<KioskComponentProps> = ({ 
-  navigateTo, 
-  updateCustomerData, 
-  customerData,
-  resetJourney 
-}) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [inventory, setInventory] = useState<Vehicle[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+type StatType = 'total' | 'suv' | 'truck' | 'price' | null;
 
-  // Load inventory on mount
+const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
+  const [isVisible, setIsVisible] = useState<boolean>(false);
+  const [hoveredPath, setHoveredPath] = useState<string | null>(null);
+  const [hoveredStat, setHoveredStat] = useState<StatType>(null);
+  const [stats, setStats] = useState<InventoryStats | null>(null);
+  
+  // Name capture state
+  const [customerName, setCustomerName] = useState<string>(customerData?.customerName || '');
+  const [nameSubmitted, setNameSubmitted] = useState<boolean>(!!customerData?.customerName);
+  const [isTyping, setIsTyping] = useState<boolean>(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    const loadInventory = async () => {
-      try {
-        const data = await api.getInventory({});
-        // Handle both array and object response types
-        const vehicles = Array.isArray(data) ? data : (data as { vehicles?: Vehicle[] }).vehicles || [];
-        setInventory(vehicles);
-      } catch (err) {
-        console.error('Error loading inventory:', err);
-      }
-    };
-    loadInventory();
-  }, []);
-
-  // Add welcome message on mount
-  useEffect(() => {
-    const welcomeMessage: Message = {
-      id: 'welcome',
-      role: 'assistant',
-      content: customerData?.customerName 
-        ? `Hi ${customerData.customerName}! 👋 I'm your AI assistant at Quirk Chevrolet. Tell me what you're looking for in a vehicle - whether it's towing capacity, fuel efficiency, family space, or just something fun to drive. I'll search our ${inventory.length || 'entire'} vehicle inventory to find the perfect match for you!`
-        : `Hi there! 👋 I'm your AI assistant at Quirk Chevrolet. Tell me what you're looking for in a vehicle - whether it's towing capacity, fuel efficiency, family space, or just something fun to drive. I'll search our inventory to find the perfect match for you!`,
-      timestamp: new Date(),
-    };
-    setMessages([welcomeMessage]);
-  }, [customerData?.customerName, inventory.length]);
-
-  // Scroll to bottom on new messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Save conversation log to customer data
-  useEffect(() => {
-    // Skip the initial welcome message only
-    if (messages.length <= 1) return;
+    setIsVisible(true);
+    loadStats();
     
-    const conversationLog = messages.map(m => ({
-      role: m.role,
-      content: m.content,
-      timestamp: m.timestamp.toISOString(),
-      vehicles: m.vehicles?.map(v => ({
-        stockNumber: v.stockNumber || v.stock_number,
-        model: v.model,
-        price: v.salePrice || v.sale_price || v.price,
-      })),
-    }));
-    
-    updateCustomerData({ conversationLog });
-  }, [messages, updateCustomerData]);
+    // Focus name input after animation
+    if (!nameSubmitted) {
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 800);
+    }
+  }, [nameSubmitted]);
 
-  // Focus input on mount
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  // Build inventory context for AI
-  const buildInventoryContext = (): string => {
-    if (inventory.length === 0) return 'Inventory is loading...';
-    
-    // Group by model for summary
-    const modelCounts: Record<string, number> = {};
-    const priceRanges: Record<string, { min: number; max: number }> = {};
-    
-    inventory.forEach(v => {
-      const model = v.model || 'Unknown';
-      modelCounts[model] = (modelCounts[model] || 0) + 1;
-      
-      const price = v.salePrice || v.sale_price || v.price || v.msrp || 0;
-      if (!priceRanges[model]) {
-        priceRanges[model] = { min: price, max: price };
-      } else {
-        priceRanges[model].min = Math.min(priceRanges[model].min, price);
-        priceRanges[model].max = Math.max(priceRanges[model].max, price);
-      }
-    });
-
-    let context = `QUIRK CHEVROLET CURRENT INVENTORY (${inventory.length} vehicles):\n\n`;
-    
-    Object.entries(modelCounts).forEach(([model, count]) => {
-      const range = priceRanges[model];
-      context += `• ${model}: ${count} in stock ($${range.min.toLocaleString()} - $${range.max.toLocaleString()})\n`;
-    });
-
-    context += `\nDETAILED INVENTORY:\n`;
-    inventory.slice(0, 50).forEach(v => {
-      const stock = v.stockNumber || v.stock_number || '';
-      const price = v.salePrice || v.sale_price || v.price || v.msrp || 0;
-      const color = v.exteriorColor || v.exterior_color || '';
-      context += `- Stock #${stock}: ${v.year} ${v.make} ${v.model} ${v.trim || ''}, ${color}, $${price.toLocaleString()}, ${v.drivetrain || ''}\n`;
-    });
-
-    return context;
-  };
-
-  // Search inventory based on criteria
-  const searchInventory = (query: string): Vehicle[] => {
-    const lowerQuery = query.toLowerCase();
-    
-    return inventory.filter(v => {
-      const searchText = `${v.year} ${v.make} ${v.model} ${v.trim} ${v.exteriorColor || v.exterior_color} ${v.drivetrain} ${v.engine}`.toLowerCase();
-      
-      // Check for specific criteria
-      const matchesQuery = searchText.includes(lowerQuery);
-      
-      // Check for category keywords
-      const isTruck = lowerQuery.includes('truck') && 
-        (v.model?.toLowerCase().includes('silverado') || v.model?.toLowerCase().includes('colorado'));
-      const isSUV = (lowerQuery.includes('suv') || lowerQuery.includes('crossover')) && 
-        ['tahoe', 'suburban', 'equinox', 'traverse', 'trax', 'trailblazer', 'blazer'].some(m => v.model?.toLowerCase().includes(m));
-      const isElectric = lowerQuery.includes('electric') && 
-        (v.model?.toLowerCase().includes('ev') || v.fuelType?.toLowerCase().includes('electric'));
-      const isSporty = (lowerQuery.includes('sport') || lowerQuery.includes('fast') || lowerQuery.includes('performance')) && 
-        (v.model?.toLowerCase().includes('corvette') || v.model?.toLowerCase().includes('camaro'));
-      
-      // Price filtering
-      let matchesPrice = true;
-      const priceMatch = lowerQuery.match(/under\s*\$?(\d+)k?/i);
-      if (priceMatch) {
-        const maxPrice = parseInt(priceMatch[1]) * (priceMatch[1].length <= 2 ? 1000 : 1);
-        const vehiclePrice = v.salePrice || v.sale_price || v.price || v.msrp || 0;
-        matchesPrice = vehiclePrice <= maxPrice;
-      }
-
-      return (matchesQuery || isTruck || isSUV || isElectric || isSporty) && matchesPrice;
-    }).slice(0, 6);
-  };
-
-  // Send message to AI
-  const sendMessage = async (content: string) => {
-    if (!content.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: content.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsLoading(true);
-
+  const loadStats = async (): Promise<void> => {
     try {
-      // Call AI endpoint
-      const response = await api.chatWithAI({
-        message: content,
-        inventoryContext: buildInventoryContext(),
-        conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
-        customerName: customerData?.customerName,
-      });
-
-      // Search for matching vehicles
-      const matchingVehicles = searchInventory(content);
-
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: response.message,
-        vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error('AI Chat error:', error);
-      
-      // Fallback response with local search
-      const matchingVehicles = searchInventory(content);
-      
-      const fallbackMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: matchingVehicles.length > 0 
-          ? `I found ${matchingVehicles.length} vehicles that might match what you're looking for! Take a look below. Would you like more details on any of these?`
-          : `I'd be happy to help you find the perfect vehicle. Could you tell me more about what you're looking for? For example, do you need a truck for towing, an SUV for the family, or something sporty?`,
-        vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
-        timestamp: new Date(),
-      };
-      
-      setMessages(prev => [...prev, fallbackMessage]);
-    } finally {
-      setIsLoading(false);
+      const data = await api.getInventoryStats() as InventoryStats;
+      setStats(data);
+    } catch (err) {
+      console.error('Error loading stats:', err);
     }
   };
 
-  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(inputValue);
+  const handleNameSubmit = (): void => {
+    const trimmedName = customerName.trim();
+    if (trimmedName) {
+      // Capitalize first letter
+      const formattedName = trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
+      updateCustomerData({ customerName: formattedName });
+      setCustomerName(formattedName);
+    }
+    setNameSubmitted(true);
+  };
+
+  const handleNameKeyPress = (e: KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter') {
+      handleNameSubmit();
     }
   };
 
-  const handleVehicleClick = (vehicle: Vehicle) => {
-    updateCustomerData({ selectedVehicle: vehicle, path: 'aiChat' });
-    navigateTo('vehicleDetail');
+  const handleSkipName = (): void => {
+    setNameSubmitted(true);
   };
 
-  const handleSuggestedPrompt = (prompt: string) => {
-    setInputValue(prompt);
-    sendMessage(prompt);
+  const handlePathSelect = (path: 'stockLookup' | 'modelBudget' | 'guidedQuiz' | 'aiAssistant'): void => {
+    updateCustomerData({ path });
+    const routes: Record<string, string> = {
+      stockLookup: 'stockLookup',
+      modelBudget: 'modelBudget',
+      guidedQuiz: 'guidedQuiz',
+      aiAssistant: 'aiAssistant',
+    };
+    navigateTo(routes[path]);
   };
 
+  const handleBrowseAll = (): void => {
+    updateCustomerData({ path: 'browse' });
+    navigateTo('inventory');
+  };
+
+  // Handle stat clicks - each navigates to inventory with different filters
+  const handleStatClick = (statType: StatType): void => {
+    switch (statType) {
+      case 'total':
+        updateCustomerData({ path: 'browse' });
+        break;
+      case 'suv':
+        updateCustomerData({ path: 'browse' });
+        break;
+      case 'truck':
+        updateCustomerData({ path: 'browse' });
+        break;
+      case 'price':
+        updateCustomerData({ path: 'browse' });
+        break;
+      default:
+        updateCustomerData({ path: 'browse' });
+    }
+    navigateTo('inventory');
+  };
+
+  const paths: PathConfig[] = [
+    {
+      id: 'stockLookup',
+      icon: (
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+          <path d="M11 8v6M8 11h6"/>
+        </svg>
+      ),
+      title: 'I Have a Stock Number',
+      subtitle: 'Find the exact vehicle',
+      description: 'Enter your stock number to view availability, pricing, and schedule a test drive.',
+      gradient: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    },
+    {
+      id: 'modelBudget',
+      icon: (
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/>
+          <path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/>
+          <path d="M5 17h-2v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5"/>
+        </svg>
+      ),
+      title: 'I Know What I Want',
+      subtitle: 'Browse by model & budget',
+      description: 'Select your preferred model and set your budget to see matching vehicles in stock.',
+      gradient: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+    },
+    {
+      id: 'aiAssistant',
+      icon: (
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="10" r="1" fill="currentColor"/>
+          <circle cx="8" cy="10" r="1" fill="currentColor"/>
+          <circle cx="16" cy="10" r="1" fill="currentColor"/>
+        </svg>
+      ),
+      title: 'Chat with AI',
+      subtitle: "LET'S HAVE A CONVERSATION",
+      description: "Let's walk through this together and find the right vehicle that fits what you're looking for.",
+      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+    },
+    {
+      id: 'guidedQuiz',
+      icon: (
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+          <path d="M12 17h.01"/>
+        </svg>
+      ),
+      title: 'Help Me Decide',
+      subtitle: 'Take our 10-question quiz',
+      description: 'Answer a few questions and we\'ll recommend the perfect vehicle for your lifestyle.',
+      gradient: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+    },
+  ];
+
+  // Get personalized greeting
+  const getGreeting = (): JSX.Element => {
+    if (customerName) {
+      return (
+        <>
+          Nice to meet you, <span style={styles.highlight}>{customerName}</span>!
+        </>
+      );
+    }
+    return (
+      <>
+        Hi, I'm your <span style={styles.highlight}>Quirk AI</span> assistant
+      </>
+    );
+  };
+
+  // Phase 1: Name Capture Screen
+  if (!nameSubmitted) {
+    return (
+      <div style={styles.container}>
+        {/* Background Image */}
+        <div style={styles.backgroundImage} />
+        <div style={styles.backgroundOverlay} />
+        
+        {/* Name Capture Section */}
+        <div style={{
+          ...styles.nameCaptureSection,
+          opacity: isVisible ? 1 : 0,
+          transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+        }}>
+          {/* AI Avatar */}
+          <div style={styles.largeAiAvatar}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="9" cy="10" r="1.5" fill="#ffffff" stroke="none" />
+              <circle cx="15" cy="10" r="1.5" fill="#ffffff" stroke="none" />
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round" />
+            </svg>
+          </div>
+
+          <h1 style={styles.nameTitle}>
+            Hi, I'm your <span style={styles.highlight}>Quirk AI</span> assistant
+          </h1>
+          
+          <h2 style={styles.nameSubtitle}>
+            Welcome to Quirk Chevrolet!
+          </h2>
+          
+          <p style={styles.namePrompt}>
+            What's your first name?
+          </p>
+
+          {/* Name Input */}
+          <div style={styles.nameInputContainer}>
+            <input
+              ref={nameInputRef}
+              type="text"
+              style={styles.nameInput}
+              placeholder="Enter your first name"
+              value={customerName}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                setCustomerName(e.target.value);
+                setIsTyping(e.target.value.length > 0);
+              }}
+              onKeyPress={handleNameKeyPress}
+              maxLength={20}
+              autoComplete="off"
+              autoCapitalize="words"
+            />
+            
+            {isTyping && (
+              <button 
+                style={styles.nameSubmitButton}
+                onClick={handleNameSubmit}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Continue / Skip */}
+          <div style={styles.nameActions}>
+            <button 
+              style={{
+                ...styles.continueButton,
+                opacity: customerName.trim() ? 1 : 0.5,
+              }}
+              onClick={handleNameSubmit}
+              disabled={!customerName.trim()}
+            >
+              Continue
+            </button>
+            
+            <button 
+              style={styles.skipButton}
+              onClick={handleSkipName}
+            >
+              Skip for now
+            </button>
+          </div>
+
+          {/* Privacy Note */}
+          <p style={styles.privacyNote}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Your name is only used to personalize your experience today
+          </p>
+        </div>
+
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+          }
+          @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+        `}</style>
+      </div>
+    );
+  }
+
+  // Phase 2: Main Welcome Screen with Personalization
   return (
     <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerIcon}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="10" r="1" fill="currentColor"/>
-            <circle cx="8" cy="10" r="1" fill="currentColor"/>
-            <circle cx="16" cy="10" r="1" fill="currentColor"/>
-          </svg>
+      {/* Background Image */}
+      <div style={styles.backgroundImage} />
+      <div style={styles.backgroundOverlay} />
+      
+      {/* Hero Section */}
+      <div style={{
+        ...styles.heroSection,
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+      }}>
+        <div style={styles.greeting}>
+          <div style={styles.aiAvatar}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="9" cy="10" r="1.5" fill="#ffffff" stroke="none" />
+              <circle cx="15" cy="10" r="1.5" fill="#ffffff" stroke="none" />
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round" />
+            </svg>
+          </div>
+          <h1 style={styles.heroTitle}>
+            {getGreeting()}
+          </h1>
         </div>
-        <div>
-          <h1 style={styles.title}>Chat with AI Assistant</h1>
-          <p style={styles.subtitle}>Tell me what you're looking for in natural language</p>
-        </div>
+        
+        <h2 style={styles.heroSubtitle}>
+          {customerName ? 'Welcome to Quirk Chevrolet' : 'Welcome to Quirk Chevrolet'}
+        </h2>
+        
+        <p style={styles.heroText}>
+          How can I help you find your perfect vehicle today?
+        </p>
       </div>
 
-      {/* Messages Container */}
-      <div style={styles.messagesContainer}>
-        {messages.map((message) => (
-          <div
-            key={message.id}
+      {/* Path Selection Cards */}
+      <div style={{
+        ...styles.pathsContainer,
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+        transition: 'all 0.6s ease 0.2s',
+      }}>
+        {paths.map((path, index) => (
+          <button
+            key={path.id}
             style={{
-              ...styles.messageWrapper,
-              justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+              ...styles.pathCard,
+              background: hoveredPath === path.id ? path.gradient : 'rgba(0,0,0,0.7)',
+              borderColor: hoveredPath === path.id ? 'transparent' : 'rgba(255,255,255,0.2)',
+              transform: hoveredPath === path.id ? 'scale(1.02) translateY(-4px)' : 'scale(1)',
+              transitionDelay: `${index * 0.1}s`,
             }}
+            onMouseEnter={() => setHoveredPath(path.id)}
+            onMouseLeave={() => setHoveredPath(null)}
+            onClick={() => handlePathSelect(path.id)}
           >
-            <div
-              style={{
-                ...styles.messageBubble,
-                ...(message.role === 'user' ? styles.userBubble : styles.assistantBubble),
-              }}
-            >
-              {message.role === 'assistant' && (
-                <div style={styles.aiAvatar}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <circle cx="9" cy="10" r="1.5" fill="currentColor"/>
-                    <circle cx="15" cy="10" r="1.5" fill="currentColor"/>
-                    <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                  </svg>
-                </div>
-              )}
-              <p style={styles.messageText}>{message.content}</p>
-              
-              {/* Vehicle Cards */}
-              {message.vehicles && message.vehicles.length > 0 && (
-                <div style={styles.vehicleGrid}>
-                  {message.vehicles.map((vehicle, idx) => (
-                    <button
-                      key={`${vehicle.stockNumber || vehicle.stock_number}-${idx}`}
-                      style={styles.vehicleCard}
-                      onClick={() => handleVehicleClick(vehicle)}
-                    >
-                      <div style={styles.vehicleInfo}>
-                        <span style={styles.vehicleYear}>{vehicle.year}</span>
-                        <span style={styles.vehicleModel}>{vehicle.make} {vehicle.model}</span>
-                        <span style={styles.vehicleTrim}>{vehicle.trim}</span>
-                      </div>
-                      <div style={styles.vehicleDetails}>
-                        <span style={styles.vehicleColor}>
-                          {vehicle.exteriorColor || vehicle.exterior_color}
-                        </span>
-                        <span style={styles.vehiclePrice}>
-                          ${(vehicle.salePrice || vehicle.sale_price || vehicle.price || vehicle.msrp || 0).toLocaleString()}
-                        </span>
-                      </div>
-                      <div style={styles.viewButton}>
-                        View Details →
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div style={{
+              ...styles.pathIcon,
+              background: hoveredPath === path.id ? 'rgba(255,255,255,0.2)' : path.gradient,
+            }}>
+              {path.icon}
             </div>
-          </div>
+            
+            <h3 style={styles.pathTitle}>{path.title}</h3>
+            <p style={styles.pathSubtitle}>{path.subtitle}</p>
+            <p style={styles.pathDescription}>{path.description}</p>
+            
+            <div style={styles.pathArrow}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </button>
         ))}
-        
-        {/* Loading Indicator */}
-        {isLoading && (
-          <div style={styles.messageWrapper}>
-            <div style={{ ...styles.messageBubble, ...styles.assistantBubble }}>
-              <div style={styles.loadingDots}>
-                <span style={styles.dot}>●</span>
-                <span style={{ ...styles.dot, animationDelay: '0.2s' }}>●</span>
-                <span style={{ ...styles.dot, animationDelay: '0.4s' }}>●</span>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Prompts */}
-      {messages.length <= 1 && (
-        <div style={styles.suggestionsContainer}>
-          <p style={styles.suggestionsLabel}>Try asking:</p>
-          <div style={styles.suggestionsGrid}>
-            {SUGGESTED_PROMPTS.map((prompt, idx) => (
-              <button
-                key={idx}
-                style={styles.suggestionButton}
-                onClick={() => handleSuggestedPrompt(prompt)}
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Input Area */}
-      <div style={styles.inputContainer}>
-        <input
-          ref={inputRef}
-          type="text"
-          style={styles.input}
-          placeholder="Describe your ideal vehicle..."
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyPress={handleKeyPress}
-          disabled={isLoading}
-        />
-        <button
+      {/* Stats Bar - Clickable Stats */}
+      <div style={{
+        ...styles.statsBar,
+        opacity: isVisible ? 1 : 0,
+        transition: 'all 0.6s ease 0.4s',
+      }}>
+        {/* Total Vehicles */}
+        <button 
           style={{
-            ...styles.sendButton,
-            opacity: inputValue.trim() && !isLoading ? 1 : 0.5,
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'total' ? styles.statButtonHover : {}),
           }}
-          onClick={() => sendMessage(inputValue)}
-          disabled={!inputValue.trim() || isLoading}
+          onMouseEnter={() => setHoveredStat('total')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('total')}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-          </svg>
+          <span style={styles.statNumber}>{stats?.total || '---'}</span>
+          <span style={styles.statLabel}>Vehicles In Stock</span>
+        </button>
+
+        <div style={styles.statDivider} />
+
+        {/* SUVs */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'suv' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('suv')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('suv')}
+        >
+          <span style={styles.statNumber}>{stats?.byBodyStyle?.SUV || '---'}</span>
+          <span style={styles.statLabel}>SUVs</span>
+        </button>
+
+        <div style={styles.statDivider} />
+
+        {/* Trucks */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'truck' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('truck')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('truck')}
+        >
+          <span style={styles.statNumber}>{stats?.byBodyStyle?.Truck || '---'}</span>
+          <span style={styles.statLabel}>Trucks</span>
+        </button>
+
+        <div style={styles.statDivider} />
+
+        {/* Starting Price */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'price' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('price')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('price')}
+        >
+          <span style={styles.statNumber}>
+            {stats?.priceRange?.min ? `$${Math.round(stats.priceRange.min / 1000)}K` : '---'}
+          </span>
+          <span style={styles.statLabel}>Starting At</span>
         </button>
       </div>
 
-      {/* Start Over Button */}
-      {resetJourney && (
-        <div style={styles.startOverContainer}>
-          <button style={styles.startOverButton} onClick={resetJourney}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-            </svg>
-            Start Over
-          </button>
-        </div>
-      )}
+      {/* Just Browsing Link */}
+      <button
+        style={{
+          ...styles.browseLink,
+          opacity: isVisible ? 1 : 0,
+          transition: 'all 0.6s ease 0.5s',
+        }}
+        onClick={handleBrowseAll}
+      >
+        Just browsing? View all {stats?.total || ''} vehicles →
+      </button>
 
-      {/* CSS Animations */}
       <style>{`
         @keyframes pulse {
-          0%, 100% { opacity: 0.4; }
+          0%, 100% { opacity: 0.5; }
           50% { opacity: 1; }
         }
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
       `}</style>
     </div>
   );
@@ -404,199 +484,99 @@ const styles: Record<string, CSSProperties> = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    padding: '20px',
-    maxWidth: '900px',
-    margin: '0 auto',
-    width: '100%',
-    boxSizing: 'border-box',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    marginBottom: '24px',
-    paddingBottom: '20px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-  },
-  headerIcon: {
-    width: '64px',
-    height: '64px',
-    borderRadius: '16px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
-    display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#ffffff',
-  },
-  title: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#ffffff',
-    margin: 0,
-  },
-  subtitle: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.6)',
-    margin: '4px 0 0 0',
-  },
-  messagesContainer: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '20px 0',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-  },
-  messageWrapper: {
-    display: 'flex',
-    width: '100%',
-  },
-  messageBubble: {
-    maxWidth: '85%',
-    padding: '16px',
-    borderRadius: '16px',
+    padding: '40px',
     position: 'relative',
+    overflow: 'hidden',
   },
-  userBubble: {
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
-    borderBottomRightRadius: '4px',
-  },
-  assistantBubble: {
-    background: 'rgba(255,255,255,0.1)',
-    borderBottomLeftRadius: '4px',
-  },
-  aiAvatar: {
+  backgroundImage: {
     position: 'absolute',
-    top: '-10px',
-    left: '-10px',
-    width: '32px',
-    height: '32px',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundImage: 'url(/showroom.jpg)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    zIndex: 0,
+  },
+  backgroundOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.75) 50%, rgba(0,0,0,0.85) 100%)',
+    zIndex: 1,
+  },
+  // Name Capture Styles
+  nameCaptureSection: {
+    textAlign: 'center',
+    maxWidth: '500px',
+    padding: '40px',
+    position: 'relative',
+    zIndex: 2,
+    transition: 'all 0.6s ease',
+  },
+  largeAiAvatar: {
+    width: '100px',
+    height: '100px',
     borderRadius: '50%',
     background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     color: '#ffffff',
-    border: '2px solid #0a0a0a',
+    margin: '0 auto 24px',
+    boxShadow: '0 8px 32px rgba(27, 115, 64, 0.4)',
   },
-  messageText: {
-    fontSize: '15px',
-    lineHeight: '1.6',
-    color: '#ffffff',
-    margin: 0,
-    whiteSpace: 'pre-wrap',
-  },
-  vehicleGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '12px',
-    marginTop: '16px',
-  },
-  vehicleCard: {
-    background: 'rgba(0,0,0,0.3)',
-    border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: '12px',
-    padding: '16px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    textAlign: 'left',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  vehicleInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
-  },
-  vehicleYear: {
-    fontSize: '12px',
-    color: '#4ade80',
-    fontWeight: '600',
-  },
-  vehicleModel: {
-    fontSize: '16px',
+  nameTitle: {
+    fontSize: '32px',
     fontWeight: '700',
     color: '#ffffff',
+    margin: '0 0 8px 0',
+    textShadow: '0 2px 4px rgba(0,0,0,0.5)',
   },
-  vehicleTrim: {
-    fontSize: '12px',
-    color: 'rgba(255,255,255,0.6)',
-  },
-  vehicleDetails: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: '8px',
-  },
-  vehicleColor: {
-    fontSize: '12px',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  vehiclePrice: {
-    fontSize: '16px',
-    fontWeight: '700',
-    color: '#4ade80',
-  },
-  viewButton: {
-    fontSize: '13px',
-    color: '#60a5fa',
+  nameSubtitle: {
+    fontSize: '24px',
     fontWeight: '600',
-    marginTop: '8px',
+    color: 'rgba(255,255,255,0.9)',
+    margin: '0 0 32px 0',
+    textShadow: '0 2px 4px rgba(0,0,0,0.5)',
   },
-  loadingDots: {
-    display: 'flex',
-    gap: '6px',
-    padding: '8px 0',
-  },
-  dot: {
-    fontSize: '12px',
-    color: '#4ade80',
-    animation: 'pulse 1s infinite',
-  },
-  suggestionsContainer: {
-    padding: '20px 0',
-    borderTop: '1px solid rgba(255,255,255,0.1)',
-  },
-  suggestionsLabel: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
-    margin: '0 0 12px 0',
-  },
-  suggestionsGrid: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-  },
-  suggestionButton: {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: '20px',
-    padding: '10px 16px',
+  namePrompt: {
+    fontSize: '20px',
     color: 'rgba(255,255,255,0.8)',
-    fontSize: '13px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    margin: '0 0 20px 0',
   },
-  inputContainer: {
-    display: 'flex',
-    gap: '12px',
-    padding: '20px 0',
-    borderTop: '1px solid rgba(255,255,255,0.1)',
+  nameInputContainer: {
+    position: 'relative',
+    width: '100%',
+    marginBottom: '24px',
   },
-  input: {
-    flex: 1,
-    padding: '16px 20px',
+  nameInput: {
+    width: '100%',
+    padding: '20px 60px 20px 24px',
     background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: '12px',
+    border: '2px solid rgba(255,255,255,0.2)',
+    borderRadius: '16px',
     color: '#ffffff',
-    fontSize: '16px',
-    outline: 'none',
+    fontSize: '24px',
+    fontWeight: '600',
+    textAlign: 'center',
+    transition: 'all 0.2s ease',
+    backdropFilter: 'blur(10px)',
+    boxSizing: 'border-box',
   },
-  sendButton: {
-    width: '56px',
-    height: '56px',
+  nameSubmitButton: {
+    position: 'absolute',
+    right: '12px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: '44px',
+    height: '44px',
     borderRadius: '12px',
     background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
     border: 'none',
@@ -607,25 +587,219 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'center',
     transition: 'all 0.2s ease',
   },
-  startOverContainer: {
+  nameActions: {
     display: 'flex',
-    justifyContent: 'center',
-    paddingTop: '16px',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '24px',
   },
-  startOverButton: {
+  continueButton: {
+    width: '100%',
+    padding: '18px 32px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    borderRadius: '12px',
+    color: '#ffffff',
+    fontSize: '18px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 4px 15px rgba(27, 115, 64, 0.3)',
+  },
+  skipButton: {
+    background: 'transparent',
+    border: 'none',
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    padding: '12px',
+    transition: 'color 0.2s ease',
+  },
+  privacyNote: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.4)',
+    margin: 0,
+  },
+  // Main Welcome Styles
+  heroSection: {
+    textAlign: 'center',
+    marginBottom: '48px',
+    transition: 'all 0.6s ease',
+    position: 'relative',
+    zIndex: 2,
+  },
+  greeting: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    marginBottom: '16px',
+  },
+  aiAvatar: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#ffffff',
+  },
+  heroTitle: {
+    fontSize: '28px',
+    fontWeight: '600',
+    color: '#ffffff',
+    margin: 0,
+    textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+  },
+  highlight: {
+    color: '#4ade80',
+  },
+  heroSubtitle: {
+    fontSize: '48px',
+    fontWeight: '800',
+    color: '#ffffff',
+    margin: '0 0 16px 0',
+    letterSpacing: '-1px',
+    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+  },
+  heroText: {
+    fontSize: '20px',
+    color: 'rgba(255,255,255,0.9)',
+    margin: 0,
+    textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+  },
+  pathsContainer: {
+    display: 'flex',
+    gap: '24px',
+    marginBottom: '40px',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    maxWidth: '1200px',
+    position: 'relative',
+    zIndex: 2,
+  },
+  pathCard: {
+    flex: '1 1 320px',
+    maxWidth: '380px',
+    minHeight: '280px',
+    padding: '32px',
+    borderRadius: '20px',
+    border: '1px solid rgba(255,255,255,0.2)',
+    backdropFilter: 'blur(10px)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    textAlign: 'center',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  pathIcon: {
+    width: '80px',
+    height: '80px',
+    borderRadius: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#ffffff',
+    marginBottom: '20px',
+    transition: 'all 0.3s ease',
+  },
+  pathTitle: {
+    fontSize: '22px',
+    fontWeight: '700',
+    color: '#ffffff',
+    margin: '0 0 4px 0',
+  },
+  pathSubtitle: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#4ade80',
+    margin: '0 0 12px 0',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+  },
+  pathDescription: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)',
+    margin: '0',
+    lineHeight: '1.5',
+    flex: 1,
+  },
+  pathArrow: {
+    marginTop: '20px',
+    color: 'rgba(255,255,255,0.5)',
+    transition: 'transform 0.3s ease',
+  },
+  statsBar: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: '8px',
+    padding: '16px 24px',
+    background: 'rgba(0,0,0,0.7)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    marginBottom: '24px',
+    position: 'relative',
+    zIndex: 2,
+  },
+  statItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  statButton: {
+    background: 'transparent',
+    border: 'none',
     padding: '12px 24px',
-    color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: '600',
+    borderRadius: '12px',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
+  statButtonHover: {
+    background: 'rgba(74, 222, 128, 0.15)',
+    transform: 'scale(1.05)',
+  },
+  statNumber: {
+    fontSize: '32px',
+    fontWeight: '700',
+    color: '#4ade80',
+  },
+  statLabel: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+  },
+  statDivider: {
+    width: '1px',
+    height: '40px',
+    background: 'rgba(255,255,255,0.1)',
+  },
+  browseLink: {
+    background: 'rgba(0,0,0,0.5)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: '16px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    padding: '12px 24px',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
+    position: 'relative',
+    zIndex: 2,
+    backdropFilter: 'blur(5px)',
+  },
 };
 
-export default AIAssistant;
+export default WelcomeScreen;
