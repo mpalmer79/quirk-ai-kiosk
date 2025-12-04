@@ -90,6 +90,9 @@ BODY_CODE_MAP_MEDIUM_DUTY = {
     '543': {'cab': 'Crew Cab', 'bed': 'Chassis Cab'},
 }
 
+# Backward-compatible alias for tests
+BODY_CODE_MAP = BODY_CODE_MAP_LIGHT_DUTY
+
 
 def parse_model_code(model_str: str) -> dict:
     """
