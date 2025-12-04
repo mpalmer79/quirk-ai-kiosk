@@ -1,5 +1,6 @@
 // Vehicle & Inventory Types
 export interface Vehicle {
+  id?: string | number;
   stock_number?: string;
   stockNumber?: string;
   vin?: string;
@@ -21,6 +22,7 @@ export interface Vehicle {
   drivetrain?: string;
   fuel_type?: string;
   fuelType?: string;
+  fuelEconomy?: string;
   mpg_city?: number;
   mpg_highway?: number;
   body_style?: string;
@@ -31,9 +33,14 @@ export interface Vehicle {
   images?: string[];
   features?: string[];
   description?: string;
-  status?: 'available' | 'sold' | 'pending' | 'hold';
+  status?: string;
   cab_type?: string;
   cabType?: string;
+  gradient?: string;
+  monthlyLease?: number;
+  monthlyFinance?: number;
+  savings?: number;
+  rebates?: Array<{ name: string; amount: number }>;
 }
 
 // GM Color Types
