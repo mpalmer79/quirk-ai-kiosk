@@ -127,6 +127,18 @@ interface TrafficStats {
   topVehiclesViewed: Array<{ stockNumber: string; views: number }>;
 }
 
+interface AIChatRequest {
+  message: string;
+  inventoryContext: string;
+  conversationHistory: Array<{ role: string; content: string }>;
+  customerName?: string;
+}
+
+interface AIChatResponse {
+  message: string;
+  suggestedVehicles?: string[];
+}
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
@@ -432,6 +444,20 @@ export const getTrafficSession = async (sessionId: string): Promise<TrafficLogEn
 };
 
 // ============================================
+// AI ASSISTANT ENDPOINTS
+// ============================================
+
+/**
+ * Chat with AI assistant for vehicle recommendations
+ */
+export const chatWithAI = async (request: AIChatRequest): Promise<AIChatResponse> => {
+  return apiRequest<AIChatResponse>('/v1/ai/chat', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+};
+
+// ============================================
 // EXPORT DEFAULT API OBJECT
 // ============================================
 
@@ -473,6 +499,9 @@ const api = {
   getTrafficLog,
   getTrafficStats,
   getTrafficSession,
+  
+  // AI Assistant
+  chatWithAI,
 };
 
 export default api;
