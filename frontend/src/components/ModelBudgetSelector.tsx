@@ -21,6 +21,13 @@ interface ColorChoices {
 // Inventory count by model name
 type InventoryByModel = Record<string, number>;
 
+// Currency formatter
+const formatCurrency = (value: string): string => {
+  const num = parseFloat(value.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return '';
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 const ModelBudgetSelector: React.FC<KioskComponentProps> = ({ 
   navigateTo, 
   updateCustomerData, 
@@ -38,6 +45,8 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const [hasTrade, setHasTrade] = useState<boolean | null>(null);
   const [hasPayoff, setHasPayoff] = useState<boolean | null>(null);
   const [payoffAmount, setPayoffAmount] = useState<string>('');
+  const [monthlyPayment, setMonthlyPayment] = useState<string>('');
+  const [financedWith, setFinancedWith] = useState<string>('');
   const [inventoryCount, setInventoryCount] = useState<number | null>(null);
   const [inventoryByModel, setInventoryByModel] = useState<InventoryByModel>({});
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
@@ -135,6 +144,24 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     setColorChoices(prev => ({ ...prev, [choice]: value }));
   };
 
+  // Handle currency input for payoff amount
+  const handlePayoffAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+    setPayoffAmount(rawValue);
+  };
+
+  // Handle currency input for monthly payment
+  const handleMonthlyPaymentChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+    setMonthlyPayment(rawValue);
+  };
+
+  // Handle financed with input (max 25 chars)
+  const handleFinancedWithChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const value = e.target.value.slice(0, 25);
+    setFinancedWith(value);
+  };
+
   const handleSearch = (): void => {
     updateCustomerData({
       selectedModel: selectedModel?.name,
@@ -145,6 +172,8 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
       hasTrade,
       hasPayoff,
       payoffAmount: hasPayoff ? parseFloat(payoffAmount) : null,
+      monthlyPayment: hasPayoff ? parseFloat(monthlyPayment) : null,
+      financedWith: hasPayoff ? financedWith : null,
       path: 'modelBudget',
     });
     navigateTo('inventory');
@@ -212,11 +241,9 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
 
   // Step 2: Model Selection
   const renderModelSelection = (): JSX.Element | null => {
-    const category = selectedCategory ? VEHICLE_CATEGORIES[selectedCategory] : null;
-    if (!category) {
-      setStep(1);
-      return null;
-    }
+    if (!selectedCategory || !VEHICLE_CATEGORIES[selectedCategory]) return null;
+    const category = VEHICLE_CATEGORIES[selectedCategory];
+    
     return (
       <div style={styles.stepContainer}>
         <button style={styles.backButton} onClick={handleBack}>
@@ -228,15 +255,15 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
         <div style={styles.stepHeader}>
           <span style={styles.categoryBadge}>{category.icon} {category.name}</span>
           <h1 style={styles.stepTitle}>Which model interests you?</h1>
-          <p style={styles.stepSubtitle}>Select a model to see available options</p>
+          <p style={styles.stepSubtitle}>Select a model to continue</p>
         </div>
         <div style={styles.modelGrid}>
-          {category.models.map((model) => (
+          {category.models.map((model: AvailableModel) => (
             <button key={model.name} style={styles.modelCard} onClick={() => handleModelSelect(model)}>
               <div style={styles.modelInitial}>{model.name.charAt(0)}</div>
               <span style={styles.modelName}>{model.name}</span>
               <span style={styles.modelCount}>{model.count} in stock</span>
-              {model.cabOptions && <span style={styles.modelConfig}>{model.cabOptions.length} configurations</span>}
+              {model.cabOptions && <span style={styles.modelConfig}>Multiple configurations</span>}
             </button>
           ))}
         </div>
@@ -244,9 +271,21 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     );
   };
 
-  // Step 3: Cab Selection
+  // Step 3: Cab Selection (only for trucks)
   const renderCabSelection = (): JSX.Element | null => {
     if (!selectedModel?.cabOptions) return null;
+    
+    const cabIcons: Record<string, string> = {
+      'Regular Cab': '🚛',
+      'Double Cab': '🚙',
+      'Crew Cab': '🚐',
+    };
+    
+    const cabDescriptions: Record<string, string> = {
+      'Regular Cab': '2 doors, single row seating',
+      'Double Cab': '4 doors, smaller rear seats',
+      'Crew Cab': '4 doors, full-size rear seats',
+    };
     
     return (
       <div style={styles.stepContainer}>
@@ -258,25 +297,15 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
         </button>
         <div style={styles.stepHeader}>
           <span style={styles.modelBadge}>{selectedModel.name}</span>
-          <h1 style={styles.stepTitle}>What cab configuration?</h1>
-          <p style={styles.stepSubtitle}>Select the cab style that fits your needs</p>
+          <h1 style={styles.stepTitle}>Choose your cab style</h1>
+          <p style={styles.stepSubtitle}>Select the configuration that fits your needs</p>
         </div>
         <div style={styles.cabGrid}>
-          {selectedModel.cabOptions.map((cab) => (
+          {selectedModel.cabOptions.map((cab: string) => (
             <button key={cab} style={styles.cabCard} onClick={() => handleCabSelect(cab)}>
-              <div style={styles.cabIcon}>
-                {cab.includes('Regular') && '🚗'}
-                {cab.includes('Double') && '🚙'}
-                {cab.includes('Crew') && '🛻'}
-                {cab.includes('Extended') && '🚙'}
-              </div>
+              <span style={styles.cabIcon}>{cabIcons[cab] || '🚗'}</span>
               <span style={styles.cabName}>{cab}</span>
-              <span style={styles.cabDesc}>
-                {cab.includes('Regular') && '2-door, 3 passengers'}
-                {cab.includes('Double') && '4-door, 5-6 passengers'}
-                {cab.includes('Crew') && '4-door, 5-6 passengers, most room'}
-                {cab.includes('Extended') && '4-door, 5 passengers'}
-              </span>
+              <span style={styles.cabDesc}>{cabDescriptions[cab] || ''}</span>
             </button>
           ))}
         </div>
@@ -287,10 +316,12 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   // Step 4: Color Selection
   const renderColorSelection = (): JSX.Element | null => {
     if (!selectedModel) return null;
-    
     const colors = getModelColors();
-    const availableForSecond = colors.filter(c => c.name !== colorChoices.first);
-
+    
+    const getSelectedColor = (colorName: string): GMColor | undefined => {
+      return colors.find(c => c.name === colorName);
+    };
+    
     return (
       <div style={styles.stepContainer}>
         <button style={styles.backButton} onClick={handleBack}>
@@ -301,60 +332,55 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
         </button>
         <div style={styles.stepHeader}>
           <span style={styles.modelBadge}>{selectedModel.name} {selectedCab && `• ${selectedCab}`}</span>
-          <h1 style={styles.stepTitle}>🎨 Color Preferences</h1>
-          <p style={styles.stepSubtitle}>
-            {inventoryCount !== null && `We have ${inventoryCount} ${selectedModel.name} vehicles in stock`}
-          </p>
+          <h1 style={styles.stepTitle}>🎨 Pick Your Colors</h1>
+          <p style={styles.stepSubtitle}>Choose your preferred exterior colors</p>
         </div>
         <div style={styles.formSection}>
-          <p style={styles.formIntro}>Select up to 2 GM colors for {selectedModel.name} in order of preference:</p>
+          <p style={styles.formIntro}>
+            We'll prioritize showing you {selectedModel.name}s in these colors (when available).
+          </p>
           <div style={styles.colorSelects}>
             <div style={styles.colorSelectGroup}>
               <label style={styles.inputLabel}>First Choice</label>
               <select 
-                style={styles.selectInput} 
-                value={colorChoices.first} 
+                style={styles.selectInput}
+                value={colorChoices.first}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) => handleColorChange('first', e.target.value)}
               >
-                <option value="">Select a color...</option>
-                {colors.map((color) => (
-                  <option key={color.code} value={color.name}>
-                    {color.name} {color.premium && `(+$${color.price})`}
-                  </option>
+                <option value="">Any color is fine</option>
+                {colors.map((color: GMColor) => (
+                  <option key={color.name} value={color.name}>{color.name}</option>
                 ))}
               </select>
               {colorChoices.first && (
                 <div style={styles.colorPreview}>
-                  <div style={{...styles.colorSwatch, backgroundColor: colors.find(c => c.name === colorChoices.first)?.hex || '#666'}} />
-                  <span>{colorChoices.first}</span>
+                  <div style={{ ...styles.colorSwatch, background: getSelectedColor(colorChoices.first)?.hex || '#666' }} />
+                  {getSelectedColor(colorChoices.first)?.name}
                 </div>
               )}
             </div>
             <div style={styles.colorSelectGroup}>
-              <label style={styles.inputLabel}>Second Choice</label>
+              <label style={styles.inputLabel}>Second Choice (Optional)</label>
               <select 
-                style={{...styles.selectInput, opacity: colorChoices.first ? 1 : 0.5}} 
-                value={colorChoices.second} 
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleColorChange('second', e.target.value)} 
-                disabled={!colorChoices.first}
+                style={styles.selectInput}
+                value={colorChoices.second}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleColorChange('second', e.target.value)}
               >
-                <option value="">Select a color...</option>
-                {availableForSecond.map((color) => (
-                  <option key={color.code} value={color.name}>
-                    {color.name} {color.premium && `(+$${color.price})`}
-                  </option>
+                <option value="">No second choice</option>
+                {colors.filter((c: GMColor) => c.name !== colorChoices.first).map((color: GMColor) => (
+                  <option key={color.name} value={color.name}>{color.name}</option>
                 ))}
               </select>
               {colorChoices.second && (
                 <div style={styles.colorPreview}>
-                  <div style={{...styles.colorSwatch, backgroundColor: colors.find(c => c.name === colorChoices.second)?.hex || '#666'}} />
-                  <span>{colorChoices.second}</span>
+                  <div style={{ ...styles.colorSwatch, background: getSelectedColor(colorChoices.second)?.hex || '#666' }} />
+                  {getSelectedColor(colorChoices.second)?.name}
                 </div>
               )}
             </div>
           </div>
           <button style={styles.continueButton} onClick={() => setStep(5)}>
-            Continue to Budget
+            Continue
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M5 12h14M12 5l7 7-7 7"/>
             </svg>
@@ -364,28 +390,18 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     );
   };
 
-  // Step 5: Budget Selection with Buying Power Calculation
+  // Step 5: Budget Selection
   const renderBudgetSelection = (): JSX.Element | null => {
     if (!selectedModel) return null;
-    
+
+    // Payment calculation variables
     const APR = 0.07;
+    const term = 72;
     const monthlyRate = APR / 12;
-    
-    const calculateLoanAmount = (payment: number, months: number): number => {
-      if (monthlyRate === 0) return payment * months;
-      return payment * ((1 - Math.pow(1 + monthlyRate, -months)) / monthlyRate);
-    };
-    
-    const estimatedLoan = calculateLoanAmount(budgetRange.max, 84);
-    const term = estimatedLoan > 20000 ? 84 : 72;
-    const loanAmount = calculateLoanAmount(budgetRange.max, term);
-    
-    // Calculate total buying power based on down payment percentage
-    const downPaymentFraction = downPaymentPercent / 100;
-    const totalBuyingPower = downPaymentPercent === 0 
-      ? loanAmount 
-      : loanAmount / (1 - downPaymentFraction);
-    const downPaymentAmount = totalBuyingPower * downPaymentFraction;
+    const factor = (Math.pow(1 + monthlyRate, term) - 1) / (monthlyRate * Math.pow(1 + monthlyRate, term));
+    const loanAmount = budgetRange.max * factor;
+    const downPaymentAmount = downPaymentPercent > 0 ? (loanAmount / (1 - downPaymentPercent / 100)) * (downPaymentPercent / 100) : 0;
+    const totalBuyingPower = loanAmount + downPaymentAmount;
     
     return (
       <div style={styles.stepContainer}>
@@ -398,17 +414,17 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
         <div style={styles.stepHeader}>
           <span style={styles.modelBadge}>{selectedModel.name} {selectedCab && `• ${selectedCab}`}</span>
           <h1 style={styles.stepTitle}>💰 Monthly Budget</h1>
-          <p style={styles.stepSubtitle}>What monthly payment range works for you?</p>
+          <p style={styles.stepSubtitle}>What monthly payment works for you?</p>
         </div>
         <div style={styles.formSection}>
           <div style={styles.budgetDisplay}>
-            <span style={styles.budgetValue}>${budgetRange.min.toLocaleString()}</span>
+            <span style={styles.budgetValue}>${budgetRange.min}</span>
             <span style={styles.budgetSeparator}>to</span>
-            <span style={styles.budgetValue}>${budgetRange.max.toLocaleString()}</span>
+            <span style={styles.budgetValue}>${budgetRange.max}</span>
             <span style={styles.budgetLabel}>/month</span>
           </div>
           <div style={styles.sliderGroup}>
-            <label style={styles.sliderLabel}>Target Budget: ${budgetRange.min.toLocaleString()}/mo</label>
+            <label style={styles.sliderLabel}>Minimum: ${budgetRange.min}/mo</label>
             <input 
               type="range" 
               min="200" 
@@ -423,7 +439,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
             />
           </div>
           <div style={styles.sliderGroup}>
-            <label style={styles.sliderLabel}>Maximum: ${budgetRange.max.toLocaleString()}/mo</label>
+            <label style={styles.sliderLabel}>Maximum: ${budgetRange.max}/mo</label>
             <input 
               type="range" 
               min="300" 
@@ -568,17 +584,50 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                 </button>
               </div>
               {hasPayoff === true && (
-                <div style={styles.payoffAmountGroup}>
-                  <label style={styles.inputLabel}>Approximate Payoff Amount</label>
-                  <div style={styles.inputWrapper}>
-                    <span style={styles.inputPrefix}>$</span>
-                    <input
-                      type="number"
-                      style={styles.textInput}
-                      placeholder="Enter amount"
-                      value={payoffAmount}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => setPayoffAmount(e.target.value)}
-                    />
+                <div style={styles.payoffFieldsGrid}>
+                  {/* Approximate Payoff Amount */}
+                  <div style={styles.payoffFieldGroup}>
+                    <label style={styles.inputLabel}>Approximate Payoff Amount</label>
+                    <div style={styles.inputWrapper}>
+                      <span style={styles.inputPrefix}>$</span>
+                      <input
+                        type="text"
+                        style={styles.textInput}
+                        placeholder="18000"
+                        value={payoffAmount ? formatCurrency(payoffAmount) : ''}
+                        onChange={handlePayoffAmountChange}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Monthly Payment - Center aligned */}
+                  <div style={{...styles.payoffFieldGroup, ...styles.payoffFieldCenter}}>
+                    <label style={styles.inputLabel}>Monthly Payment</label>
+                    <div style={styles.inputWrapper}>
+                      <span style={styles.inputPrefix}>$</span>
+                      <input
+                        type="text"
+                        style={styles.textInput}
+                        placeholder="450"
+                        value={monthlyPayment ? formatCurrency(monthlyPayment) : ''}
+                        onChange={handleMonthlyPaymentChange}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Financed With */}
+                  <div style={styles.payoffFieldGroup}>
+                    <label style={styles.inputLabel}>Financed With</label>
+                    <div style={styles.inputWrapper}>
+                      <input
+                        type="text"
+                        style={styles.textInputFull}
+                        placeholder="Bank or lender name"
+                        value={financedWith}
+                        onChange={handleFinancedWithChange}
+                        maxLength={25}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
