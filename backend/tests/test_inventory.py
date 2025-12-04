@@ -1,6 +1,8 @@
 """
 Tests for Inventory Router functions
 Tests the actual functions in app/routers/inventory.py
+
+Note: Tests focus on function behavior, not internal data structures.
 """
 import pytest
 from app.routers.inventory import (
@@ -12,48 +14,162 @@ from app.routers.inventory import (
     get_transmission,
     parse_drivetrain,
     get_features,
-    BODY_CODE_MAP,
     VEHICLE_IMAGES,
 )
 
 
 class TestParseModelCode:
-    """Test GM model code parsing"""
+    """
+    Test GM model code parsing.
+    
+    GM Model Code Format: [Drive][Series][Body]
+    - Drive: CC = 2WD, CK = 4WD
+    - Series: 10 = 1500, 20 = 2500, 30 = 3500, 54/55/56 = Medium Duty
+    - Body: 3-digit code for cab/bed configuration
+    """
+
+    # ==========================================================================
+    # Light-Duty Trucks (1500/2500/3500 Series)
+    # ==========================================================================
 
     def test_crew_cab_short_bed_4wd(self):
+        """CK10543: 4WD 1500 series, Crew Cab Short Bed"""
         result = parse_model_code('CK10543')
         assert result['cab'] == 'Crew Cab'
         assert result['bed'] == 'Short Bed'
         assert result['drive'] == '4WD'
 
+    def test_crew_cab_standard_bed_4wd(self):
+        """CK10743: 4WD 1500 series, Crew Cab Standard Bed"""
+        result = parse_model_code('CK10743')
+        assert result['cab'] == 'Crew Cab'
+        assert result['bed'] == 'Standard Bed'
+        assert result['drive'] == '4WD'
+
+    def test_crew_cab_long_bed_4wd(self):
+        """CK20943: 4WD 2500 series, Crew Cab Long Bed"""
+        result = parse_model_code('CK20943')
+        assert result['cab'] == 'Crew Cab'
+        assert result['bed'] == 'Long Bed'
+        assert result['drive'] == '4WD'
+
     def test_double_cab_standard_bed_2wd(self):
+        """CC10753: 2WD 1500 series, Double Cab Standard Bed"""
         result = parse_model_code('CC10753')
         assert result['cab'] == 'Double Cab'
         assert result['bed'] == 'Standard Bed'
         assert result['drive'] == '2WD'
 
-    def test_regular_cab_long_bed(self):
+    def test_double_cab_long_bed_4wd(self):
+        """CK30953: 4WD 3500 series, Double Cab Long Bed"""
+        result = parse_model_code('CK30953')
+        assert result['cab'] == 'Double Cab'
+        assert result['bed'] == 'Long Bed'
+        assert result['drive'] == '4WD'
+
+    def test_regular_cab_standard_bed_2wd(self):
+        """CC10703: 2WD 1500 series, Regular Cab Standard Bed"""
+        result = parse_model_code('CC10703')
+        assert result['cab'] == 'Regular Cab'
+        assert result['bed'] == 'Standard Bed'
+        assert result['drive'] == '2WD'
+
+    def test_regular_cab_long_bed_4wd(self):
+        """CK20903: 4WD 2500 series, Regular Cab Long Bed"""
         result = parse_model_code('CK20903')
         assert result['cab'] == 'Regular Cab'
         assert result['bed'] == 'Long Bed'
         assert result['drive'] == '4WD'
 
+    # ==========================================================================
+    # Medium-Duty Trucks (4500/5500/6500 Series)
+    # ==========================================================================
+
+    def test_medium_duty_regular_cab_2wd(self):
+        """CC56403: 2WD Medium Duty (5500/6500), Regular Cab Chassis"""
+        result = parse_model_code('CC56403')
+        assert result['cab'] == 'Regular Cab'
+        assert result['bed'] == 'Chassis Cab'
+        assert result['drive'] == '2WD'
+
+    def test_medium_duty_regular_cab_4wd(self):
+        """CK56403: 4WD Medium Duty, Regular Cab Chassis"""
+        result = parse_model_code('CK56403')
+        assert result['cab'] == 'Regular Cab'
+        assert result['bed'] == 'Chassis Cab'
+        assert result['drive'] == '4WD'
+
+    def test_medium_duty_crew_cab_2wd(self):
+        """CC56443: 2WD Medium Duty, Crew Cab Chassis"""
+        result = parse_model_code('CC56443')
+        assert result['cab'] == 'Crew Cab'
+        assert result['bed'] == 'Chassis Cab'
+        assert result['drive'] == '2WD'
+
+    def test_medium_duty_crew_cab_4wd(self):
+        """CK54543: 4WD Medium Duty (4500), Crew Cab Chassis"""
+        result = parse_model_code('CK54543')
+        assert result['cab'] == 'Crew Cab'
+        assert result['bed'] == 'Chassis Cab'
+        assert result['drive'] == '4WD'
+
+    # ==========================================================================
+    # Drive Type Tests (CC = 2WD, CK = 4WD)
+    # ==========================================================================
+
+    def test_cc_prefix_is_2wd(self):
+        """CC prefix should always return 2WD"""
+        result = parse_model_code('CC10543')
+        assert result['drive'] == '2WD'
+
+    def test_ck_prefix_is_4wd(self):
+        """CK prefix should always return 4WD"""
+        result = parse_model_code('CK10543')
+        assert result['drive'] == '4WD'
+
+    # ==========================================================================
+    # Edge Cases & Invalid Inputs
+    # ==========================================================================
+
     def test_empty_string_returns_none(self):
+        """Empty string should return all None values"""
         result = parse_model_code('')
         assert result['cab'] is None
         assert result['bed'] is None
         assert result['drive'] is None
 
     def test_none_input_returns_none(self):
+        """None input should return all None values"""
         result = parse_model_code(None)
         assert result['cab'] is None
         assert result['bed'] is None
         assert result['drive'] is None
 
     def test_non_gm_model_returns_none(self):
+        """Non-GM model codes should return None for cab/bed"""
         result = parse_model_code('F-150 XLT')
         assert result['cab'] is None
         assert result['bed'] is None
+        assert result['drive'] is None
+
+    def test_invalid_body_code_returns_none_for_cab(self):
+        """Valid prefix but invalid body code should return None for cab/bed"""
+        result = parse_model_code('CK10999')  # 999 is not a valid body code
+        assert result['drive'] == '4WD'  # Drive should still be parsed
+        assert result['cab'] is None
+        assert result['bed'] is None
+
+    def test_lowercase_input_is_handled(self):
+        """Lowercase input should be handled correctly"""
+        result = parse_model_code('ck10543')
+        assert result['cab'] == 'Crew Cab'
+        assert result['drive'] == '4WD'
+
+    def test_whitespace_is_trimmed(self):
+        """Whitespace should be trimmed"""
+        result = parse_model_code('  CK10543  ')
+        assert result['cab'] == 'Crew Cab'
+        assert result['drive'] == '4WD'
 
 
 class TestGetImageUrl:
@@ -225,23 +341,61 @@ class TestGetFeatures:
         assert 'DC Fast Charging' in features
 
 
-class TestBodyCodeMap:
-    """Test body code mapping completeness"""
+class TestParseModelCodeBehavior:
+    """
+    Test parse_model_code behavior comprehensively.
+    
+    These tests verify the function produces valid outputs for all supported
+    configurations without testing internal data structures.
+    """
 
-    def test_all_codes_have_cab_and_bed(self):
-        for code, config in BODY_CODE_MAP.items():
-            assert 'cab' in config
-            assert 'bed' in config
+    def test_all_light_duty_cab_types_supported(self):
+        """Verify all light-duty cab types can be parsed"""
+        # Regular Cab
+        result = parse_model_code('CK10703')
+        assert result['cab'] == 'Regular Cab'
+        
+        # Double Cab
+        result = parse_model_code('CK10753')
+        assert result['cab'] == 'Double Cab'
+        
+        # Crew Cab
+        result = parse_model_code('CK10543')
+        assert result['cab'] == 'Crew Cab'
 
-    def test_valid_cab_types(self):
-        valid_cabs = {'Regular Cab', 'Double Cab', 'Crew Cab'}
-        for code, config in BODY_CODE_MAP.items():
-            assert config['cab'] in valid_cabs
+    def test_all_light_duty_bed_types_supported(self):
+        """Verify all light-duty bed lengths can be parsed"""
+        # Short Bed (Crew Cab only)
+        result = parse_model_code('CK10543')
+        assert result['bed'] == 'Short Bed'
+        
+        # Standard Bed
+        result = parse_model_code('CK10703')
+        assert result['bed'] == 'Standard Bed'
+        
+        # Long Bed
+        result = parse_model_code('CK10903')
+        assert result['bed'] == 'Long Bed'
 
-    def test_valid_bed_types(self):
-        valid_beds = {'Short Bed', 'Standard Bed', 'Long Bed'}
-        for code, config in BODY_CODE_MAP.items():
-            assert config['bed'] in valid_beds
+    def test_medium_duty_chassis_cab_supported(self):
+        """Verify medium-duty chassis cab configurations are supported"""
+        result = parse_model_code('CC56403')
+        assert result['cab'] == 'Regular Cab'
+        assert result['bed'] == 'Chassis Cab'
+
+    def test_all_series_supported(self):
+        """Verify 1500, 2500, 3500 series are all supported"""
+        # 1500 series
+        result = parse_model_code('CK10543')
+        assert result['cab'] is not None
+        
+        # 2500 series
+        result = parse_model_code('CK20543')
+        assert result['cab'] is not None
+        
+        # 3500 series
+        result = parse_model_code('CK30543')
+        assert result['cab'] is not None
 
 
 class TestVehicleImages:
