@@ -516,7 +516,7 @@ const KioskApp: React.FC = () => {
 
 const styles: Record<string, CSSProperties> = {
   container: {
-    minHeight: '100vh',
+    height: '100vh',
     display: 'flex',
     flexDirection: 'column',
     background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0f0f0f 100%)',
@@ -602,7 +602,9 @@ const styles: Record<string, CSSProperties> = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'auto',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    minHeight: 0,
     transition: 'opacity 0.15s ease, transform 0.15s ease',
   },
   footer: {
