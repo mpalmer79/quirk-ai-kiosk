@@ -4,21 +4,13 @@ import GM_COLORS from '../types/gmColors';
 import { BASE_CATEGORIES, modelMatches } from '../types/vehicleCategories';
 import styles from './modelBudgetSelectorStyles';
 import type { 
-  CustomerData, 
   BudgetRange, 
   Vehicle, 
   VehicleCategories, 
   AvailableModel,
-  GMColor 
+  GMColor,
+  KioskComponentProps
 } from '../types';
-
-// Component Props Interface
-interface ModelBudgetSelectorProps {
-  navigateTo: (screen: string) => void;
-  updateCustomerData: (data: Partial<CustomerData>) => void;
-  customerData: CustomerData;
-  resetJourney?: () => void;
-}
 
 // Color choices state interface
 interface ColorChoices {
@@ -29,7 +21,7 @@ interface ColorChoices {
 // Inventory count by model name
 type InventoryByModel = Record<string, number>;
 
-const ModelBudgetSelector: React.FC<ModelBudgetSelectorProps> = ({ 
+const ModelBudgetSelector: React.FC<KioskComponentProps> = ({ 
   navigateTo, 
   updateCustomerData, 
   customerData,
