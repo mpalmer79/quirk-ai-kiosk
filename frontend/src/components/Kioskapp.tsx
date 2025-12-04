@@ -13,6 +13,7 @@ import CustomerHandoff from './Customerhandoff';
 import ProtectionPackages from './Protectionpackages';
 import TrafficLog from './Trafficlog';
 import AIAssistant from './AIAssistant';
+import SalesManagerDashboard from './SalesManagerDashboard';
 import ErrorBoundary from './Errorboundary';
 import api from './api';
 
@@ -31,7 +32,8 @@ type ScreenName =
   | 'tradeIn'
   | 'handoff'
   | 'protectionPackages'
-  | 'trafficLog';
+  | 'trafficLog'
+  | 'salesDashboard';
 
 // Screen error boundary props
 interface ScreenErrorBoundaryProps {
@@ -283,7 +285,7 @@ const KioskApp: React.FC = () => {
     let timeout: ReturnType<typeof setTimeout>;
     const resetTimer = (): void => {
       clearTimeout(timeout);
-      if (currentScreen !== 'welcome' && currentScreen !== 'trafficLog') {
+      if (currentScreen !== 'welcome' && currentScreen !== 'trafficLog' && currentScreen !== 'salesDashboard') {
         timeout = setTimeout(() => {
           resetJourney();
         }, 180000); // 3 minutes
@@ -303,7 +305,7 @@ const KioskApp: React.FC = () => {
   // Traffic logging - log session on key customer data changes
   useEffect(() => {
     // Skip logging for admin screens
-    if (currentScreen === 'trafficLog') return;
+    if (currentScreen === 'trafficLog' || currentScreen === 'salesDashboard') return;
     
     // Only log if we have some meaningful data
     const hasData = customerData.customerName || 
@@ -397,6 +399,7 @@ const KioskApp: React.FC = () => {
     handoff: CustomerHandoff,
     protectionPackages: ProtectionPackages,
     trafficLog: TrafficLog,
+    salesDashboard: SalesManagerDashboard,
   };
 
   const CurrentScreenComponent = screens[currentScreen] || WelcomeScreen;
@@ -404,6 +407,7 @@ const KioskApp: React.FC = () => {
   // Check if we can go back (not on welcome and have history)
   const canGoBack = currentScreen !== 'welcome' && 
                     currentScreen !== 'trafficLog' && 
+                    currentScreen !== 'salesDashboard' &&
                     navigationHistoryRef.current.length > 1;
 
   // Props passed to all screen components
@@ -420,7 +424,7 @@ const KioskApp: React.FC = () => {
       <header style={styles.header}>
         {/* Left spacer for centering */}
         <div style={styles.headerLeft}>
-          {currentScreen !== 'welcome' && currentScreen !== 'trafficLog' && canGoBack && (
+          {currentScreen !== 'welcome' && currentScreen !== 'trafficLog' && currentScreen !== 'salesDashboard' && canGoBack && (
             <button style={styles.backButton} onClick={goBack}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M19 12H5M12 19l-7-7 7-7"/>
@@ -441,12 +445,20 @@ const KioskApp: React.FC = () => {
         {/* Right side */}
         <div style={styles.headerRight}>
           {currentScreen === 'welcome' && (
-            <button 
-              style={styles.adminLink} 
-              onClick={() => navigateTo('trafficLog')}
-            >
-              Admin
-            </button>
+            <>
+              <button 
+                style={styles.salesDeskLink} 
+                onClick={() => navigateTo('salesDashboard')}
+              >
+                Sales Desk
+              </button>
+              <button 
+                style={styles.adminLink} 
+                onClick={() => navigateTo('trafficLog')}
+              >
+                Admin
+              </button>
+            </>
           )}
         </div>
       </header>
@@ -586,6 +598,17 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  salesDeskLink: {
+    background: 'rgba(27, 115, 64, 0.2)',
+    border: '1px solid rgba(27, 115, 64, 0.4)',
+    color: '#4ade80',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: '8px 14px',
+    borderRadius: '6px',
     transition: 'all 0.2s ease',
   },
   adminLink: {
