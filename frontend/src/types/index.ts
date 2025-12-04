@@ -92,6 +92,14 @@ export interface BudgetRange {
 
 export type SortOption = 'recommended' | 'price-low' | 'price-high' | 'newest' | 'mileage';
 
+// Trade-in vehicle info (Year/Make/Model/Mileage)
+export interface TradeVehicleInfo {
+  year: string;
+  make: string;
+  model: string;
+  mileage: number | null;
+}
+
 export interface CustomerData {
   customerName?: string;
   selectedModel?: string;
@@ -103,6 +111,9 @@ export interface CustomerData {
   hasTrade?: boolean | null;
   hasPayoff?: boolean | null;
   payoffAmount?: number | null;
+  monthlyPayment?: number | null;
+  financedWith?: string | null;
+  tradeVehicle?: TradeVehicleInfo | null;
   path?: 'modelBudget' | 'stockLookup' | 'inventory' | 'browse' | 'aiChat' | 'aiAssistant';
   selectedVehicle?: Vehicle;
   protectionPackages?: Array<string | { id: string; name: string; price: number }>;
