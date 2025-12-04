@@ -388,6 +388,17 @@ const styles: Record<string, CSSProperties> = {
   payoffAmountGroup: {
     marginTop: '16px',
   },
+  payoffFieldsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '16px',
+    marginTop: '16px',
+  },
+  payoffFieldGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
   inputWrapper: {
     display: 'flex',
     alignItems: 'center',
@@ -413,6 +424,17 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '16px',
     outline: 'none',
     minWidth: 0,
+  },
+  textInputFull: {
+    flex: 1,
+    padding: '14px 16px',
+    background: 'transparent',
+    border: 'none',
+    color: '#ffffff',
+    fontSize: '16px',
+    outline: 'none',
+    minWidth: 0,
+    width: '100%',
   },
   searchButton: {
     display: 'flex',
