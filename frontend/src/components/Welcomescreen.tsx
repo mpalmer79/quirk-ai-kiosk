@@ -19,7 +19,7 @@ interface InventoryStats {
 
 // Path configuration
 interface PathConfig {
-  id: 'stockLookup' | 'modelBudget' | 'guidedQuiz' | 'aiAssistant';
+  id: 'stockLookup' | 'modelBudget' | 'aiAssistant';
   icon: JSX.Element;
   title: string;
   subtitle: string;
@@ -83,12 +83,11 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     setNameSubmitted(true);
   };
 
-  const handlePathSelect = (path: 'stockLookup' | 'modelBudget' | 'guidedQuiz' | 'aiAssistant'): void => {
+  const handlePathSelect = (path: 'stockLookup' | 'modelBudget' | 'aiAssistant'): void => {
     updateCustomerData({ path });
     const routes: Record<string, string> = {
       stockLookup: 'stockLookup',
       modelBudget: 'modelBudget',
-      guidedQuiz: 'guidedQuiz',
       aiAssistant: 'aiAssistant',
     };
     navigateTo(routes[path]);
@@ -159,24 +158,10 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
           <circle cx="16" cy="10" r="1" fill="currentColor"/>
         </svg>
       ),
-      title: 'Chat with AI',
+      title: 'Chat with Quirk AI',
       subtitle: "LET'S HAVE A CONVERSATION",
       description: "Let's walk through this together and find the right vehicle that fits what you're looking for.",
       gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-    },
-    {
-      id: 'guidedQuiz',
-      icon: (
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-          <path d="M12 17h.01"/>
-        </svg>
-      ),
-      title: 'Help Me Decide',
-      subtitle: 'Take our 10-question quiz',
-      description: 'Answer a few questions and we\'ll recommend the perfect vehicle for your lifestyle.',
-      gradient: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
     },
   ];
 
