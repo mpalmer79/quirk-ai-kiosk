@@ -59,6 +59,76 @@ const defaultVehicle: DetailedVehicle = {
   ],
 };
 
+// GM Truck VIN Decoder - extracts cab type and drive type for Silverado models
+interface TruckVINInfo {
+  cabType: string;
+  driveType: string;
+}
+
+const decodeGMTruckVIN = (vin: string, model: string): TruckVINInfo | null => {
+  if (!vin || vin.length !== 17) return null;
+  
+  // Only decode for Silverado models
+  const modelLower = (model || '').toLowerCase();
+  if (!modelLower.includes('silverado')) return null;
+  
+  const vinUpper = vin.toUpperCase();
+  
+  // GM Silverado VIN Structure (2019+):
+  // Position 6 (index 5) - Cab type
+  // Position 7 (index 6) - Drive type
+  const cabCode = vinUpper[5];
+  const driveCode = vinUpper[6];
+  
+  // Cab type mapping for Silverado
+  let cabType = '';
+  switch (cabCode) {
+    case 'A':
+    case 'B':
+      cabType = 'Regular Cab';
+      break;
+    case 'C':
+    case 'D':
+      cabType = 'Double Cab';
+      break;
+    case 'K':
+    case 'U':
+    case 'G':
+      cabType = 'Crew Cab';
+      break;
+    default:
+      // Try to infer from other positions or leave empty
+      cabType = '';
+  }
+  
+  // Drive type mapping for GM trucks
+  // Position 7 encodes drivetrain info
+  let driveType = '';
+  switch (driveCode) {
+    case 'E':
+    case 'K':
+    case 'G':
+    case 'J':
+      driveType = '4WD';
+      break;
+    case 'A':
+    case 'D':
+    case 'C':
+    case 'B':
+      driveType = '2WD';
+      break;
+    default:
+      driveType = '';
+  }
+  
+  // Only return if we decoded at least one piece of info
+  if (cabType || driveType) {
+    return { cabType, driveType };
+  }
+  
+  return null;
+};
+
 const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
   const [vehicleRequested, setVehicleRequested] = useState<boolean>(false);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
@@ -75,6 +145,11 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   const interiorColor = vehicle.interiorColor || vehicle.interior_color || '';
   const salePrice = vehicle.salePrice || vehicle.sale_price || vehicle.price || 0;
   const gradient = vehicle.gradient || 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)';
+  
+  // Decode VIN for Silverado trucks to get cab type and drive type
+  const truckVINInfo = decodeGMTruckVIN(vehicle.vin || '', vehicle.model || '');
+  const vinCabType = truckVINInfo?.cabType || '';
+  const vinDriveType = truckVINInfo?.driveType || vehicle.drivetrain || '';
   
   // Build image candidates in priority order for fallback chain
   // Priority: 1) API imageUrl, 2) Stock-specific, 3) Model+Color, 4) Base Model+Color, 5) Model-only
@@ -351,15 +426,21 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
         <div style={styles.rightColumn}>
           {/* Header */}
           <div style={styles.vehicleHeader}>
-            <div>
+            <div style={styles.titleBlock}>
               <h1 style={styles.vehicleTitle}>
                 {vehicle.year} {vehicle.make} {vehicle.model}
+                {vinCabType && <span style={styles.titleSeparator}> • </span>}
+                {vinCabType && <span>{vinCabType}</span>}
+                {vinDriveType && <span style={styles.titleSeparator}> • </span>}
+                {vinDriveType && <span>{vinDriveType}</span>}
               </h1>
-              <p style={styles.vehicleTrim}>{vehicle.trim}</p>
-            </div>
-            <div style={styles.stockInfo}>
-              <span style={styles.stockLabel}>Stock #</span>
-              <span style={styles.stockNumber}>{stockNumber}</span>
+              <div style={styles.subtitleRow}>
+                <p style={styles.vehicleTrim}>{vehicle.trim}</p>
+                <div style={styles.stockInfo}>
+                  <span style={styles.stockLabel}>Stock #</span>
+                  <span style={styles.stockNumber}>{stockNumber}</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -600,29 +681,46 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  titleBlock: {
+    flex: 1,
+  },
   vehicleTitle: {
     fontSize: '32px',
     fontWeight: '700',
     color: '#ffffff',
     margin: 0,
+    lineHeight: 1.2,
+  },
+  titleSeparator: {
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '400',
+  },
+  subtitleRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: '8px',
   },
   vehicleTrim: {
     fontSize: '16px',
     color: 'rgba(255,255,255,0.6)',
-    margin: '4px 0 0 0',
+    margin: 0,
+    textTransform: 'uppercase',
   },
   stockInfo: {
-    textAlign: 'right',
+    textAlign: 'right' as const,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
   },
   stockLabel: {
-    display: 'block',
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '600',
     color: 'rgba(255,255,255,0.4)',
     textTransform: 'uppercase',
   },
   stockNumber: {
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: '700',
     color: '#ffffff',
   },
