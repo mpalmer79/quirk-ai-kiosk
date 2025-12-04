@@ -83,7 +83,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     setNameSubmitted(true);
   };
 
-  const handlePathSelect = (path: string): void => {
+  const handlePathSelect = (path: 'stockLookup' | 'modelBudget' | 'guidedQuiz' | 'aiAssistant'): void => {
     updateCustomerData({ path });
     const routes: Record<string, string> = {
       stockLookup: 'stockLookup',
