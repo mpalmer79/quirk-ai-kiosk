@@ -160,8 +160,8 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
         </svg>
       ),
       title: 'Chat with AI',
-      subtitle: 'Natural language search',
-      description: 'Tell me what you need in plain English and I\'ll find the perfect vehicle for you.',
+      subtitle: "LET'S HAVE A CONVERSATION",
+      description: "Let's walk through this together and find the right vehicle that fits what you're looking for.",
       gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
     },
     {
