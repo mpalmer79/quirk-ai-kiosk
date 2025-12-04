@@ -80,6 +80,8 @@ export interface BudgetRange {
   max: number;
 }
 
+export type SortOption = 'recommended' | 'price-low' | 'price-high' | 'newest' | 'mileage';
+
 export interface CustomerData {
   customerName?: string;
   selectedModel?: string;
@@ -90,10 +92,11 @@ export interface CustomerData {
   hasTrade?: boolean | null;
   hasPayoff?: boolean | null;
   payoffAmount?: number | null;
-  path?: 'modelBudget' | 'stockLookup' | 'inventory';
+  path?: 'modelBudget' | 'stockLookup' | 'inventory' | 'browse';
   selectedVehicle?: Vehicle;
   protectionPackages?: string[];
   protectionTotal?: number;
+  sortBy?: SortOption;
 }
 
 // Protection Package Types
