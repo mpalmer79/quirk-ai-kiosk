@@ -147,20 +147,20 @@ def generate_fallback_response(message: str, customer_name: Optional[str] = None
     
     message_lower = message.lower()
     
-    if any(word in message_lower for word in ['truck', 'tow', 'haul', 'work']):
+    if any(word in message_lower for word in ['truck', 'tow', 'haul', 'work', 'silverado', 'colorado']):
         return f"{greeting}Looking for a truck? Great choice! Our Silverado lineup is perfect for work and play. The Silverado 1500 offers excellent towing capacity up to 13,300 lbs, while the 2500HD and 3500HD are built for serious hauling. Check out our inventory to see what's available in your preferred configuration!"
     
-    elif any(word in message_lower for word in ['suv', 'family', 'space', 'kids']):
+    elif any(word in message_lower for word in ['suv', 'family', 'space', 'kids', 'equinox', 'traverse', 'tahoe', 'suburban', 'blazer', 'trax', 'trailblazer']):
         return f"{greeting}For family needs, I'd recommend looking at our SUV lineup! The Equinox is perfect for small families, the Traverse offers three rows of seating, and the Tahoe/Suburban are ideal for larger families or those who need maximum cargo space. What size are you thinking?"
     
-    elif any(word in message_lower for word in ['electric', 'ev', 'hybrid', 'efficient']):
-        return f"{greeting}Interested in going electric? Check out our Equinox EV and Silverado EV! The Equinox EV offers up to 319 miles of range, while the Silverado EV combines truck capability with zero emissions. Both qualify for federal tax credits!"
+    elif any(word in message_lower for word in ['electric', 'ev', 'hybrid', 'efficient', 'gas mileage', 'mpg', 'fuel', 'commut', 'gas', 'economy']):
+        return f"{greeting}Great question about fuel efficiency! For commuting, I'd recommend the Equinox which gets up to 31 MPG highway, or the Trax at 32 MPG. If you're ready to go electric, our Equinox EV offers up to 319 miles of range with zero fuel costs. What's your typical daily commute distance?"
     
-    elif any(word in message_lower for word in ['sport', 'fast', 'performance', 'fun']):
+    elif any(word in message_lower for word in ['sport', 'fast', 'performance', 'fun', 'corvette', 'camaro', 'speed', 'exciting']):
         return f"{greeting}Looking for something exciting? The Corvette is an American icon - mid-engine performance that rivals European exotics! We also have the legendary Camaro if you want muscle car heritage. Want me to show you what's in stock?"
     
-    elif any(word in message_lower for word in ['budget', 'cheap', 'affordable', 'price']):
-        return f"{greeting}We have great options at every price point! The Trax starts around $22k, the Trailblazer around $24k, and the Equinox around $28k. All come with excellent standard features. What's your target monthly payment?"
+    elif any(word in message_lower for word in ['budget', 'cheap', 'affordable', 'price', 'less expensive', 'inexpensive', 'cost', 'low price', 'under', 'below', 'cheaper']):
+        return f"{greeting}We have great options at every price point! The Trax starts around $22k, the Trailblazer around $24k, and the Equinox around $28k. All come with excellent standard features. What's your target budget or monthly payment?"
     
     else:
         return f"{greeting}I'd love to help you find the perfect vehicle! To give you the best recommendations, could you tell me a bit more about what you're looking for? For example:\n\n• What will you primarily use it for? (commuting, family, work, fun)\n• How many passengers do you typically carry?\n• Any must-have features?\n• Do you have a budget in mind?"
