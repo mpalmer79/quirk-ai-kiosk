@@ -309,7 +309,7 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
             const vehicleWithScore = vehicle as Vehicle & { matchScore?: number };
             const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
             const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
-            const vehicleId = vehicle.id || stockNumber || String(index);
+            const vehicleId = String(vehicle.id || stockNumber || index);
             const imageUrl = getVehicleImageUrl(vehicle);
             const showImage = imageUrl && !failedImages.has(vehicleId);
             
