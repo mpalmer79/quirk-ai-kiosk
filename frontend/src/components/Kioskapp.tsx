@@ -16,7 +16,7 @@ import AIAssistant from './AIAssistant';
 import ErrorBoundary from './Errorboundary';
 import api from './api';
 
-import type { Vehicle, CustomerData, KioskComponentProps } from '../types';
+import type { CustomerData, KioskComponentProps } from '../types';
 
 // Screen names type
 type ScreenName = 
