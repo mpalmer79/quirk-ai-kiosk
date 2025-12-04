@@ -408,31 +408,28 @@ const KioskApp: React.FC = () => {
     <div style={styles.container}>
       {/* Header */}
       <header style={styles.header}>
-        <div style={styles.logo} onClick={resetJourney}>
-          <span style={styles.logoText}>QUIRK</span>
-          <span style={styles.logoAI}>AI</span>
-        </div>
-        <div style={styles.headerRight}>
-          {currentScreen !== 'welcome' && currentScreen !== 'trafficLog' && (
-            <div style={styles.headerButtons}>
-              {/* Back Button - only show if there's history to go back to */}
-              {canGoBack && (
-                <button style={styles.backButton} onClick={goBack}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M19 12H5M12 19l-7-7 7-7"/>
-                  </svg>
-                  Back
-                </button>
-              )}
-              {/* Start Over Button */}
-              <button style={styles.startOverButton} onClick={resetJourney}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                </svg>
-                Start Over
-              </button>
-            </div>
+        {/* Left spacer for centering */}
+        <div style={styles.headerLeft}>
+          {currentScreen !== 'welcome' && currentScreen !== 'trafficLog' && canGoBack && (
+            <button style={styles.backButton} onClick={goBack}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+              Back
+            </button>
           )}
+        </div>
+        
+        {/* Centered Logo */}
+        <div style={styles.logoContainer}>
+          <div style={styles.logo} onClick={resetJourney}>
+            <span style={styles.logoText}>QUIRK</span>
+            <span style={styles.logoAI}>AI</span>
+          </div>
+        </div>
+        
+        {/* Right side */}
+        <div style={styles.headerRight}>
           {currentScreen === 'welcome' && (
             <button 
               style={styles.adminLink} 
@@ -527,6 +524,17 @@ const styles: Record<string, CSSProperties> = {
     backdropFilter: 'blur(10px)',
     zIndex: 100,
   },
+  headerLeft: {
+    flex: 1,
+    display: 'flex',
+    justifyContent: 'flex-start',
+    minWidth: '120px',
+  },
+  logoContainer: {
+    flex: 1,
+    display: 'flex',
+    justifyContent: 'center',
+  },
   logo: {
     display: 'flex',
     alignItems: 'center',
@@ -549,14 +557,12 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '6px',
   },
   headerRight: {
+    flex: 1,
     display: 'flex',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     gap: '16px',
-  },
-  headerButtons: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
+    minWidth: '120px',
   },
   backButton: {
     display: 'flex',
@@ -566,20 +572,6 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.2)',
     color: '#ffffff',
     padding: '12px 20px',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  startOverButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    color: '#ffffff',
-    padding: '12px 24px',
     borderRadius: '8px',
     fontSize: '14px',
     fontWeight: '600',
