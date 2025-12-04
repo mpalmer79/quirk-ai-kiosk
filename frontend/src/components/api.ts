@@ -101,15 +101,50 @@ interface ChatMessage {
   timestamp?: string;
 }
 
+// Enhanced trade-in vehicle info
+interface TradeInVehicleInfo {
+  year: string | null;
+  make: string | null;
+  model: string | null;
+  mileage: number | null;
+}
+
+// Enhanced trade-in data
+interface TradeInData {
+  hasTrade: boolean | null;
+  vehicle: TradeInVehicleInfo | null;
+  hasPayoff: boolean | null;
+  payoffAmount: number | null;
+  monthlyPayment: number | null;
+  financedWith: string | null;
+}
+
+// Vehicle interest from ModelBudgetSelector
+interface VehicleInterestData {
+  model: string | null;
+  cab: string | null;
+  colors: string[];
+}
+
+// Budget info
+interface BudgetData {
+  min: number | null;
+  max: number | null;
+  downPaymentPercent: number | null;
+}
+
 interface TrafficSessionData {
   sessionId?: string;
   customerName?: string | null;
   phone?: string;
   path?: string | null;
+  currentStep?: string | null;
+  vehicleInterest?: VehicleInterestData;
+  budget?: BudgetData;
   vehicleRequested?: boolean;
   actions?: string[];
   vehicle?: Partial<Vehicle>;
-  tradeIn?: Partial<TradeInVehicleData & { estimatedValue?: number }>;
+  tradeIn?: TradeInData | Partial<TradeInVehicleData & { estimatedValue?: number }>;
   payment?: {
     type?: string;
     monthly?: number;
@@ -126,7 +161,10 @@ interface TrafficLogEntry {
   customerName?: string;
   phone?: string;
   path?: string;
+  currentStep?: string;
   vehicle?: Partial<Vehicle>;
+  vehicleInterest?: VehicleInterestData;
+  budget?: BudgetData;
   tradeIn?: Partial<TradeInVehicleData & { estimatedValue?: number }>;
   payment?: {
     type?: string;
@@ -150,6 +188,7 @@ interface TrafficLogResponse {
 
 interface TrafficStats {
   total_sessions: number;
+  active_now: number;
   today: number;
   today_date: string;
   by_path: Record<string, number>;
@@ -161,6 +200,55 @@ interface TrafficStats {
   conversion_rate: number;
   timezone: string;
   server_time: string;
+}
+
+// Active session for Sales Manager Dashboard
+interface ActiveSession {
+  sessionId: string;
+  customerName: string | null;
+  phone: string | null;
+  startTime: string;
+  lastActivity: string;
+  currentStep: string;
+  vehicleInterest: {
+    model: string | null;
+    cab: string | null;
+    colors: string[];
+  };
+  budget: {
+    min: number | null;
+    max: number | null;
+    downPaymentPercent: number | null;
+  };
+  tradeIn: {
+    hasTrade: boolean | null;
+    vehicle: {
+      year: string | null;
+      make: string | null;
+      model: string | null;
+      mileage: number | null;
+    } | null;
+    hasPayoff: boolean | null;
+    payoffAmount: number | null;
+    monthlyPayment: number | null;
+    financedWith: string | null;
+  };
+  selectedVehicle: {
+    stockNumber: string | null;
+    year: number | null;
+    make: string | null;
+    model: string | null;
+    trim: string | null;
+    price: number | null;
+  } | null;
+}
+
+interface ActiveSessionsResponse {
+  sessions: ActiveSession[];
+  count: number;
+  timeout_minutes: number;
+  server_time: string;
+  timezone: string;
 }
 
 interface AIChatRequest {
@@ -492,6 +580,21 @@ export const getTrafficSession = async (sessionId: string): Promise<TrafficLogEn
   return apiRequest<TrafficLogEntry>(`/traffic/log/${sessionId}`);
 };
 
+/**
+ * Get active kiosk sessions for Sales Manager Dashboard
+ * @param timeoutMinutes - Consider sessions active if updated within this many minutes (default 30)
+ */
+export const getActiveSessions = async (timeoutMinutes: number = 30): Promise<ActiveSessionsResponse> => {
+  return apiRequest<ActiveSessionsResponse>(`/traffic/active?timeout_minutes=${timeoutMinutes}`);
+};
+
+/**
+ * Get single session formatted for dashboard 4-square view
+ */
+export const getSessionForDashboard = async (sessionId: string): Promise<ActiveSession> => {
+  return apiRequest<ActiveSession>(`/traffic/dashboard/${sessionId}`);
+};
+
 // ============================================
 // AI ASSISTANT ENDPOINTS
 // ============================================
@@ -548,6 +651,10 @@ const api = {
   getTrafficLog,
   getTrafficStats,
   getTrafficSession,
+  
+  // Sales Manager Dashboard
+  getActiveSessions,
+  getSessionForDashboard,
   
   // AI Assistant
   chatWithAI,
