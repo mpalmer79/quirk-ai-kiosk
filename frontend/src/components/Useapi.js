@@ -54,7 +54,8 @@ export const useInventory = () => {
     
     try {
       const result = await api.getInventory(filters);
-      setInventory(result.vehicles || result);
+      const vehicles = Array.isArray(result) ? result : result?.vehicles || [];
+      setInventory(vehicles);
       return result;
     } catch (err) {
       setError(err.message);
@@ -96,7 +97,8 @@ export const useInventory = () => {
     
     try {
       const result = await api.searchByPreferences(preferences);
-      setInventory(result.vehicles || result);
+      const vehicles = Array.isArray(result) ? result : result?.vehicles || [];
+      setInventory(vehicles);
       return result;
     } catch (err) {
       setError(err.message);
