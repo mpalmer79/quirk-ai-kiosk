@@ -2,6 +2,59 @@ import React, { useState, useRef, useEffect, KeyboardEvent, CSSProperties } from
 import api from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
 
+// Web Speech API TypeScript declarations
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 // Message types
 interface Message {
   id: string;
@@ -30,9 +83,68 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
   const [inventory, setInventory] = useState<Vehicle[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Check for Speech Recognition support and initialize
+  useEffect(() => {
+    // Check if browser supports speech recognition
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (SpeechRecognitionAPI) {
+      setSpeechSupported(true);
+      
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+      
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('');
+        
+        setInputValue(transcript);
+        
+        // If this is a final result, stop listening
+        if (event.results[event.results.length - 1].isFinal) {
+          // Optional: auto-send after speech ends
+          // sendMessage(transcript);
+        }
+      };
+      
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        
+        if (event.error === 'not-allowed') {
+          alert('Microphone access was denied. Please enable microphone permissions to use voice input.');
+        }
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+      
+      recognitionRef.current = recognition;
+    } else {
+      setSpeechSupported(false);
+    }
+    
+    // Cleanup
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
 
   // Load inventory on mount
   useEffect(() => {
@@ -228,10 +340,29 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     }
   };
 
-  // Handle microphone button - visual only for now
+  // Handle microphone button - start/stop speech recognition
   const handleMicrophoneClick = () => {
-    setIsListening(!isListening);
-    // TODO: Implement speech-to-text functionality
+    if (!speechSupported) {
+      alert('Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.');
+      return;
+    }
+    
+    if (!recognitionRef.current) return;
+    
+    if (isListening) {
+      // Stop listening
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      // Start listening
+      setInputValue(''); // Clear previous input
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        // Recognition might already be running
+        console.error('Speech recognition start error:', error);
+      }
+    }
   };
 
   const handleVehicleClick = (vehicle: Vehicle) => {
@@ -369,28 +500,31 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
           onKeyPress={handleKeyPress}
           disabled={isLoading || isListening}
         />
-        <button
-          style={{
-            ...styles.micButton,
-            ...(isListening ? styles.micButtonActive : {}),
-          }}
-          onClick={handleMicrophoneClick}
-          disabled={isLoading}
-          aria-label={isListening ? "Stop listening" : "Start voice input"}
-        >
-          {isListening ? (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-          ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
-          )}
-        </button>
+        {speechSupported && (
+          <button
+            style={{
+              ...styles.micButton,
+              ...(isListening ? styles.micButtonActive : {}),
+            }}
+            onClick={handleMicrophoneClick}
+            disabled={isLoading}
+            aria-label={isListening ? "Stop listening" : "Start voice input"}
+            title={isListening ? "Click to stop" : "Click to speak"}
+          >
+            {isListening ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            )}
+          </button>
+        )}
         <button
           style={{
             ...styles.sendButton,
