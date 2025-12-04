@@ -445,7 +445,7 @@ export const healthCheck = async (): Promise<{ status: string }> => {
  */
 export const logTrafficSession = async (sessionData: TrafficSessionData): Promise<void> => {
   try {
-    await apiRequest<void>('/v1/traffic/session', {
+    await apiRequest<void>('/traffic/session', {
       method: 'POST',
       body: JSON.stringify({
         sessionId: getSessionId(),
@@ -475,21 +475,21 @@ export const getTrafficLog = async (
   if (filterToday) {
     params.append('filter_today', 'true');
   }
-  return apiRequest<TrafficLogResponse>(`/v1/traffic/log?${params.toString()}`);
+  return apiRequest<TrafficLogResponse>(`/traffic/log?${params.toString()}`);
 };
 
 /**
  * Get traffic statistics (admin)
  */
 export const getTrafficStats = async (): Promise<TrafficStats> => {
-  return apiRequest<TrafficStats>('/v1/traffic/stats');
+  return apiRequest<TrafficStats>('/traffic/stats');
 };
 
 /**
  * Get single session details (admin)
  */
 export const getTrafficSession = async (sessionId: string): Promise<TrafficLogEntry> => {
-  return apiRequest<TrafficLogEntry>(`/v1/traffic/log/${sessionId}`);
+  return apiRequest<TrafficLogEntry>(`/traffic/log/${sessionId}`);
 };
 
 // ============================================
@@ -500,7 +500,7 @@ export const getTrafficSession = async (sessionId: string): Promise<TrafficLogEn
  * Chat with AI assistant for vehicle recommendations
  */
 export const chatWithAI = async (request: AIChatRequest): Promise<AIChatResponse> => {
-  return apiRequest<AIChatResponse>('/v1/ai/chat', {
+  return apiRequest<AIChatResponse>('/ai/chat', {
     method: 'POST',
     body: JSON.stringify(request),
   });
