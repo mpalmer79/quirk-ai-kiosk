@@ -38,7 +38,8 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     const loadInventory = async () => {
       try {
         const data = await api.getInventory({});
-        const vehicles = Array.isArray(data) ? data : data.vehicles || [];
+        // Handle both array and object response types
+        const vehicles = Array.isArray(data) ? data : (data as { vehicles?: Vehicle[] }).vehicles || [];
         setInventory(vehicles);
       } catch (err) {
         console.error('Error loading inventory:', err);
