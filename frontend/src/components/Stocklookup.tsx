@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, ChangeEvent, KeyboardEvent } from 'react';
+import React, { useState, useRef, useEffect, ChangeEvent, KeyboardEvent, CSSProperties } from 'react';
 import api from './api';
 import type { Vehicle, CustomerData, KioskComponentProps } from '../types';
 
@@ -314,8 +314,6 @@ const StockLookup: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomer
     </div>
   );
 };
-
-import type { CSSProperties } from 'react';
 
 const styles: Record<string, CSSProperties> = {
   container: {
