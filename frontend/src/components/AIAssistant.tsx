@@ -30,8 +30,60 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [inventory, setInventory] = useState<Vehicle[]>([]);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Initialize Web Speech API
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInputValue(transcript);
+        setIsListening(false);
+        // Auto-send after voice input
+        setTimeout(() => {
+          if (transcript.trim()) {
+            sendMessage(transcript);
+          }
+        }, 300);
+      };
+      
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+      
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const toggleVoiceInput = () => {
+    if (!recognitionRef.current) {
+      alert('Voice input is not supported in this browser');
+      return;
+    }
+    
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      setInputValue('');
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
 
   // Load inventory on mount
   useEffect(() => {
@@ -364,12 +416,39 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
           ref={inputRef}
           type="text"
           style={styles.input}
-          placeholder="Describe your ideal vehicle..."
+          placeholder={isListening ? "Listening..." : "Describe your ideal vehicle..."}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyPress={handleKeyPress}
-          disabled={isLoading}
+          disabled={isLoading || isListening}
         />
+        <button
+          style={{
+            ...styles.micButton,
+            background: isListening 
+              ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' 
+              : 'rgba(255,255,255,0.1)',
+            animation: isListening ? 'pulse 1s infinite' : 'none',
+          }}
+          onClick={toggleVoiceInput}
+          disabled={isLoading}
+          title={isListening ? "Stop listening" : "Voice input"}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            {isListening ? (
+              // Stop icon when listening
+              <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>
+            ) : (
+              // Microphone icon
+              <>
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </>
+            )}
+          </svg>
+        </button>
         <button
           style={{
             ...styles.sendButton,
@@ -608,6 +687,19 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '12px',
     background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
     border: 'none',
+    color: '#ffffff',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+  },
+  micButton: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '12px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
     color: '#ffffff',
     cursor: 'pointer',
     display: 'flex',
