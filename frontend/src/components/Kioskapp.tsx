@@ -12,6 +12,7 @@ import TradeInEstimator from './TradeInestimator';
 import CustomerHandoff from './Customerhandoff';
 import ProtectionPackages from './Protectionpackages';
 import TrafficLog from './Trafficlog';
+import AIAssistant from './AIAssistant';
 import ErrorBoundary from './Errorboundary';
 import api from './api';
 
@@ -23,6 +24,7 @@ type ScreenName =
   | 'stockLookup'
   | 'modelBudget'
   | 'guidedQuiz'
+  | 'aiAssistant'
   | 'inventory'
   | 'vehicleDetail'
   | 'paymentCalculator'
@@ -380,6 +382,7 @@ const KioskApp: React.FC = () => {
     stockLookup: StockLookup,
     modelBudget: ModelBudgetSelector,
     guidedQuiz: GuidedQuiz,
+    aiAssistant: AIAssistant,
     inventory: InventoryResults,
     vehicleDetail: VehicleDetail,
     paymentCalculator: PaymentCalculator,
