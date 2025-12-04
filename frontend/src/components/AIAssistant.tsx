@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, KeyboardEvent, CSSProperties } from 'react';
+import React, { useState, useRef, useEffect, useCallback, KeyboardEvent, CSSProperties } from 'react';
 import api from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
 
@@ -34,6 +34,142 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+  const sendMessageRef = useRef<(content: string) => void>();
+
+  // Build inventory context for AI
+  const buildInventoryContext = useCallback((): string => {
+    if (inventory.length === 0) return 'Inventory is loading...';
+    
+    // Group by model for summary
+    const modelCounts: Record<string, number> = {};
+    const priceRanges: Record<string, { min: number; max: number }> = {};
+    
+    inventory.forEach(v => {
+      const model = v.model || 'Unknown';
+      modelCounts[model] = (modelCounts[model] || 0) + 1;
+      
+      const price = v.salePrice || v.sale_price || v.price || v.msrp || 0;
+      if (!priceRanges[model]) {
+        priceRanges[model] = { min: price, max: price };
+      } else {
+        priceRanges[model].min = Math.min(priceRanges[model].min, price);
+        priceRanges[model].max = Math.max(priceRanges[model].max, price);
+      }
+    });
+
+    let context = `QUIRK CHEVROLET CURRENT INVENTORY (${inventory.length} vehicles):\n\n`;
+    
+    Object.entries(modelCounts).forEach(([model, count]) => {
+      const range = priceRanges[model];
+      context += `• ${model}: ${count} in stock ($${range.min.toLocaleString()} - $${range.max.toLocaleString()})\n`;
+    });
+
+    context += `\nDETAILED INVENTORY:\n`;
+    inventory.slice(0, 50).forEach(v => {
+      const stock = v.stockNumber || v.stock_number || '';
+      const price = v.salePrice || v.sale_price || v.price || v.msrp || 0;
+      const color = v.exteriorColor || v.exterior_color || '';
+      context += `- Stock #${stock}: ${v.year} ${v.make} ${v.model} ${v.trim || ''}, ${color}, $${price.toLocaleString()}, ${v.drivetrain || ''}\n`;
+    });
+
+    return context;
+  }, [inventory]);
+
+  // Search inventory based on criteria
+  const searchInventory = useCallback((query: string): Vehicle[] => {
+    const lowerQuery = query.toLowerCase();
+    
+    return inventory.filter(v => {
+      const searchText = `${v.year} ${v.make} ${v.model} ${v.trim} ${v.exteriorColor || v.exterior_color} ${v.drivetrain} ${v.engine}`.toLowerCase();
+      
+      // Check for specific criteria
+      const matchesQuery = searchText.includes(lowerQuery);
+      
+      // Check for category keywords
+      const isTruck = lowerQuery.includes('truck') && 
+        (v.model?.toLowerCase().includes('silverado') || v.model?.toLowerCase().includes('colorado'));
+      const isSUV = (lowerQuery.includes('suv') || lowerQuery.includes('crossover')) && 
+        ['tahoe', 'suburban', 'equinox', 'traverse', 'trax', 'trailblazer', 'blazer'].some(m => v.model?.toLowerCase().includes(m));
+      const isElectric = lowerQuery.includes('electric') && 
+        (v.model?.toLowerCase().includes('ev') || v.fuelType?.toLowerCase().includes('electric'));
+      const isSporty = (lowerQuery.includes('sport') || lowerQuery.includes('fast') || lowerQuery.includes('performance')) && 
+        (v.model?.toLowerCase().includes('corvette') || v.model?.toLowerCase().includes('camaro'));
+      
+      // Price filtering
+      let matchesPrice = true;
+      const priceMatch = lowerQuery.match(/under\s*\$?(\d+)k?/i);
+      if (priceMatch) {
+        const maxPrice = parseInt(priceMatch[1]) * (priceMatch[1].length <= 2 ? 1000 : 1);
+        const vehiclePrice = v.salePrice || v.sale_price || v.price || v.msrp || 0;
+        matchesPrice = vehiclePrice <= maxPrice;
+      }
+
+      return (matchesQuery || isTruck || isSUV || isElectric || isSporty) && matchesPrice;
+    }).slice(0, 6);
+  }, [inventory]);
+
+  // Send message to AI
+  const sendMessage = useCallback(async (content: string) => {
+    if (!content.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: content.trim(),
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+
+    try {
+      // Call AI endpoint
+      const response = await api.chatWithAI({
+        message: content,
+        inventoryContext: buildInventoryContext(),
+        conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
+        customerName: customerData?.customerName,
+      });
+
+      // Search for matching vehicles
+      const matchingVehicles = searchInventory(content);
+
+      const assistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: response.message,
+        vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('AI Chat error:', error);
+      
+      // Fallback response with local search
+      const matchingVehicles = searchInventory(content);
+      
+      const fallbackMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: matchingVehicles.length > 0 
+          ? `I found ${matchingVehicles.length} vehicles that might match what you're looking for! Take a look below. Would you like more details on any of these?`
+          : `I'd be happy to help you find the perfect vehicle. Could you tell me more about what you're looking for? For example, do you need a truck for towing, an SUV for the family, or something sporty?`,
+        vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, fallbackMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, messages, customerData?.customerName, buildInventoryContext, searchInventory]);
+
+  // Keep sendMessageRef updated with latest sendMessage
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
 
   // Initialize Web Speech API
   useEffect(() => {
@@ -51,7 +187,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         // Auto-send after voice input
         setTimeout(() => {
           if (transcript.trim()) {
-            sendMessage(transcript);
+            sendMessageRef.current?.(transcript);
           }
         }, 300);
       };
@@ -149,136 +285,6 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  // Build inventory context for AI
-  const buildInventoryContext = (): string => {
-    if (inventory.length === 0) return 'Inventory is loading...';
-    
-    // Group by model for summary
-    const modelCounts: Record<string, number> = {};
-    const priceRanges: Record<string, { min: number; max: number }> = {};
-    
-    inventory.forEach(v => {
-      const model = v.model || 'Unknown';
-      modelCounts[model] = (modelCounts[model] || 0) + 1;
-      
-      const price = v.salePrice || v.sale_price || v.price || v.msrp || 0;
-      if (!priceRanges[model]) {
-        priceRanges[model] = { min: price, max: price };
-      } else {
-        priceRanges[model].min = Math.min(priceRanges[model].min, price);
-        priceRanges[model].max = Math.max(priceRanges[model].max, price);
-      }
-    });
-
-    let context = `QUIRK CHEVROLET CURRENT INVENTORY (${inventory.length} vehicles):\n\n`;
-    
-    Object.entries(modelCounts).forEach(([model, count]) => {
-      const range = priceRanges[model];
-      context += `• ${model}: ${count} in stock ($${range.min.toLocaleString()} - $${range.max.toLocaleString()})\n`;
-    });
-
-    context += `\nDETAILED INVENTORY:\n`;
-    inventory.slice(0, 50).forEach(v => {
-      const stock = v.stockNumber || v.stock_number || '';
-      const price = v.salePrice || v.sale_price || v.price || v.msrp || 0;
-      const color = v.exteriorColor || v.exterior_color || '';
-      context += `- Stock #${stock}: ${v.year} ${v.make} ${v.model} ${v.trim || ''}, ${color}, $${price.toLocaleString()}, ${v.drivetrain || ''}\n`;
-    });
-
-    return context;
-  };
-
-  // Search inventory based on criteria
-  const searchInventory = (query: string): Vehicle[] => {
-    const lowerQuery = query.toLowerCase();
-    
-    return inventory.filter(v => {
-      const searchText = `${v.year} ${v.make} ${v.model} ${v.trim} ${v.exteriorColor || v.exterior_color} ${v.drivetrain} ${v.engine}`.toLowerCase();
-      
-      // Check for specific criteria
-      const matchesQuery = searchText.includes(lowerQuery);
-      
-      // Check for category keywords
-      const isTruck = lowerQuery.includes('truck') && 
-        (v.model?.toLowerCase().includes('silverado') || v.model?.toLowerCase().includes('colorado'));
-      const isSUV = (lowerQuery.includes('suv') || lowerQuery.includes('crossover')) && 
-        ['tahoe', 'suburban', 'equinox', 'traverse', 'trax', 'trailblazer', 'blazer'].some(m => v.model?.toLowerCase().includes(m));
-      const isElectric = lowerQuery.includes('electric') && 
-        (v.model?.toLowerCase().includes('ev') || v.fuelType?.toLowerCase().includes('electric'));
-      const isSporty = (lowerQuery.includes('sport') || lowerQuery.includes('fast') || lowerQuery.includes('performance')) && 
-        (v.model?.toLowerCase().includes('corvette') || v.model?.toLowerCase().includes('camaro'));
-      
-      // Price filtering
-      let matchesPrice = true;
-      const priceMatch = lowerQuery.match(/under\s*\$?(\d+)k?/i);
-      if (priceMatch) {
-        const maxPrice = parseInt(priceMatch[1]) * (priceMatch[1].length <= 2 ? 1000 : 1);
-        const vehiclePrice = v.salePrice || v.sale_price || v.price || v.msrp || 0;
-        matchesPrice = vehiclePrice <= maxPrice;
-      }
-
-      return (matchesQuery || isTruck || isSUV || isElectric || isSporty) && matchesPrice;
-    }).slice(0, 6);
-  };
-
-  // Send message to AI
-  const sendMessage = async (content: string) => {
-    if (!content.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: content.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsLoading(true);
-
-    try {
-      // Call AI endpoint
-      const response = await api.chatWithAI({
-        message: content,
-        inventoryContext: buildInventoryContext(),
-        conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
-        customerName: customerData?.customerName,
-      });
-
-      // Search for matching vehicles
-      const matchingVehicles = searchInventory(content);
-
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: response.message,
-        vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error('AI Chat error:', error);
-      
-      // Fallback response with local search
-      const matchingVehicles = searchInventory(content);
-      
-      const fallbackMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: matchingVehicles.length > 0 
-          ? `I found ${matchingVehicles.length} vehicles that might match what you're looking for! Take a look below. Would you like more details on any of these?`
-          : `I'd be happy to help you find the perfect vehicle. Could you tell me more about what you're looking for? For example, do you need a truck for towing, an SUV for the family, or something sporty?`,
-        vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
-        timestamp: new Date(),
-      };
-      
-      setMessages(prev => [...prev, fallbackMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
