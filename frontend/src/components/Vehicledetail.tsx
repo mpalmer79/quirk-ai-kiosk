@@ -61,6 +61,8 @@ const defaultVehicle: DetailedVehicle = {
 
 const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
   const [vehicleRequested, setVehicleRequested] = useState<boolean>(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+  const [allImagesFailed, setAllImagesFailed] = useState<boolean>(false);
   
   // Get customer name for personalization
   const customerName = customerData?.customerName;
@@ -73,6 +75,60 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   const interiorColor = vehicle.interiorColor || vehicle.interior_color || '';
   const salePrice = vehicle.salePrice || vehicle.sale_price || vehicle.price || 0;
   const gradient = vehicle.gradient || 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)';
+  
+  // Build image candidates in priority order for fallback chain
+  // Priority: 1) API imageUrl, 2) Stock-specific, 3) Model+Color, 4) Model-only
+  const getImageCandidates = (): string[] => {
+    const candidates: string[] = [];
+    
+    // 1. First check API-provided URLs
+    if (vehicle.imageUrl) candidates.push(vehicle.imageUrl);
+    if (vehicle.image_url) candidates.push(vehicle.image_url);
+    if (vehicle.images && vehicle.images.length > 0) {
+      candidates.push(...vehicle.images);
+    }
+    
+    // Normalize model and color for file matching
+    const model = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const color = (exteriorColor || '').toLowerCase();
+    
+    // Map color descriptions to base color categories
+    const getColorCategory = (colorDesc: string): string => {
+      if (colorDesc.includes('black')) return 'black';
+      if (colorDesc.includes('white') || colorDesc.includes('summit') || colorDesc.includes('arctic')) return 'white';
+      if (colorDesc.includes('red') || colorDesc.includes('cherry') || colorDesc.includes('cajun')) return 'red';
+      if (colorDesc.includes('blue') || colorDesc.includes('northsky') || colorDesc.includes('glacier')) return 'blue';
+      if (colorDesc.includes('silver') || colorDesc.includes('sterling')) return 'silver';
+      if (colorDesc.includes('gray') || colorDesc.includes('grey') || colorDesc.includes('shadow')) return 'gray';
+      if (colorDesc.includes('green') || colorDesc.includes('woodland')) return 'green';
+      if (colorDesc.includes('orange') || colorDesc.includes('tangier')) return 'orange';
+      if (colorDesc.includes('yellow') || colorDesc.includes('accelerate')) return 'yellow';
+      if (colorDesc.includes('brown') || colorDesc.includes('harvest')) return 'brown';
+      return '';
+    };
+    
+    const colorCategory = getColorCategory(color);
+    
+    // 2. Stock-specific image (for featured/special vehicles)
+    // Images stored in: frontend/public/images/vehicles/
+    if (stockNumber) {
+      candidates.push(`/images/vehicles/${stockNumber}.jpg`);
+    }
+    
+    // 3. Model + Color combination (e.g., corvette-black.jpg)
+    if (model && colorCategory) {
+      candidates.push(`/images/vehicles/${model}-${colorCategory}.jpg`);
+    }
+    
+    // 4. Model-only fallback (e.g., corvette.jpg)
+    if (model) {
+      candidates.push(`/images/vehicles/${model}.jpg`);
+    }
+    
+    return candidates;
+  };
+  
+  const imageCandidates = getImageCandidates();
 
   const handleRequestVehicle = (): void => {
     setVehicleRequested(true);
@@ -218,8 +274,30 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       <div style={styles.content}>
         {/* Left Column - Vehicle Image & Gallery */}
         <div style={styles.leftColumn}>
-          <div style={{ ...styles.mainImage, background: gradient }}>
-            <span style={styles.imageInitial}>{(vehicle.model || 'V').charAt(0)}</span>
+          <div style={{ 
+            ...styles.mainImage, 
+            background: (!allImagesFailed && imageCandidates.length > 0) ? '#1a1a1a' : gradient 
+          }}>
+            {!allImagesFailed && imageCandidates.length > 0 && imageCandidates[currentImageIndex] ? (
+              <img 
+                src={imageCandidates[currentImageIndex]} 
+                alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                style={styles.vehicleImage}
+                onError={() => {
+                  // Try next image candidate
+                  if (currentImageIndex < imageCandidates.length - 1) {
+                    setCurrentImageIndex(currentImageIndex + 1);
+                  } else {
+                    // All candidates failed, show placeholder
+                    setAllImagesFailed(true);
+                  }
+                }}
+              />
+            ) : (
+              <span style={styles.imageInitial}>
+                {(vehicle.model || 'V').charAt(0)}
+              </span>
+            )}
             <div style={styles.statusBadge}>
               <span style={styles.statusDot} />
               {vehicle.status || 'In Stock'}
@@ -437,11 +515,21 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  vehicleImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    borderRadius: '20px',
   },
   imageInitial: {
     fontSize: '120px',
     fontWeight: '800',
     color: 'rgba(255,255,255,0.2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statusBadge: {
     position: 'absolute',
