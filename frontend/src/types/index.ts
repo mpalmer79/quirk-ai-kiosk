@@ -92,7 +92,7 @@ export interface CustomerData {
   hasTrade?: boolean | null;
   hasPayoff?: boolean | null;
   payoffAmount?: number | null;
-  path?: 'modelBudget' | 'stockLookup' | 'inventory' | 'browse';
+  path?: 'modelBudget' | 'stockLookup' | 'inventory' | 'browse' | 'aiChat';
   selectedVehicle?: Vehicle;
   protectionPackages?: string[];
   protectionTotal?: number;
