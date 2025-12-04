@@ -77,7 +77,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   const gradient = vehicle.gradient || 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)';
   
   // Build image candidates in priority order for fallback chain
-  // Priority: 1) API imageUrl, 2) Stock-specific, 3) Model+Color, 4) Model-only
+  // Priority: 1) API imageUrl, 2) Stock-specific, 3) Model+Color, 4) Base Model+Color, 5) Model-only
   const getImageCandidates = (): string[] => {
     const candidates: string[] = [];
     
@@ -88,16 +88,18 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       candidates.push(...vehicle.images);
     }
     
-    // Normalize model and color for file matching
-    const model = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    // Normalize model for file matching
+    const fullModel = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    // Get base model without EV/HD/etc suffixes for fallback (equinox-ev -> equinox)
+    const baseModel = fullModel.replace(/-ev$/, '').replace(/-hd$/, '').replace(/\d+$/, '');
     const color = (exteriorColor || '').toLowerCase();
     
     // Map color descriptions to base color categories
     const getColorCategory = (colorDesc: string): string => {
       if (colorDesc.includes('black')) return 'black';
-      if (colorDesc.includes('white') || colorDesc.includes('summit') || colorDesc.includes('arctic')) return 'white';
-      if (colorDesc.includes('red') || colorDesc.includes('cherry') || colorDesc.includes('cajun')) return 'red';
-      if (colorDesc.includes('blue') || colorDesc.includes('northsky') || colorDesc.includes('glacier')) return 'blue';
+      if (colorDesc.includes('white') || colorDesc.includes('summit') || colorDesc.includes('arctic') || colorDesc.includes('polar')) return 'white';
+      if (colorDesc.includes('red') || colorDesc.includes('cherry') || colorDesc.includes('cajun') || colorDesc.includes('radiant')) return 'red';
+      if (colorDesc.includes('blue') || colorDesc.includes('northsky') || colorDesc.includes('glacier') || colorDesc.includes('reef')) return 'blue';
       if (colorDesc.includes('silver') || colorDesc.includes('sterling')) return 'silver';
       if (colorDesc.includes('gray') || colorDesc.includes('grey') || colorDesc.includes('shadow')) return 'gray';
       if (colorDesc.includes('green') || colorDesc.includes('woodland')) return 'green';
@@ -115,14 +117,22 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       candidates.push(`/images/vehicles/${stockNumber}.jpg`);
     }
     
-    // 3. Model + Color combination (e.g., corvette-black.jpg)
-    if (model && colorCategory) {
-      candidates.push(`/images/vehicles/${model}-${colorCategory}.jpg`);
+    // 3. Full Model + Color combination (e.g., equinox-ev-gray.jpg)
+    if (fullModel && colorCategory) {
+      candidates.push(`/images/vehicles/${fullModel}-${colorCategory}.jpg`);
     }
     
-    // 4. Model-only fallback (e.g., corvette.jpg)
-    if (model) {
-      candidates.push(`/images/vehicles/${model}.jpg`);
+    // 4. Base Model + Color (e.g., equinox-gray.jpg for Equinox EV)
+    if (baseModel && baseModel !== fullModel && colorCategory) {
+      candidates.push(`/images/vehicles/${baseModel}-${colorCategory}.jpg`);
+    }
+    
+    // 5. Model-only fallback (e.g., equinox.jpg)
+    if (fullModel) {
+      candidates.push(`/images/vehicles/${fullModel}.jpg`);
+    }
+    if (baseModel && baseModel !== fullModel) {
+      candidates.push(`/images/vehicles/${baseModel}.jpg`);
     }
     
     return candidates;
