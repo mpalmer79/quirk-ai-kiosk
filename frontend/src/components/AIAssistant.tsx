@@ -2,59 +2,6 @@ import React, { useState, useRef, useEffect, KeyboardEvent, CSSProperties } from
 import api from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
 
-// Web Speech API TypeScript declarations
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  isFinal: boolean;
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message: string;
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
-  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null;
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-
-interface SpeechRecognitionConstructor {
-  new (): SpeechRecognition;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
-}
-
 // Message types
 interface Message {
   id: string;
@@ -82,69 +29,9 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
   const [inventory, setInventory] = useState<Vehicle[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-
-  // Check for Speech Recognition support and initialize
-  useEffect(() => {
-    // Check if browser supports speech recognition
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (SpeechRecognitionAPI) {
-      setSpeechSupported(true);
-      
-      const recognition = new SpeechRecognitionAPI();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-      
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
-      
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0].transcript)
-          .join('');
-        
-        setInputValue(transcript);
-        
-        // If this is a final result, stop listening
-        if (event.results[event.results.length - 1].isFinal) {
-          // Optional: auto-send after speech ends
-          // sendMessage(transcript);
-        }
-      };
-      
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-        
-        if (event.error === 'not-allowed') {
-          alert('Microphone access was denied. Please enable microphone permissions to use voice input.');
-        }
-      };
-      
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-      
-      recognitionRef.current = recognition;
-    } else {
-      setSpeechSupported(false);
-    }
-    
-    // Cleanup
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
-      }
-    };
-  }, []);
 
   // Load inventory on mount
   useEffect(() => {
@@ -172,31 +59,39 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       timestamp: new Date(),
     };
     setMessages([welcomeMessage]);
+    
+    // Log initial AI chat session
+    api.logTrafficSession({
+      path: 'aiChat',
+      customerName: customerData?.customerName,
+      actions: ['started_ai_chat'],
+    });
   }, [customerData?.customerName, inventory.length]);
+
+  // Log chat history whenever messages change (after initial welcome)
+  useEffect(() => {
+    // Only log if there are user messages (more than just the welcome message)
+    if (messages.length > 1) {
+      const chatHistory = messages.map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        timestamp: m.timestamp.toISOString(),
+      }));
+      
+      // Log to traffic system
+      api.logTrafficSession({
+        path: 'aiChat',
+        customerName: customerData?.customerName,
+        chatHistory,
+        actions: ['ai_chat_message'],
+      });
+    }
+  }, [messages, customerData?.customerName]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Save conversation log to customer data
-  useEffect(() => {
-    // Skip the initial welcome message only
-    if (messages.length <= 1) return;
-    
-    const conversationLog = messages.map(m => ({
-      role: m.role,
-      content: m.content,
-      timestamp: m.timestamp.toISOString(),
-      vehicles: m.vehicles?.map(v => ({
-        stockNumber: v.stockNumber || v.stock_number,
-        model: v.model,
-        price: v.salePrice || v.sale_price || v.price,
-      })),
-    }));
-    
-    updateCustomerData({ conversationLog });
-  }, [messages, updateCustomerData]);
 
   // Focus input on mount
   useEffect(() => {
@@ -340,31 +235,6 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     }
   };
 
-  // Handle microphone button - start/stop speech recognition
-  const handleMicrophoneClick = () => {
-    if (!speechSupported) {
-      alert('Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.');
-      return;
-    }
-    
-    if (!recognitionRef.current) return;
-    
-    if (isListening) {
-      // Stop listening
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      // Start listening
-      setInputValue(''); // Clear previous input
-      try {
-        recognitionRef.current.start();
-      } catch (error) {
-        // Recognition might already be running
-        console.error('Speech recognition start error:', error);
-      }
-    }
-  };
-
   const handleVehicleClick = (vehicle: Vehicle) => {
     updateCustomerData({ selectedVehicle: vehicle, path: 'aiChat' });
     navigateTo('vehicleDetail');
@@ -394,7 +264,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       </div>
 
       {/* Messages Container */}
-      <div style={styles.messagesContainer} className="ai-messages-container">
+      <div style={styles.messagesContainer}>
         {messages.map((message) => (
           <div
             key={message.id}
@@ -494,37 +364,12 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
           ref={inputRef}
           type="text"
           style={styles.input}
-          placeholder={isListening ? "Listening..." : "Describe your ideal vehicle..."}
+          placeholder="Describe your ideal vehicle..."
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyPress={handleKeyPress}
-          disabled={isLoading || isListening}
+          disabled={isLoading}
         />
-        {speechSupported && (
-          <button
-            style={{
-              ...styles.micButton,
-              ...(isListening ? styles.micButtonActive : {}),
-            }}
-            onClick={handleMicrophoneClick}
-            disabled={isLoading}
-            aria-label={isListening ? "Stop listening" : "Start voice input"}
-            title={isListening ? "Click to stop" : "Click to speak"}
-          >
-            {isListening ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                <line x1="12" y1="19" x2="12" y2="23"/>
-                <line x1="8" y1="23" x2="16" y2="23"/>
-              </svg>
-            )}
-          </button>
-        )}
         <button
           style={{
             ...styles.sendButton,
@@ -557,21 +402,6 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
           0%, 100% { opacity: 0.4; }
           50% { opacity: 1; }
         }
-        
-        /* Scrollbar styling for webkit browsers */
-        .ai-messages-container::-webkit-scrollbar {
-          width: 8px;
-        }
-        .ai-messages-container::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .ai-messages-container::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.3);
-          border-radius: 4px;
-        }
-        .ai-messages-container::-webkit-scrollbar-thumb:hover {
-          background: rgba(255,255,255,0.5);
-        }
       `}</style>
     </div>
   );
@@ -587,8 +417,6 @@ const styles: Record<string, CSSProperties> = {
     margin: '0 auto',
     width: '100%',
     boxSizing: 'border-box',
-    minHeight: 0,
-    overflow: 'hidden',
   },
   header: {
     display: 'flex',
@@ -622,14 +450,10 @@ const styles: Record<string, CSSProperties> = {
   messagesContainer: {
     flex: 1,
     overflowY: 'auto',
-    overflowX: 'hidden',
-    padding: '20px 10px 20px 0',
+    padding: '20px 0',
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
-    minHeight: 0,
-    scrollbarWidth: 'thin',
-    scrollbarColor: 'rgba(255,255,255,0.3) transparent',
   },
   messageWrapper: {
     display: 'flex',
@@ -790,24 +614,6 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s ease',
-  },
-  micButton: {
-    width: '56px',
-    height: '56px',
-    borderRadius: '12px',
-    background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    color: '#ffffff',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s ease',
-  },
-  micButtonActive: {
-    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-    border: '1px solid #ef4444',
-    animation: 'pulse 1s infinite',
   },
   startOverContainer: {
     display: 'flex',
