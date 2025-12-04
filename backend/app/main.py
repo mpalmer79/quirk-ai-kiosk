@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 import os
 
 # Import routers - the original working routers
-from app.routers import inventory, recommendations, leads, analytics, traffic
+from app.routers import inventory, recommendations, leads, analytics, traffic, ai
 
 # Lifespan handler for startup/shutdown
 @asynccontextmanager
@@ -59,6 +59,7 @@ app.include_router(recommendations.router, prefix="/api/v1/recommendations", tag
 app.include_router(leads.router, prefix="/api/v1/leads", tags=["leads"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(traffic.router, prefix="/api/v1/traffic", tags=["traffic"])
+app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
 
 # Root endpoint
 @app.get("/")
