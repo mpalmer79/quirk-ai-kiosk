@@ -1,16 +1,16 @@
 import React, { useState, useCallback, useEffect, useRef, CSSProperties, ReactNode } from 'react';
 
-// Import all customer journey components (using corrected PascalCase filenames)
-import WelcomeScreen from './WelcomeScreen';
-import StockLookup from './StockLookup';
+// Import all customer journey components (matching actual filenames - case sensitive)
+import WelcomeScreen from './Welcomescreen';
+import StockLookup from './Stocklookup';
 import ModelBudgetSelector from './ModelBudgetSelector';
 import GuidedQuiz from './Guidedquiz';
-import InventoryResults from './InventoryResults';
-import VehicleDetail from './VehicleDetail';
+import InventoryResults from './Inventoryresults';
+import VehicleDetail from './Vehicledetail';
 import PaymentCalculator from './Paymentcalculator';
 import TradeInEstimator from './TradeInestimator';
 import CustomerHandoff from './Customerhandoff';
-import ProtectionPackages from './ProtectionPackages';
+import ProtectionPackages from './Protectionpackages';
 import TrafficLog from './Trafficlog';
 import ErrorBoundary from './Errorboundary';
 import api from './api';
