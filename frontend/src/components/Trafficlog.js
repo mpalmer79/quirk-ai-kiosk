@@ -8,19 +8,41 @@ const TrafficLog = ({ navigateTo }) => {
   const [error, setError] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState(null); // 'today', 'vehicle', 'requested', 'completed', 'chat'
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeFilter]);
 
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      // Build query params based on active filter
+      const params = { limit: 100 };
+      if (activeFilter === 'today') {
+        params.filter_today = true;
+      }
+      
       const [logData, statsData] = await Promise.all([
-        api.getTrafficLog(50),
+        api.getTrafficLog(params.limit, 0, params.filter_today),
         api.getTrafficStats()
       ]);
-      setSessions(logData.sessions || []);
+      
+      let sessionList = logData.sessions || [];
+      
+      // Client-side filtering for other filter types
+      if (activeFilter === 'vehicle') {
+        sessionList = sessionList.filter(s => s.vehicle);
+      } else if (activeFilter === 'requested') {
+        sessionList = sessionList.filter(s => s.vehicleRequested);
+      } else if (activeFilter === 'completed') {
+        sessionList = sessionList.filter(s => s.phone);
+      } else if (activeFilter === 'chat') {
+        sessionList = sessionList.filter(s => s.chatHistory && s.chatHistory.length > 0);
+      }
+      
+      setSessions(sessionList);
       setStats(statsData);
       setError(null);
     } catch (err) {
@@ -37,12 +59,34 @@ const TrafficLog = ({ navigateTo }) => {
     setRefreshing(false);
   };
 
+  const handleStatCardClick = (filterType) => {
+    // Toggle filter - if already active, clear it
+    if (activeFilter === filterType) {
+      setActiveFilter(null);
+    } else {
+      setActiveFilter(filterType);
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
+    // Parse the date - timestamps are already in EST from backend
     const date = new Date(dateStr);
     return date.toLocaleString('en-US', {
+      timeZone: 'America/New_York',
       month: 'short',
       day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatChatTime = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-US', {
+      timeZone: 'America/New_York',
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -63,7 +107,8 @@ const TrafficLog = ({ navigateTo }) => {
       stockLookup: 'Stock Lookup',
       modelBudget: 'Model & Budget',
       guidedQuiz: 'Guided Quiz',
-      browse: 'Browse All'
+      browse: 'Browse All',
+      aiChat: 'AI Chat'
     };
     return labels[path] || path || 'Unknown';
   };
@@ -73,12 +118,13 @@ const TrafficLog = ({ navigateTo }) => {
       stockLookup: '#1B7340',
       modelBudget: '#2563eb',
       guidedQuiz: '#dc2626',
-      browse: '#6b7280'
+      browse: '#6b7280',
+      aiChat: '#8b5cf6'
     };
     return colors[path] || '#6b7280';
   };
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <div style={styles.container}>
         <div style={styles.loadingState}>
@@ -117,33 +163,50 @@ const TrafficLog = ({ navigateTo }) => {
           <h1 style={styles.title}>Traffic Log</h1>
           <span style={styles.subtitle}>Kiosk Session Monitor</span>
         </div>
-        <button 
-          style={styles.refreshButton} 
-          onClick={handleRefresh}
-          disabled={refreshing}
-        >
-          <svg 
-            width="18" 
-            height="18" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2"
-            style={{ 
-              animation: refreshing ? 'spin 1s linear infinite' : 'none' 
-            }}
+        <div style={styles.headerRight}>
+          {activeFilter && (
+            <button 
+              style={styles.clearFilterButton}
+              onClick={() => setActiveFilter(null)}
+            >
+              Clear Filter ✕
+            </button>
+          )}
+          <button 
+            style={styles.refreshButton} 
+            onClick={handleRefresh}
+            disabled={refreshing}
           >
-            <path d="M23 4v6h-6M1 20v-6h6"/>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-          </svg>
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
+            <svg 
+              width="18" 
+              height="18" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2"
+              style={{ 
+                animation: refreshing ? 'spin 1s linear infinite' : 'none' 
+              }}
+            >
+              <path d="M23 4v6h-6M1 20v-6h6"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Now Clickable */}
       {stats && (
         <div style={styles.statsGrid}>
-          <div style={styles.statCard}>
+          <div 
+            style={{
+              ...styles.statCard,
+              ...(activeFilter === 'today' ? styles.statCardActive : {}),
+              cursor: 'pointer'
+            }}
+            onClick={() => handleStatCardClick('today')}
+          >
             <span style={styles.statValue}>{stats.today || 0}</span>
             <span style={styles.statLabel}>Today</span>
           </div>
@@ -151,24 +214,60 @@ const TrafficLog = ({ navigateTo }) => {
             <span style={styles.statValue}>{stats.total_sessions || 0}</span>
             <span style={styles.statLabel}>Total Sessions</span>
           </div>
-          <div style={styles.statCard}>
+          <div 
+            style={{
+              ...styles.statCard,
+              ...(activeFilter === 'vehicle' ? styles.statCardActive : {}),
+              cursor: 'pointer'
+            }}
+            onClick={() => handleStatCardClick('vehicle')}
+          >
             <span style={styles.statValue}>{stats.with_vehicle_selected || 0}</span>
             <span style={styles.statLabel}>Viewed Vehicle</span>
           </div>
-          <div style={styles.statCard}>
+          <div 
+            style={{
+              ...styles.statCard,
+              ...(activeFilter === 'requested' ? styles.statCardActive : {}),
+              cursor: 'pointer'
+            }}
+            onClick={() => handleStatCardClick('requested')}
+          >
             <span style={styles.statValue}>{stats.vehicle_requests || 0}</span>
             <span style={styles.statLabel}>Requested Vehicle</span>
           </div>
-          <div style={styles.statCard}>
+          <div 
+            style={{
+              ...styles.statCard,
+              ...(activeFilter === 'completed' ? styles.statCardActive : {}),
+              cursor: 'pointer'
+            }}
+            onClick={() => handleStatCardClick('completed')}
+          >
             <span style={styles.statValue}>{stats.completed_handoffs || 0}</span>
             <span style={styles.statLabel}>Completed</span>
           </div>
           <div style={styles.statCard}>
-            <span style={{ ...styles.statValue, color: '#4ade80' }}>
+            <span style={{ 
+              ...styles.statValue, 
+              color: stats.conversion_rate > 0 ? '#4ade80' : '#ef4444' 
+            }}>
               {stats.conversion_rate || 0}%
             </span>
             <span style={styles.statLabel}>Conversion</span>
           </div>
+        </div>
+      )}
+
+      {/* Filter indicator */}
+      {activeFilter && (
+        <div style={styles.filterIndicator}>
+          Showing: {activeFilter === 'today' ? "Today's Sessions" : 
+                    activeFilter === 'vehicle' ? 'Sessions with Vehicle Viewed' :
+                    activeFilter === 'requested' ? 'Sessions with Vehicle Requested' :
+                    activeFilter === 'completed' ? 'Completed Sessions' :
+                    activeFilter === 'chat' ? 'Sessions with AI Chat' : 'All'}
+          {' '}({sessions.length} results)
         </div>
       )}
 
@@ -190,7 +289,7 @@ const TrafficLog = ({ navigateTo }) => {
             {sessions.length === 0 ? (
               <tr>
                 <td colSpan="7" style={styles.emptyState}>
-                  No sessions recorded yet
+                  {activeFilter ? 'No sessions match this filter' : 'No sessions recorded yet'}
                 </td>
               </tr>
             ) : (
@@ -257,24 +356,31 @@ const TrafficLog = ({ navigateTo }) => {
                     )}
                   </td>
                   <td style={styles.td}>
-                    {session.phone ? (
-                      <span style={styles.statusComplete}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Completed
-                      </span>
-                    ) : session.vehicleRequested ? (
-                      <span style={styles.statusRequested}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10"/>
-                          <path d="M12 6v6l4 2"/>
-                        </svg>
-                        Requested
-                      </span>
-                    ) : (
-                      <span style={styles.statusBrowsing}>Browsing</span>
-                    )}
+                    <div style={styles.statusCell}>
+                      {session.phone ? (
+                        <span style={styles.statusComplete}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                          Completed
+                        </span>
+                      ) : session.vehicleRequested ? (
+                        <span style={styles.statusRequested}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                          </svg>
+                          Requested
+                        </span>
+                      ) : (
+                        <span style={styles.statusBrowsing}>Browsing</span>
+                      )}
+                      {session.chatHistory && session.chatHistory.length > 0 && (
+                        <span style={styles.chatBadge} title="Has AI Chat History">
+                          💬 {session.chatHistory.length}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td style={styles.td}>
                     <button 
@@ -441,6 +547,40 @@ const TrafficLog = ({ navigateTo }) => {
                 </div>
               )}
 
+              {/* AI Chat History */}
+              {selectedSession.chatHistory && selectedSession.chatHistory.length > 0 && (
+                <div style={styles.detailSection}>
+                  <h3 style={styles.sectionTitle}>
+                    AI Chat History ({selectedSession.chatHistory.length} messages)
+                  </h3>
+                  <div style={styles.chatHistoryContainer}>
+                    {selectedSession.chatHistory.map((msg, idx) => (
+                      <div 
+                        key={idx} 
+                        style={{
+                          ...styles.chatMessage,
+                          ...(msg.role === 'user' ? styles.chatMessageUser : styles.chatMessageAssistant)
+                        }}
+                      >
+                        <div style={styles.chatMessageHeader}>
+                          <span style={styles.chatRole}>
+                            {msg.role === 'user' ? '👤 Customer' : '🤖 AI Assistant'}
+                          </span>
+                          {msg.timestamp && (
+                            <span style={styles.chatTimestamp}>
+                              {formatChatTime(msg.timestamp)}
+                            </span>
+                          )}
+                        </div>
+                        <div style={styles.chatContent}>
+                          {msg.content}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Timestamps */}
               <div style={styles.detailSection}>
                 <h3 style={styles.sectionTitle}>Timeline</h3>
@@ -529,6 +669,11 @@ const styles = {
     alignItems: 'center',
     gap: '16px',
   },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
   backButton: {
     display: 'flex',
     alignItems: 'center',
@@ -550,6 +695,16 @@ const styles = {
   subtitle: {
     fontSize: '14px',
     color: 'rgba(255,255,255,0.5)',
+  },
+  clearFilterButton: {
+    padding: '10px 16px',
+    background: 'rgba(239, 68, 68, 0.2)',
+    border: '1px solid rgba(239, 68, 68, 0.3)',
+    borderRadius: '8px',
+    color: '#ef4444',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
   },
   refreshButton: {
     display: 'flex',
@@ -578,6 +733,11 @@ const styles = {
     background: 'rgba(255,255,255,0.03)',
     borderRadius: '12px',
     border: '1px solid rgba(255,255,255,0.08)',
+    transition: 'all 0.2s ease',
+  },
+  statCardActive: {
+    background: 'rgba(27, 115, 64, 0.15)',
+    border: '1px solid rgba(27, 115, 64, 0.4)',
   },
   statValue: {
     fontSize: '32px',
@@ -589,6 +749,15 @@ const styles = {
     color: 'rgba(255,255,255,0.5)',
     textTransform: 'uppercase',
     marginTop: '4px',
+  },
+  filterIndicator: {
+    padding: '12px 16px',
+    background: 'rgba(27, 115, 64, 0.1)',
+    border: '1px solid rgba(27, 115, 64, 0.2)',
+    borderRadius: '8px',
+    color: '#4ade80',
+    fontSize: '13px',
+    marginBottom: '16px',
   },
   tableContainer: {
     background: 'rgba(255,255,255,0.02)',
@@ -680,6 +849,11 @@ const styles = {
   emptyCell: {
     color: 'rgba(255,255,255,0.2)',
   },
+  statusCell: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
   statusComplete: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -711,6 +885,13 @@ const styles = {
     fontSize: '12px',
     fontWeight: '600',
   },
+  chatBadge: {
+    fontSize: '12px',
+    padding: '2px 6px',
+    background: 'rgba(139, 92, 246, 0.2)',
+    borderRadius: '4px',
+    color: '#a78bfa',
+  },
   viewButton: {
     padding: '6px 12px',
     background: 'rgba(255,255,255,0.05)',
@@ -735,7 +916,7 @@ const styles = {
   },
   modal: {
     width: '90%',
-    maxWidth: '600px',
+    maxWidth: '700px',
     maxHeight: '90vh',
     background: '#1a1a1a',
     borderRadius: '20px',
@@ -796,6 +977,48 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     color: '#ffffff',
+  },
+  // Chat History Styles
+  chatHistoryContainer: {
+    maxHeight: '300px',
+    overflow: 'auto',
+    background: 'rgba(0,0,0,0.3)',
+    borderRadius: '12px',
+    padding: '12px',
+  },
+  chatMessage: {
+    marginBottom: '12px',
+    padding: '12px',
+    borderRadius: '8px',
+  },
+  chatMessageUser: {
+    background: 'rgba(37, 99, 235, 0.15)',
+    borderLeft: '3px solid #2563eb',
+  },
+  chatMessageAssistant: {
+    background: 'rgba(27, 115, 64, 0.15)',
+    borderLeft: '3px solid #1B7340',
+  },
+  chatMessageHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+  },
+  chatRole: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  chatTimestamp: {
+    fontSize: '11px',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  chatContent: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: '1.5',
+    whiteSpace: 'pre-wrap',
   },
 };
 
