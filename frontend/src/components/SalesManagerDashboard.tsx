@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from './api';
 
+interface TradeInVehicle {
+  year: string | null;
+  make: string | null;
+  model: string | null;
+  mileage: number | null;
+}
+
 interface CustomerSession {
   sessionId: string;
   customerName: string | null;
@@ -20,12 +27,7 @@ interface CustomerSession {
   };
   tradeIn: {
     hasTrade: boolean | null;
-    vehicle: {
-      year: string | null;
-      make: string | null;
-      model: string | null;
-      mileage: number | null;
-    } | null;
+    vehicle: TradeInVehicle | null;
     hasPayoff: boolean | null;
     payoffAmount: number | null;
     monthlyPayment: number | null;
@@ -46,12 +48,14 @@ const SalesManagerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<CustomerSession | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<string>('');
 
   // Fetch active sessions
   const fetchSessions = async () => {
     try {
-      const data = await api.getActiveSessions();
+      const data = await api.getActiveSessions(30); // 30 minute timeout
       setSessions(data.sessions || []);
+      setLastUpdate(new Date().toLocaleTimeString());
     } catch (err) {
       console.error('Error fetching sessions:', err);
     } finally {
@@ -63,7 +67,7 @@ const SalesManagerDashboard: React.FC = () => {
     fetchSessions();
     
     // Auto-refresh every 5 seconds
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (autoRefresh) {
       interval = setInterval(fetchSessions, 5000);
     }
@@ -72,6 +76,16 @@ const SalesManagerDashboard: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [autoRefresh]);
+
+  // Update selected session when sessions refresh
+  useEffect(() => {
+    if (selectedSession) {
+      const updated = sessions.find(s => s.sessionId === selectedSession.sessionId);
+      if (updated) {
+        setSelectedSession(updated);
+      }
+    }
+  }, [sessions, selectedSession?.sessionId]);
 
   const getStepLabel = (step: string): string => {
     const steps: Record<string, string> = {
@@ -86,11 +100,17 @@ const SalesManagerDashboard: React.FC = () => {
       'vehicleDetail': 'Viewing Vehicle',
       'handoff': 'Ready for Handoff',
       'aiChat': 'AI Assistant Chat',
+      'modelBudget': 'Model & Budget Flow',
+      'stockLookup': 'Stock Lookup',
+      'guidedQuiz': 'Guided Quiz',
+      'browse': 'Browsing',
+      'browsing': 'Browsing',
     };
-    return steps[step] || step;
+    return steps[step] || step || 'Browsing';
   };
 
   const getTimeSince = (dateStr: string): string => {
+    if (!dateStr) return 'Unknown';
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'Just now';
@@ -101,7 +121,7 @@ const SalesManagerDashboard: React.FC = () => {
   };
 
   const formatCurrency = (val: number | null): string => {
-    if (val === null) return '—';
+    if (val === null || val === undefined) return '—';
     return `$${val.toLocaleString()}`;
   };
 
@@ -134,16 +154,16 @@ const SalesManagerDashboard: React.FC = () => {
         <div style={styles.vehicleGrid}>
           <div style={styles.vehicleField}>
             <span style={styles.fieldLabel}>MODEL</span>
-            <span style={styles.fieldValue}>{session.vehicleInterest.model || '—'}</span>
+            <span style={styles.fieldValue}>{session.vehicleInterest?.model || '—'}</span>
           </div>
           <div style={styles.vehicleField}>
             <span style={styles.fieldLabel}>CAB/CONFIG</span>
-            <span style={styles.fieldValue}>{session.vehicleInterest.cab || '—'}</span>
+            <span style={styles.fieldValue}>{session.vehicleInterest?.cab || '—'}</span>
           </div>
           <div style={styles.vehicleField}>
             <span style={styles.fieldLabel}>COLOR PREF</span>
             <span style={styles.fieldValue}>
-              {session.vehicleInterest.colors.length > 0 
+              {session.vehicleInterest?.colors?.length > 0 
                 ? session.vehicleInterest.colors.join(', ') 
                 : '—'}
             </span>
@@ -166,7 +186,7 @@ const SalesManagerDashboard: React.FC = () => {
         {/* Trade-In Quadrant */}
         <div style={styles.quadrant}>
           <h4 style={styles.quadrantTitle}>TRADE-IN</h4>
-          {session.tradeIn.hasTrade === true && session.tradeIn.vehicle ? (
+          {session.tradeIn?.hasTrade === true && session.tradeIn?.vehicle ? (
             <div style={styles.quadrantContent}>
               <div style={styles.tradeVehicleInfo}>
                 <span>{session.tradeIn.vehicle.year} {session.tradeIn.vehicle.make}</span>
@@ -197,7 +217,7 @@ const SalesManagerDashboard: React.FC = () => {
                 <span style={styles.paidOff}>✓ Paid Off / No Loan</span>
               )}
             </div>
-          ) : session.tradeIn.hasTrade === false ? (
+          ) : session.tradeIn?.hasTrade === false ? (
             <span style={styles.noTrade}>No Trade-In</span>
           ) : (
             <span style={styles.pending}>Pending...</span>
@@ -220,7 +240,7 @@ const SalesManagerDashboard: React.FC = () => {
         <div style={styles.quadrant}>
           <h4 style={styles.quadrantTitle}>CASH DOWN</h4>
           <div style={styles.quadrantContent}>
-            {session.budget.downPaymentPercent !== null ? (
+            {session.budget?.downPaymentPercent !== null && session.budget?.downPaymentPercent !== undefined ? (
               <>
                 <span style={styles.bigValue}>{session.budget.downPaymentPercent}%</span>
                 <span style={styles.subValue}>Down Payment</span>
@@ -235,7 +255,7 @@ const SalesManagerDashboard: React.FC = () => {
         <div style={styles.quadrant}>
           <h4 style={styles.quadrantTitle}>MONTHLY PAYMENTS</h4>
           <div style={styles.quadrantContent}>
-            {session.budget.min !== null && session.budget.max !== null ? (
+            {session.budget?.min !== null && session.budget?.max !== null ? (
               <>
                 <span style={styles.bigValue}>
                   {formatCurrency(session.budget.min)} - {formatCurrency(session.budget.max)}
@@ -258,6 +278,7 @@ const SalesManagerDashboard: React.FC = () => {
           <div style={styles.spinner} />
           <p>Loading active sessions...</p>
         </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -267,6 +288,7 @@ const SalesManagerDashboard: React.FC = () => {
       <div style={styles.header}>
         <h1 style={styles.title}>📊 Sales Manager Dashboard</h1>
         <div style={styles.headerControls}>
+          <span style={styles.lastUpdate}>Last update: {lastUpdate}</span>
           <label style={styles.autoRefreshLabel}>
             <input
               type="checkbox"
@@ -309,7 +331,7 @@ const SalesManagerDashboard: React.FC = () => {
                   <span style={styles.sessionStatus}>{getStepLabel(session.currentStep)}</span>
                 </div>
                 <div style={styles.sessionCardDetails}>
-                  <span>{session.vehicleInterest.model || 'Browsing'}</span>
+                  <span>{session.vehicleInterest?.model || 'Browsing'}</span>
                   <span>{getTimeSince(session.lastActivity)}</span>
                 </div>
               </button>
@@ -329,6 +351,7 @@ const SalesManagerDashboard: React.FC = () => {
           )}
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
@@ -363,6 +386,8 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '24px',
     paddingBottom: '16px',
     borderBottom: '1px solid rgba(255,255,255,0.1)',
+    flexWrap: 'wrap',
+    gap: '16px',
   },
   title: {
     fontSize: '24px',
@@ -373,6 +398,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '16px',
+    flexWrap: 'wrap',
+  },
+  lastUpdate: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
   },
   autoRefreshLabel: {
     display: 'flex',
@@ -380,6 +410,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     fontSize: '14px',
     color: 'rgba(255,255,255,0.7)',
+    cursor: 'pointer',
   },
   refreshButton: {
     padding: '8px 16px',
@@ -394,13 +425,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: '320px 1fr',
     gap: '24px',
-    height: 'calc(100vh - 120px)',
+    minHeight: 'calc(100vh - 140px)',
   },
   sessionsList: {
     background: 'rgba(255,255,255,0.03)',
     borderRadius: '12px',
     padding: '16px',
     overflowY: 'auto',
+    maxHeight: 'calc(100vh - 140px)',
   },
   sectionHeader: {
     fontSize: '14px',
@@ -424,6 +456,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     textAlign: 'left',
     transition: 'all 0.2s ease',
+    color: '#ffffff',
   },
   sessionCardActive: {
     background: 'rgba(27, 115, 64, 0.2)',
@@ -440,7 +473,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ffffff',
   },
   sessionStatus: {
-    fontSize: '12px',
+    fontSize: '11px',
     padding: '4px 8px',
     background: 'rgba(74, 222, 128, 0.2)',
     borderRadius: '4px',
@@ -457,6 +490,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '12px',
     padding: '24px',
     overflowY: 'auto',
+    maxHeight: 'calc(100vh - 140px)',
   },
   selectPrompt: {
     display: 'flex',
@@ -464,6 +498,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
+    minHeight: '400px',
     color: 'rgba(255,255,255,0.4)',
     gap: '16px',
   },
@@ -479,6 +514,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '24px',
+    flexWrap: 'wrap',
+    gap: '12px',
   },
   fourSquareTitle: {
     fontSize: '20px',
