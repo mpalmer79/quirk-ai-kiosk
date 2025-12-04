@@ -319,7 +319,7 @@ const KioskApp: React.FC = () => {
       customerName: customerData.customerName,
       phone: customerData.contactInfo?.phone,
       path: customerData.path,
-      vehicleRequested: !!(customerData as CustomerData & { vehicleRequested?: unknown }).vehicleRequested,
+      vehicleRequested: !!customerData.vehicleRequested,
       actions: [currentScreen],
     };
 
