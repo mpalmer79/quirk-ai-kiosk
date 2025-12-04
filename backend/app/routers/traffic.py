@@ -22,6 +22,9 @@ TRAFFIC_LOG_FILE = os.path.join(DATA_DIR, 'traffic_log.json')
 # For simplicity, using EST. In production, use pytz for DST handling.
 EST_OFFSET = timedelta(hours=-5)
 
+# Active session timeout (minutes)
+ACTIVE_SESSION_TIMEOUT = 30
+
 
 def get_eastern_time() -> datetime:
     """Get current time in Eastern Time."""
@@ -39,6 +42,20 @@ def get_eastern_date_str() -> str:
 def format_eastern_timestamp() -> str:
     """Get ISO format timestamp in Eastern Time."""
     return get_eastern_time().strftime('%Y-%m-%dT%H:%M:%S') + '-05:00'
+
+
+def parse_timestamp(ts_str: str) -> datetime:
+    """Parse a timestamp string into datetime."""
+    try:
+        # Handle ISO format with timezone
+        if '+' in ts_str or ts_str.endswith('Z'):
+            return datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+        elif '-05:00' in ts_str:
+            return datetime.fromisoformat(ts_str)
+        else:
+            return datetime.fromisoformat(ts_str)
+    except:
+        return datetime.now()
 
 
 def load_traffic_log() -> List[Dict]:
@@ -81,7 +98,23 @@ class VehicleInfo(BaseModel):
     salePrice: Optional[float] = None
 
 
+class TradeInVehicle(BaseModel):
+    """Trade-in vehicle details (Year/Make/Model/Mileage)"""
+    year: Optional[str] = None
+    make: Optional[str] = None
+    model: Optional[str] = None
+    mileage: Optional[int] = None
+
+
 class TradeInInfo(BaseModel):
+    """Full trade-in info including vehicle and payoff details"""
+    hasTrade: Optional[bool] = None
+    vehicle: Optional[TradeInVehicle] = None
+    hasPayoff: Optional[bool] = None
+    payoffAmount: Optional[float] = None
+    monthlyPayment: Optional[float] = None
+    financedWith: Optional[str] = None
+    # Legacy fields for backward compatibility
     year: Optional[int] = None
     make: Optional[str] = None
     model: Optional[str] = None
@@ -97,6 +130,20 @@ class PaymentInfo(BaseModel):
     downPayment: Optional[float] = None
 
 
+class BudgetInfo(BaseModel):
+    """Budget range info for 4-square"""
+    min: Optional[int] = None
+    max: Optional[int] = None
+    downPaymentPercent: Optional[int] = None
+
+
+class VehicleInterest(BaseModel):
+    """Vehicle interest from ModelBudgetSelector"""
+    model: Optional[str] = None
+    cab: Optional[str] = None
+    colors: Optional[List[str]] = None
+
+
 class ChatMessage(BaseModel):
     role: str  # 'user' or 'assistant'
     content: str
@@ -108,7 +155,10 @@ class SessionCreate(BaseModel):
     customerName: Optional[str] = None
     phone: Optional[str] = None
     path: Optional[str] = None  # stockLookup, modelBudget, guidedQuiz, browse, aiChat
+    currentStep: Optional[str] = None  # Current step in journey
     vehicle: Optional[VehicleInfo] = None
+    vehicleInterest: Optional[VehicleInterest] = None  # New: model/cab/colors
+    budget: Optional[BudgetInfo] = None  # New: budget range
     tradeIn: Optional[TradeInInfo] = None
     payment: Optional[PaymentInfo] = None
     vehicleRequested: Optional[bool] = False
@@ -128,7 +178,10 @@ class TrafficLogEntry(BaseModel):
     customerName: Optional[str]
     phone: Optional[str]
     path: Optional[str]
+    currentStep: Optional[str]
     vehicle: Optional[Dict]
+    vehicleInterest: Optional[Dict]
+    budget: Optional[Dict]
     tradeIn: Optional[Dict]
     payment: Optional[Dict]
     vehicleRequested: bool
@@ -136,6 +189,59 @@ class TrafficLogEntry(BaseModel):
     chatHistory: Optional[List[Dict]]
     createdAt: str
     updatedAt: str
+
+
+# ============ Helper Functions ============
+
+def format_session_for_dashboard(session: Dict) -> Dict:
+    """Format a session for the Sales Manager Dashboard 4-square view."""
+    trade_in = session.get('tradeIn') or {}
+    vehicle_interest = session.get('vehicleInterest') or {}
+    budget = session.get('budget') or {}
+    selected_vehicle = session.get('vehicle')
+    
+    return {
+        'sessionId': session.get('sessionId'),
+        'customerName': session.get('customerName'),
+        'phone': session.get('phone'),
+        'startTime': session.get('createdAt'),
+        'lastActivity': session.get('updatedAt'),
+        'currentStep': session.get('currentStep') or session.get('path') or 'browsing',
+        'vehicleInterest': {
+            'model': vehicle_interest.get('model'),
+            'cab': vehicle_interest.get('cab'),
+            'colors': vehicle_interest.get('colors') or [],
+        },
+        'budget': {
+            'min': budget.get('min'),
+            'max': budget.get('max'),
+            'downPaymentPercent': budget.get('downPaymentPercent'),
+        },
+        'tradeIn': {
+            'hasTrade': trade_in.get('hasTrade'),
+            'vehicle': trade_in.get('vehicle') if trade_in.get('vehicle') else (
+                # Backward compatibility with old format
+                {
+                    'year': str(trade_in.get('year')) if trade_in.get('year') else None,
+                    'make': trade_in.get('make'),
+                    'model': trade_in.get('model'),
+                    'mileage': trade_in.get('mileage'),
+                } if trade_in.get('year') or trade_in.get('make') else None
+            ),
+            'hasPayoff': trade_in.get('hasPayoff'),
+            'payoffAmount': trade_in.get('payoffAmount'),
+            'monthlyPayment': trade_in.get('monthlyPayment'),
+            'financedWith': trade_in.get('financedWith'),
+        },
+        'selectedVehicle': {
+            'stockNumber': selected_vehicle.get('stockNumber'),
+            'year': selected_vehicle.get('year'),
+            'make': selected_vehicle.get('make'),
+            'model': selected_vehicle.get('model'),
+            'trim': selected_vehicle.get('trim'),
+            'price': selected_vehicle.get('salePrice') or selected_vehicle.get('msrp'),
+        } if selected_vehicle else None,
+    }
 
 
 # ============ Endpoints ============
@@ -164,7 +270,10 @@ async def create_or_update_session(session: SessionCreate):
         'customerName': session.customerName,
         'phone': session.phone,
         'path': session.path,
+        'currentStep': session.currentStep,
         'vehicle': session.vehicle.dict() if session.vehicle else None,
+        'vehicleInterest': session.vehicleInterest.dict() if session.vehicleInterest else None,
+        'budget': session.budget.dict() if session.budget else None,
         'tradeIn': session.tradeIn.dict() if session.tradeIn else None,
         'payment': session.payment.dict() if session.payment else None,
         'vehicleRequested': session.vehicleRequested or False,
@@ -198,7 +307,7 @@ async def create_or_update_session(session: SessionCreate):
             session_data['chatHistory'] = existing_chat if existing_chat else None
         
         # Keep non-null values from existing if new value is null
-        for key in ['customerName', 'phone', 'path', 'vehicle', 'tradeIn', 'payment']:
+        for key in ['customerName', 'phone', 'path', 'currentStep', 'vehicle', 'vehicleInterest', 'budget', 'tradeIn', 'payment']:
             if session_data.get(key) is None and existing.get(key) is not None:
                 session_data[key] = existing[key]
         
@@ -215,6 +324,50 @@ async def create_or_update_session(session: SessionCreate):
         status="success",
         message="Session logged successfully"
     )
+
+
+@router.get("/active")
+async def get_active_sessions(
+    timeout_minutes: int = Query(ACTIVE_SESSION_TIMEOUT, ge=1, le=120),
+):
+    """
+    Get active kiosk sessions for Sales Manager Dashboard.
+    Returns sessions that have been updated within the timeout period.
+    Formatted for the 4-square worksheet view.
+    """
+    global traffic_sessions
+    traffic_sessions = load_traffic_log()
+    
+    now = get_eastern_time()
+    cutoff = now - timedelta(minutes=timeout_minutes)
+    
+    active = []
+    for session in traffic_sessions:
+        updated_at = session.get('updatedAt', session.get('createdAt', ''))
+        if updated_at:
+            try:
+                session_time = parse_timestamp(updated_at)
+                # Remove timezone info for comparison if needed
+                if session_time.tzinfo:
+                    session_time = session_time.replace(tzinfo=None)
+                cutoff_naive = cutoff.replace(tzinfo=None)
+                
+                if session_time >= cutoff_naive:
+                    active.append(format_session_for_dashboard(session))
+            except Exception as e:
+                print(f"Error parsing timestamp: {e}")
+                continue
+    
+    # Sort by most recent activity first
+    active.sort(key=lambda x: x.get('lastActivity', ''), reverse=True)
+    
+    return {
+        "sessions": active,
+        "count": len(active),
+        "timeout_minutes": timeout_minutes,
+        "server_time": format_eastern_timestamp(),
+        "timezone": "America/New_York"
+    }
 
 
 @router.get("/log")
@@ -282,6 +435,19 @@ async def get_session_detail(session_id: str):
     return {"error": "Session not found"}
 
 
+@router.get("/dashboard/{session_id}")
+async def get_session_for_dashboard(session_id: str):
+    """Get a single session formatted for the 4-square dashboard view."""
+    global traffic_sessions
+    traffic_sessions = load_traffic_log()
+    
+    for session in traffic_sessions:
+        if session.get('sessionId') == session_id:
+            return format_session_for_dashboard(session)
+    
+    return {"error": "Session not found"}
+
+
 @router.get("/stats")
 async def get_traffic_stats():
     """
@@ -310,6 +476,11 @@ async def get_traffic_stats():
     today = get_eastern_date_str()
     today_count = 0
     
+    # Active sessions count (last 30 min)
+    now = get_eastern_time()
+    active_cutoff = now - timedelta(minutes=ACTIVE_SESSION_TIMEOUT)
+    active_count = 0
+    
     for session in traffic_sessions:
         path = session.get('path') or 'unknown'
         by_path[path] = by_path.get(path, 0) + 1
@@ -332,9 +503,23 @@ async def get_traffic_stats():
         created = session.get('createdAt', '')
         if created.startswith(today):
             today_count += 1
+        
+        # Check if active
+        updated_at = session.get('updatedAt', created)
+        if updated_at:
+            try:
+                session_time = parse_timestamp(updated_at)
+                if session_time.tzinfo:
+                    session_time = session_time.replace(tzinfo=None)
+                active_cutoff_naive = active_cutoff.replace(tzinfo=None)
+                if session_time >= active_cutoff_naive:
+                    active_count += 1
+            except:
+                pass
     
     return {
         "total_sessions": total,
+        "active_now": active_count,
         "today": today_count,
         "today_date": today,
         "by_path": by_path,
