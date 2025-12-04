@@ -71,7 +71,8 @@ CATEGORY_MAP = {
 # GM MODEL CODE DECODER
 # =============================================================================
 
-BODY_CODE_MAP = {
+# Body code mapping for light-duty trucks (Silverado 1500/2500/3500)
+BODY_CODE_MAP_LIGHT_DUTY = {
     '703': {'cab': 'Regular Cab', 'bed': 'Standard Bed'},
     '903': {'cab': 'Regular Cab', 'bed': 'Long Bed'},
     '753': {'cab': 'Double Cab', 'bed': 'Standard Bed'},
@@ -81,25 +82,63 @@ BODY_CODE_MAP = {
     '943': {'cab': 'Crew Cab', 'bed': 'Long Bed'},
 }
 
+# Body code mapping for Medium Duty trucks (Silverado 4500/5500/6500)
+BODY_CODE_MAP_MEDIUM_DUTY = {
+    '403': {'cab': 'Regular Cab', 'bed': 'Chassis Cab'},
+    '503': {'cab': 'Regular Cab', 'bed': 'Chassis Cab'},
+    '443': {'cab': 'Crew Cab', 'bed': 'Chassis Cab'},
+    '543': {'cab': 'Crew Cab', 'bed': 'Chassis Cab'},
+}
+
 
 def parse_model_code(model_str: str) -> dict:
-    """Parse GM model code to extract cab style and bed length."""
+    """
+    Parse GM model code to extract cab style, bed length, and drive type.
+    
+    Format: CC/CK + Series (2 digits) + Body Code (3 digits)
+    Examples:
+      - CK10543: 4WD, 1500 series, Crew Cab Short Bed
+      - CC20903: 2WD, 2500 series, Regular Cab Long Bed  
+      - CC56403: 2WD, Medium Duty (5500/6500), Regular Cab Chassis
+    
+    Drive codes:
+      - CC = 2WD (Conventional Cab, 2-wheel drive)
+      - CK = 4WD (Conventional Cab, K = 4-wheel drive)
+    """
     result = {'cab': None, 'bed': None, 'drive': None}
     
     if not model_str:
         return result
     
-    model_upper = model_str.upper()
-    pattern = r'(CC|CK)([123]0)(\d{3})'
-    match = re.search(pattern, model_upper)
+    model_upper = model_str.upper().strip()
     
-    if match:
-        drive_code = match.group(1)
-        body_code = match.group(3)
-        result['drive'] = '4WD' if drive_code == 'CK' else '2WD'
-        if body_code in BODY_CODE_MAP:
-            result['cab'] = BODY_CODE_MAP[body_code]['cab']
-            result['bed'] = BODY_CODE_MAP[body_code]['bed']
+    # Pattern: CC or CK + 2 digits (series) + 3 digits (body code)
+    pattern = r'^(CC|CK)(\d{2})(\d{3})$'
+    match = re.match(pattern, model_upper)
+    
+    if not match:
+        return result
+    
+    drive_code = match.group(1)
+    series_code = match.group(2)
+    body_code = match.group(3)
+    
+    # Drive type: CC = 2WD, CK = 4WD
+    result['drive'] = '4WD' if drive_code == 'CK' else '2WD'
+    
+    # Determine if light-duty or medium-duty based on series
+    series_int = int(series_code)
+    
+    if series_int in [10, 20, 30]:
+        # Light-duty: 1500, 2500, 3500
+        if body_code in BODY_CODE_MAP_LIGHT_DUTY:
+            result['cab'] = BODY_CODE_MAP_LIGHT_DUTY[body_code]['cab']
+            result['bed'] = BODY_CODE_MAP_LIGHT_DUTY[body_code]['bed']
+    elif series_int >= 40:
+        # Medium-duty: 4500, 5500, 6500 (series codes 54, 55, 56, etc.)
+        if body_code in BODY_CODE_MAP_MEDIUM_DUTY:
+            result['cab'] = BODY_CODE_MAP_MEDIUM_DUTY[body_code]['cab']
+            result['bed'] = BODY_CODE_MAP_MEDIUM_DUTY[body_code]['bed']
     
     return result
 
