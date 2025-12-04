@@ -101,6 +101,33 @@ export interface CustomerData {
     bodyStyle?: string;
     [key: string]: unknown;
   };
+  quizAnswers?: Record<string, string>;
+  contactInfo?: {
+    phone?: string;
+    email?: string;
+    [key: string]: unknown;
+  };
+  paymentPreference?: {
+    type?: string;
+    monthly?: number;
+    term?: number;
+    downPayment?: number;
+    [key: string]: unknown;
+  };
+  tradeIn?: {
+    year?: number;
+    make?: string;
+    model?: string;
+    mileage?: number;
+    condition?: string;
+    estimatedValue?: number;
+    [key: string]: unknown;
+  };
+  vehicleRequested?: {
+    stockNumber?: string;
+    requestedAt?: string;
+    [key: string]: unknown;
+  };
 }
 
 // Protection Package Types
