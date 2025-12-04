@@ -47,7 +47,8 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     const loadInventoryCounts = async (): Promise<void> => {
       try {
         const data = await api.getInventory({});
-        const vehicles: Vehicle[] = data?.vehicles || data || [];
+        // Handle both array and object response types
+        const vehicles: Vehicle[] = Array.isArray(data) ? data : (data as { vehicles?: Vehicle[] }).vehicles || [];
         
         // Count vehicles by model
         const counts: InventoryByModel = {};
