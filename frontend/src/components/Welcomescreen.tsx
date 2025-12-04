@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, KeyboardEvent, ChangeEvent } from 'react';
+import React, { useState, useEffect, useRef, KeyboardEvent, ChangeEvent, CSSProperties } from 'react';
 import api from './api';
 import type { CustomerData, KioskComponentProps } from '../types';
 
@@ -462,8 +462,6 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     </div>
   );
 };
-
-import type { CSSProperties } from 'react';
 
 const styles: Record<string, CSSProperties> = {
   container: {
