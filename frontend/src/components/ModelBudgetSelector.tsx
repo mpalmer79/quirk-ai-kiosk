@@ -18,6 +18,14 @@ interface ColorChoices {
   second: string;
 }
 
+// Trade-in vehicle info
+interface TradeVehicleInfo {
+  year: string;
+  make: string;
+  model: string;
+  mileage: string;
+}
+
 // Inventory count by model name
 type InventoryByModel = Record<string, number>;
 
@@ -27,6 +35,18 @@ const formatCurrency = (value: string): string => {
   if (isNaN(num)) return '';
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
+
+// Generate year options (current year + 1 down to 20 years ago)
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 21 }, (_, i) => (currentYear + 1 - i).toString());
+
+// Common makes for dropdown
+const COMMON_MAKES = [
+  'Acura', 'Audi', 'BMW', 'Buick', 'Cadillac', 'Chevrolet', 'Chrysler', 'Dodge',
+  'Ford', 'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Jeep', 'Kia', 'Lexus',
+  'Lincoln', 'Mazda', 'Mercedes-Benz', 'Nissan', 'Ram', 'Subaru', 'Tesla',
+  'Toyota', 'Volkswagen', 'Volvo', 'Other'
+];
 
 const ModelBudgetSelector: React.FC<KioskComponentProps> = ({ 
   navigateTo, 
@@ -47,6 +67,12 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const [payoffAmount, setPayoffAmount] = useState<string>('');
   const [monthlyPayment, setMonthlyPayment] = useState<string>('');
   const [financedWith, setFinancedWith] = useState<string>('');
+  const [tradeVehicle, setTradeVehicle] = useState<TradeVehicleInfo>({
+    year: '',
+    make: '',
+    model: '',
+    mileage: '',
+  });
   const [inventoryCount, setInventoryCount] = useState<number | null>(null);
   const [inventoryByModel, setInventoryByModel] = useState<InventoryByModel>({});
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
@@ -56,15 +82,12 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     const loadInventoryCounts = async (): Promise<void> => {
       try {
         const data = await api.getInventory({});
-        // Handle both array and object response types
         const vehicles: Vehicle[] = Array.isArray(data) ? data : (data as { vehicles?: Vehicle[] }).vehicles || [];
         
-        // Count vehicles by model
         const counts: InventoryByModel = {};
         vehicles.forEach((vehicle: Vehicle) => {
           const model = (vehicle.model || '').trim();
           if (model) {
-            // Try to match to our category models
             Object.values(BASE_CATEGORIES).forEach(category => {
               category.modelNames.forEach((categoryModel: string) => {
                 if (modelMatches(model, categoryModel)) {
@@ -97,7 +120,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
           cabOptions: category.cabOptions?.[modelName],
         }));
       
-      // Only include category if it has available models
       if (availableModels.length > 0) {
         acc[key] = {
           name: category.name,
@@ -117,7 +139,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   };
 
   useEffect(() => {
-    // Use pre-loaded inventory count instead of making another API call
     if (selectedModel) {
       setInventoryCount(inventoryByModel[selectedModel.name] || 0);
     }
@@ -144,22 +165,23 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     setColorChoices(prev => ({ ...prev, [choice]: value }));
   };
 
-  // Handle currency input for payoff amount
   const handlePayoffAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const rawValue = e.target.value.replace(/[^0-9]/g, '');
     setPayoffAmount(rawValue);
   };
 
-  // Handle currency input for monthly payment
   const handleMonthlyPaymentChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const rawValue = e.target.value.replace(/[^0-9]/g, '');
     setMonthlyPayment(rawValue);
   };
 
-  // Handle financed with input (max 25 chars)
   const handleFinancedWithChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const value = e.target.value.slice(0, 25);
     setFinancedWith(value);
+  };
+
+  const handleTradeVehicleChange = (field: keyof TradeVehicleInfo, value: string): void => {
+    setTradeVehicle(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSearch = (): void => {
@@ -174,6 +196,12 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
       payoffAmount: hasPayoff ? parseFloat(payoffAmount) : null,
       monthlyPayment: hasPayoff ? parseFloat(monthlyPayment) : null,
       financedWith: hasPayoff ? financedWith : null,
+      tradeVehicle: hasTrade ? {
+        year: tradeVehicle.year,
+        make: tradeVehicle.make,
+        model: tradeVehicle.model,
+        mileage: tradeVehicle.mileage ? parseInt(tradeVehicle.mileage) : null,
+      } : null,
       path: 'modelBudget',
     });
     navigateTo('inventory');
@@ -225,7 +253,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
         ))}
       </div>
       
-      {/* Start Over Button - centered below categories */}
       {resetJourney && (
         <div style={styles.startOverContainer}>
           <button style={styles.startOverButton} onClick={resetJourney}>
@@ -393,7 +420,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     );
   };
 
-  // Step 5: Budget Selection with Buying Power Calculation
+  // Step 5: Budget Selection
   const renderBudgetSelection = (): JSX.Element | null => {
     if (!selectedModel) return null;
     
@@ -409,7 +436,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     const term = estimatedLoan > 20000 ? 84 : 72;
     const loanAmount = calculateLoanAmount(budgetRange.max, term);
     
-    // Calculate total buying power based on down payment percentage
     const downPaymentFraction = downPaymentPercent / 100;
     const totalBuyingPower = downPaymentPercent === 0 
       ? loanAmount 
@@ -581,7 +607,59 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
 
           {hasTrade === true && (
             <div style={styles.payoffSection}>
-              <h3 style={styles.payoffTitle}>Does your trade-in have a loan payoff?</h3>
+              {/* Trade Vehicle Information */}
+              <h3 style={styles.payoffTitle}>Tell us about your trade-in vehicle</h3>
+              <div style={styles.tradeVehicleGrid}>
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Year</label>
+                  <select
+                    style={styles.selectInput}
+                    value={tradeVehicle.year}
+                    onChange={(e) => handleTradeVehicleChange('year', e.target.value)}
+                  >
+                    <option value="">Select Year</option>
+                    {YEAR_OPTIONS.map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Make</label>
+                  <select
+                    style={styles.selectInput}
+                    value={tradeVehicle.make}
+                    onChange={(e) => handleTradeVehicleChange('make', e.target.value)}
+                  >
+                    <option value="">Select Make</option>
+                    {COMMON_MAKES.map((make) => (
+                      <option key={make} value={make}>{make}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Model</label>
+                  <input
+                    type="text"
+                    style={styles.textInputStandalone}
+                    placeholder="e.g., Camry, F-150"
+                    value={tradeVehicle.model}
+                    onChange={(e) => handleTradeVehicleChange('model', e.target.value)}
+                  />
+                </div>
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Mileage</label>
+                  <input
+                    type="text"
+                    style={styles.textInputStandalone}
+                    placeholder="e.g., 45000"
+                    value={tradeVehicle.mileage}
+                    onChange={(e) => handleTradeVehicleChange('mileage', e.target.value.replace(/[^0-9]/g, ''))}
+                  />
+                </div>
+              </div>
+
+              {/* Loan Payoff Question */}
+              <h3 style={{...styles.payoffTitle, marginTop: '24px'}}>Does your trade-in have a loan payoff?</h3>
               <div style={styles.payoffOptions}>
                 <button
                   style={{...styles.optionButton, ...(hasPayoff === true ? styles.optionButtonActive : {})}}
@@ -596,9 +674,9 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                   No / Paid Off
                 </button>
               </div>
+
               {hasPayoff === true && (
                 <div style={styles.payoffFieldsGrid}>
-                  {/* Approximate Payoff Amount */}
                   <div style={styles.payoffFieldGroup}>
                     <label style={styles.inputLabel}>Approximate Payoff Amount</label>
                     <div style={styles.inputWrapper}>
@@ -613,7 +691,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                     </div>
                   </div>
                   
-                  {/* Monthly Payment */}
                   <div style={styles.payoffFieldGroup}>
                     <label style={styles.inputLabel}>Monthly Payment</label>
                     <div style={styles.inputWrapper}>
@@ -628,7 +705,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                     </div>
                   </div>
                   
-                  {/* Financed With */}
                   <div style={styles.payoffFieldGroup}>
                     <label style={styles.inputLabel}>Financed With</label>
                     <div style={styles.inputWrapper}>
