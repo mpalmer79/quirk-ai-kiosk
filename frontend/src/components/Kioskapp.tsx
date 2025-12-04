@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, CSSProperties, ReactNode } from 'react';
+import React, { useState, useCallback, useEffect, useRef, CSSProperties, ReactNode } from 'react';
 
 // Import all customer journey components (using corrected PascalCase filenames)
 import WelcomeScreen from './WelcomeScreen';
@@ -125,23 +125,156 @@ const KioskApp: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('welcome');
   const [customerData, setCustomerData] = useState<CustomerData>(initialCustomerData);
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
+  
+  // Track navigation history for back button support
+  const navigationHistoryRef = useRef<ScreenName[]>(['welcome']);
+  const isPopStateNavigationRef = useRef<boolean>(false);
 
   const updateCustomerData = useCallback((updates: Partial<CustomerData>): void => {
     setCustomerData(prev => ({ ...prev, ...updates }));
   }, []);
 
+  // Navigate to a new screen with browser history support
   const navigateTo = useCallback((screen: string): void => {
+    const screenName = screen as ScreenName;
+    
+    // Don't push duplicate consecutive screens
+    const currentHistory = navigationHistoryRef.current;
+    if (currentHistory[currentHistory.length - 1] === screenName) {
+      return;
+    }
+    
     setIsTransitioning(true);
+    
     setTimeout(() => {
-      setCurrentScreen(screen as ScreenName);
+      // If this navigation is triggered by popstate (back button), don't push to history
+      if (!isPopStateNavigationRef.current) {
+        // Add to navigation history
+        navigationHistoryRef.current = [...navigationHistoryRef.current, screenName];
+        
+        // Push state to browser history
+        window.history.pushState(
+          { screen: screenName, index: navigationHistoryRef.current.length - 1 },
+          '',
+          `#${screenName}`
+        );
+      }
+      
+      isPopStateNavigationRef.current = false;
+      setCurrentScreen(screenName);
       setIsTransitioning(false);
     }, 150);
   }, []);
 
+  // Go back to previous screen
+  const goBack = useCallback((): void => {
+    const currentHistory = navigationHistoryRef.current;
+    
+    // If we're at welcome or only have one screen, can't go back further
+    if (currentHistory.length <= 1 || currentScreen === 'welcome') {
+      return;
+    }
+    
+    // Remove current screen from history
+    const newHistory = currentHistory.slice(0, -1);
+    navigationHistoryRef.current = newHistory;
+    
+    // Get the previous screen
+    const previousScreen = newHistory[newHistory.length - 1];
+    
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentScreen(previousScreen);
+      setIsTransitioning(false);
+    }, 150);
+  }, [currentScreen]);
+
   const resetJourney = useCallback((): void => {
+    // Clear navigation history and reset to welcome
+    navigationHistoryRef.current = ['welcome'];
+    
+    // Replace current history state with welcome
+    window.history.replaceState(
+      { screen: 'welcome', index: 0 },
+      '',
+      '#welcome'
+    );
+    
     setCustomerData(initialCustomerData);
     setCurrentScreen('welcome');
   }, []);
+
+  // Initialize browser history state on mount
+  useEffect(() => {
+    // Set initial state in browser history
+    window.history.replaceState(
+      { screen: 'welcome', index: 0 },
+      '',
+      '#welcome'
+    );
+  }, []);
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent): void => {
+      // Prevent default browser behavior of leaving the page
+      const state = event.state;
+      
+      if (state && state.screen) {
+        // Browser back/forward to a known screen
+        const targetScreen = state.screen as ScreenName;
+        const targetIndex = state.index as number;
+        
+        // Update our navigation history to match
+        navigationHistoryRef.current = navigationHistoryRef.current.slice(0, targetIndex + 1);
+        
+        // Mark this as a popstate navigation so navigateTo doesn't push to history
+        isPopStateNavigationRef.current = true;
+        
+        setIsTransitioning(true);
+        setTimeout(() => {
+          setCurrentScreen(targetScreen);
+          setIsTransitioning(false);
+          isPopStateNavigationRef.current = false;
+        }, 150);
+      } else {
+        // No state - user is trying to go before our app started
+        // Push them back to welcome and make it the backstop
+        window.history.pushState(
+          { screen: 'welcome', index: 0 },
+          '',
+          '#welcome'
+        );
+        
+        navigationHistoryRef.current = ['welcome'];
+        setCurrentScreen('welcome');
+        setCustomerData(initialCustomerData);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  // Prevent leaving the app when on welcome screen
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
+      // Only show warning if user has progressed beyond welcome
+      if (currentScreen !== 'welcome' && navigationHistoryRef.current.length > 1) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [currentScreen]);
 
   // Idle timeout - return to welcome after 3 minutes of inactivity
   useEffect(() => {
@@ -258,6 +391,11 @@ const KioskApp: React.FC = () => {
 
   const CurrentScreenComponent = screens[currentScreen] || WelcomeScreen;
 
+  // Check if we can go back (not on welcome and have history)
+  const canGoBack = currentScreen !== 'welcome' && 
+                    currentScreen !== 'trafficLog' && 
+                    navigationHistoryRef.current.length > 1;
+
   // Props passed to all screen components
   const screenProps: KioskComponentProps = {
     customerData,
@@ -276,12 +414,24 @@ const KioskApp: React.FC = () => {
         </div>
         <div style={styles.headerRight}>
           {currentScreen !== 'welcome' && currentScreen !== 'trafficLog' && (
-            <button style={styles.backButton} onClick={resetJourney}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-              </svg>
-              Start Over
-            </button>
+            <div style={styles.headerButtons}>
+              {/* Back Button - only show if there's history to go back to */}
+              {canGoBack && (
+                <button style={styles.backButton} onClick={goBack}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                  </svg>
+                  Back
+                </button>
+              )}
+              {/* Start Over Button */}
+              <button style={styles.startOverButton} onClick={resetJourney}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+                Start Over
+              </button>
+            </div>
           )}
           {currentScreen === 'welcome' && (
             <button 
@@ -398,7 +548,31 @@ const styles: Record<string, CSSProperties> = {
     padding: '4px 12px',
     borderRadius: '6px',
   },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+  headerButtons: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
   backButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: '#ffffff',
+    padding: '12px 20px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  startOverButton: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
@@ -411,11 +585,6 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-  },
-  headerRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
   },
   adminLink: {
     background: 'transparent',
