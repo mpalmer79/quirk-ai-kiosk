@@ -77,7 +77,7 @@ const SalesManagerDashboard: React.FC = () => {
     };
   }, [autoRefresh]);
 
-  // Update selected session when sessions refresh
+// Update selected session when sessions refresh
   useEffect(() => {
     if (selectedSession) {
       const updated = sessions.find(s => s.sessionId === selectedSession.sessionId);
@@ -85,7 +85,8 @@ const SalesManagerDashboard: React.FC = () => {
         setSelectedSession(updated);
       }
     }
-  }, [sessions, selectedSession?.sessionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions]);
 
   const getStepLabel = (step: string): string => {
     const steps: Record<string, string> = {
