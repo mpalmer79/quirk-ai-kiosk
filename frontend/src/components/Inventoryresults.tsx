@@ -63,15 +63,16 @@ const formatPrice = (price?: number): string => {
 const getColorCategory = (colorDesc: string): string => {
   const c = colorDesc.toLowerCase();
   if (c.includes('black')) return 'black';
-  if (c.includes('white') || c.includes('summit') || c.includes('arctic') || c.includes('polar')) return 'white';
-  if (c.includes('red') || c.includes('cherry') || c.includes('cajun') || c.includes('radiant')) return 'red';
-  if (c.includes('blue') || c.includes('northsky') || c.includes('glacier') || c.includes('reef')) return 'blue';
-  if (c.includes('silver') || c.includes('sterling')) return 'silver';
-  if (c.includes('gray') || c.includes('grey') || c.includes('shadow')) return 'gray';
-  if (c.includes('green') || c.includes('woodland')) return 'green';
-  if (c.includes('orange') || c.includes('tangier')) return 'orange';
-  if (c.includes('yellow') || c.includes('accelerate')) return 'yellow';
-  if (c.includes('brown') || c.includes('harvest')) return 'brown';
+  if (c.includes('white') || c.includes('summit') || c.includes('arctic') || c.includes('polar') || c.includes('iridescent')) return 'white';
+  if (c.includes('red') || c.includes('cherry') || c.includes('cajun') || c.includes('radiant') || c.includes('garnet')) return 'red';
+  if (c.includes('blue') || c.includes('northsky') || c.includes('glacier') || c.includes('reef') || c.includes('midnight')) return 'blue';
+  // Check gray BEFORE silver so "Sterling Gray" maps to gray
+  if (c.includes('gray') || c.includes('grey') || c.includes('shadow') || c.includes('sterling') || c.includes('satin steel')) return 'gray';
+  if (c.includes('silver')) return 'silver';
+  if (c.includes('green') || c.includes('woodland') || c.includes('evergreen')) return 'green';
+  if (c.includes('orange') || c.includes('tangier') || c.includes('cayenne')) return 'orange';
+  if (c.includes('yellow') || c.includes('accelerate') || c.includes('nitro')) return 'yellow';
+  if (c.includes('brown') || c.includes('harvest') || c.includes('auburn')) return 'brown';
   return '';
 };
 
