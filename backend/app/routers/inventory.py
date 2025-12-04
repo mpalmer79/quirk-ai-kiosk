@@ -20,6 +20,7 @@ class Vehicle(BaseModel):
     make: str
     model: str
     trim: str
+    body: Optional[str] = None  # Raw body field (e.g., "4WD Reg Cab 126\"")
     bodyStyle: str
     exteriorColor: str
     interiorColor: str
@@ -452,15 +453,30 @@ def load_inventory_from_excel() -> List[dict]:
                 continue
             
             model = str(row.get('Model', ''))
+            model_number = str(row.get('Model Number', ''))  # CC56403, CK10543, etc.
             trim = str(row.get('Trim', ''))
             body = str(row.get('Body', ''))
             body_type = str(row.get('Body Type', ''))
             cylinders = row.get('Cylinders', 0)
             exterior_color = str(row.get('Exterior Color', '')).strip()
             
-            model_info = parse_model_code(model)
+            # Parse Model Number (not Model) to get cab style from GM code
+            model_info = parse_model_code(model_number)
             cab_style = model_info.get('cab')
             bed_length = model_info.get('bed')
+            
+            # Fallback: parse cab style from Body field (e.g., "4WD Reg Cab 126\"")
+            if not cab_style and body:
+                body_lower = body.lower()
+                if 'crew cab' in body_lower:
+                    cab_style = 'Crew Cab'
+                elif 'double cab' in body_lower or 'dbl cab' in body_lower:
+                    cab_style = 'Double Cab'
+                elif 'reg cab' in body_lower or 'regular cab' in body_lower:
+                    cab_style = 'Regular Cab'
+                elif 'ext cab' in body_lower or 'extended cab' in body_lower:
+                    cab_style = 'Extended Cab'
+            
             drivetrain = model_info.get('drive') or parse_drivetrain(body, model)
             
             fuel_type = get_fuel_type(model)
@@ -473,6 +489,7 @@ def load_inventory_from_excel() -> List[dict]:
                 'make': str(row.get('Make', 'Chevrolet')).strip().title(),
                 'model': model.strip().title(),
                 'trim': trim.strip(),
+                'body': body.strip(),  # Raw body field for filtering (e.g., "4WD Reg Cab 126\"")
                 'bodyStyle': get_body_style(body_type, model, cab_style),
                 'exteriorColor': exterior_color.title(),
                 'interiorColor': 'Jet Black',
@@ -514,17 +531,21 @@ print(f"Loaded {len(INVENTORY)} vehicles from PBS inventory")
 
 @router.get("", response_model=InventoryResponse)
 async def get_inventory(
+    model: Optional[str] = Query(None, description="Filter by model"),
     body_style: Optional[str] = Query(None, description="Filter by body style"),
     make: Optional[str] = Query(None, description="Filter by make"),
     min_price: Optional[float] = Query(None, description="Minimum price"),
     max_price: Optional[float] = Query(None, description="Maximum price"),
     fuel_type: Optional[str] = Query(None, description="Filter by fuel type"),
     status: Optional[str] = Query(None, description="Filter by status"),
-    cab_style: Optional[str] = Query(None, description="Filter by cab style"),
+    cab_style: Optional[str] = Query(None, alias="cab_type", description="Filter by cab style"),
 ):
     """Get all vehicles in inventory with optional filters"""
     vehicles = INVENTORY.copy()
     
+    if model:
+        model_lower = model.lower()
+        vehicles = [v for v in vehicles if model_lower in v["model"].lower()]
     if body_style:
         vehicles = [v for v in vehicles if v["bodyStyle"].lower() == body_style.lower()]
     if make:
@@ -538,7 +559,15 @@ async def get_inventory(
     if status:
         vehicles = [v for v in vehicles if status.lower() in v["status"].lower()]
     if cab_style:
-        vehicles = [v for v in vehicles if v.get("cabStyle") and cab_style.lower() in v["cabStyle"].lower()]
+        # Match cab style from cabStyle field or body field
+        cab_lower = cab_style.lower()
+        # Handle abbreviations: "Regular Cab" -> also match "Reg Cab"
+        cab_variants = [cab_lower]
+        if 'regular' in cab_lower:
+            cab_variants.append('reg cab')
+        vehicles = [v for v in vehicles if 
+                    (v.get("cabStyle") and any(cv in v["cabStyle"].lower() for cv in cab_variants)) or
+                    (v.get("body") and any(cv in v["body"].lower() for cv in cab_variants))]
     
     vehicles.sort(key=lambda x: x["price"], reverse=True)
     
