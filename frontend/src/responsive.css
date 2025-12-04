@@ -1,0 +1,739 @@
+/* =============================================================================
+   QUIRK AI Kiosk - Responsive CSS Overrides
+   
+   Breakpoints:
+   - Mobile:  0 - 767px
+   - Tablet:  768px - 1023px  
+   - Desktop: 1024px+
+   
+   Note: Uses !important to override inline React styles
+   ============================================================================= */
+
+/* =============================================================================
+   BASE MOBILE FIXES (Touch & Scroll)
+   ============================================================================= */
+
+html, body {
+  -webkit-overflow-scrolling: touch;
+  touch-action: manipulation;
+  overflow-x: hidden;
+}
+
+/* Prevent text selection on touch */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+/* Ensure inputs are at least 16px to prevent iOS zoom */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* =============================================================================
+   MOBILE STYLES (0 - 767px)
+   ============================================================================= */
+
+@media (max-width: 767px) {
+  
+  /* ---------------------------------------------------------------------------
+     KioskApp - Header & Footer
+     --------------------------------------------------------------------------- */
+  
+  /* Header */
+  header {
+    padding: 12px 16px !important;
+    flex-wrap: wrap !important;
+  }
+  
+  /* Logo */
+  header > div:nth-child(2) span:first-child {
+    font-size: 24px !important;
+  }
+  
+  header > div:nth-child(2) span:last-child {
+    font-size: 14px !important;
+    padding: 3px 8px !important;
+  }
+  
+  /* Back button */
+  header button[style*="Back"] {
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+  }
+  
+  /* Admin/Sales Desk links */
+  header > div:last-child {
+    gap: 8px !important;
+  }
+  
+  header > div:last-child button {
+    font-size: 11px !important;
+    padding: 6px 10px !important;
+  }
+  
+  /* Footer */
+  footer {
+    padding: 12px !important;
+    font-size: 11px !important;
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+  }
+  
+  /* Main content area */
+  main {
+    padding: 0 !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     WelcomeScreen
+     --------------------------------------------------------------------------- */
+  
+  /* Main container - enable scroll */
+  div[style*="minHeight: '100%'"],
+  div[style*="min-height: 100%"] {
+    min-height: auto !important;
+    padding: 20px 16px !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Name capture section */
+  div[style*="maxWidth: '500px'"] {
+    max-width: 100% !important;
+    padding: 20px 16px !important;
+  }
+  
+  /* Large AI avatar */
+  div[style*="width: '100px'"][style*="height: '100px'"] {
+    width: 70px !important;
+    height: 70px !important;
+  }
+  
+  /* Name title */
+  h1[style*="fontSize: '32px'"],
+  div[style*="fontSize: '32px'"] {
+    font-size: 24px !important;
+  }
+  
+  /* Name subtitle */
+  h2[style*="fontSize: '24px'"],
+  p[style*="fontSize: '24px'"] {
+    font-size: 18px !important;
+  }
+  
+  /* Hero section titles */
+  h1[style*="fontSize: '48px'"],
+  div[style*="fontSize: '48px'"] {
+    font-size: 28px !important;
+    line-height: 1.2 !important;
+  }
+  
+  h2[style*="fontSize: '28px'"] {
+    font-size: 20px !important;
+  }
+  
+  /* Path cards container - stack vertically */
+  div[style*="gap: '24px'"][style*="flexWrap"] {
+    flex-direction: column !important;
+    gap: 16px !important;
+    padding: 0 8px !important;
+  }
+  
+  /* Individual path cards */
+  div[style*="flex: '1 1 320px'"],
+  div[style*="minHeight: '280px'"][style*="borderRadius: '20px'"] {
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+    min-height: 200px !important;
+    padding: 20px !important;
+  }
+  
+  /* Path card icons */
+  div[style*="width: '80px'"][style*="height: '80px'"][style*="borderRadius: '20px'"] {
+    width: 60px !important;
+    height: 60px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  /* Path card titles */
+  h3[style*="fontSize: '22px'"] {
+    font-size: 18px !important;
+  }
+  
+  /* Stats bar */
+  div[style*="gap: '8px'"][style*="padding: '16px 24px'"][style*="borderRadius: '16px'"] {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    padding: 12px !important;
+    gap: 4px !important;
+  }
+  
+  /* Stat numbers */
+  span[style*="fontSize: '32px'"] {
+    font-size: 24px !important;
+  }
+  
+  /* Stat labels */
+  span[style*="fontSize: '12px'"][style*="textTransform: 'uppercase'"] {
+    font-size: 10px !important;
+  }
+  
+  /* Stat dividers - hide on mobile */
+  div[style*="width: '1px'"][style*="height: '40px'"] {
+    display: none !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     ModelBudgetSelector
+     --------------------------------------------------------------------------- */
+  
+  /* Main container */
+  div[style*="padding: '40px'"] {
+    padding: 16px !important;
+  }
+  
+  /* Section titles */
+  h2[style*="fontSize: '20px'"],
+  h3[style*="fontSize: '20px'"] {
+    font-size: 16px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  /* Model grid - 2 columns on mobile */
+  div[style*="gridTemplateColumns: 'repeat(4, 1fr)'"],
+  div[style*="grid-template-columns: repeat(4, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  
+  /* Cab options grid */
+  div[style*="gridTemplateColumns: 'repeat(3, 1fr)'"],
+  div[style*="grid-template-columns: repeat(3, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  
+  /* Color grid - 3 columns on mobile */
+  div[style*="gridTemplateColumns: 'repeat(6, 1fr)'"],
+  div[style*="grid-template-columns: repeat(6, 1fr)"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+  }
+  
+  /* Trade vehicle grid - stack on mobile */
+  div[style*="gridTemplateColumns: '1fr 1fr 1fr 1fr'"],
+  div[style*="grid-template-columns: 1fr 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+  
+  /* Payoff fields grid - stack on mobile */
+  div[style*="gridTemplateColumns: '1fr 1fr 1fr'"],
+  div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  
+  /* Trade-in cards */
+  div[style*="flex: '1'"][style*="padding: '24px'"][style*="borderRadius: '16px'"] {
+    padding: 16px !important;
+    min-height: auto !important;
+  }
+  
+  /* Budget slider section */
+  div[style*="padding: '32px'"] {
+    padding: 16px !important;
+  }
+  
+  /* Budget range display */
+  span[style*="fontSize: '36px'"],
+  div[style*="fontSize: '36px'"] {
+    font-size: 24px !important;
+  }
+  
+  /* Search button */
+  button[style*="padding: '20px 48px'"] {
+    padding: 16px 24px !important;
+    font-size: 16px !important;
+    width: 100% !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     InventoryResults
+     --------------------------------------------------------------------------- */
+  
+  /* Results header */
+  div[style*="padding: '20px 40px'"] {
+    padding: 12px 16px !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  
+  /* Filter buttons */
+  button[style*="padding: '10px 20px'"] {
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+  }
+  
+  /* Vehicle grid - single column */
+  div[style*="gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))'"],
+  div[style*="grid-template-columns: repeat(auto-fill, minmax(340px, 1fr))"] {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    padding: 16px !important;
+  }
+  
+  /* Vehicle cards */
+  div[style*="borderRadius: '16px'"][style*="overflow: 'hidden'"] {
+    border-radius: 12px !important;
+  }
+  
+  /* Vehicle card image */
+  div[style*="height: '200px'"] img,
+  img[style*="height: '200px'"] {
+    height: 180px !important;
+  }
+  
+  /* Vehicle card content */
+  div[style*="padding: '20px'"] {
+    padding: 14px !important;
+  }
+  
+  /* Vehicle title */
+  h3[style*="fontSize: '18px'"] {
+    font-size: 16px !important;
+  }
+  
+  /* Price display */
+  span[style*="fontSize: '24px'"] {
+    font-size: 20px !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     VehicleDetail
+     --------------------------------------------------------------------------- */
+  
+  /* Main container - stack on mobile */
+  div[style*="gridTemplateColumns"][style*="1fr 450px"],
+  div[style*="grid-template-columns"][style*="1fr 450px"] {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  
+  /* Image gallery */
+  div[style*="height: '500px'"] {
+    height: 250px !important;
+  }
+  
+  /* Details panel */
+  div[style*="padding: '32px'"] {
+    padding: 16px !important;
+  }
+  
+  /* Vehicle title */
+  h1[style*="fontSize: '28px'"] {
+    font-size: 22px !important;
+  }
+  
+  /* Price section */
+  div[style*="fontSize: '42px'"],
+  span[style*="fontSize: '42px'"] {
+    font-size: 28px !important;
+  }
+  
+  /* Specs grid */
+  div[style*="gridTemplateColumns: 'repeat(2, 1fr)'"][style*="gap: '16px'"] {
+    gap: 12px !important;
+  }
+  
+  /* Action buttons */
+  button[style*="padding: '18px'"],
+  button[style*="padding: '16px'"] {
+    padding: 14px !important;
+    font-size: 14px !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     SalesManagerDashboard
+     --------------------------------------------------------------------------- */
+  
+  /* Main layout - stack on mobile */
+  div[style*="gridTemplateColumns: '320px 1fr'"],
+  div[style*="grid-template-columns: 320px 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Session list */
+  div[style*="width: '320px'"],
+  div[style*="minWidth: '320px'"] {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-height: 200px !important;
+    overflow-x: auto !important;
+  }
+  
+  /* Session list - horizontal scroll on mobile */
+  div[style*="overflowY: 'auto'"][style*="flex: '1'"] {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 12px !important;
+    padding: 12px !important;
+  }
+  
+  /* Session cards - inline on mobile */
+  div[style*="padding: '16px'"][style*="cursor: 'pointer'"] {
+    min-width: 200px !important;
+    flex-shrink: 0 !important;
+  }
+  
+  /* 4-Square grid - stack on mobile */
+  div[style*="gridTemplateColumns: '1fr 1fr'"][style*="gridTemplateRows: '1fr 1fr'"],
+  div[style*="grid-template-columns: 1fr 1fr"][style*="grid-template-rows: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
+    gap: 12px !important;
+  }
+  
+  /* 4-Square quadrants */
+  div[style*="padding: '24px'"][style*="borderRadius: '12px'"] {
+    padding: 16px !important;
+  }
+  
+  /* Large values in 4-square */
+  div[style*="fontSize: '32px'"],
+  span[style*="fontSize: '32px'"] {
+    font-size: 24px !important;
+  }
+  
+  /* Customer info bar */
+  div[style*="gridTemplateColumns: '1fr 1fr 1fr'"][style*="padding: '16px'"] {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+    text-align: center !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     PaymentCalculator
+     --------------------------------------------------------------------------- */
+  
+  /* Calculator container */
+  div[style*="maxWidth: '600px'"] {
+    max-width: 100% !important;
+    padding: 16px !important;
+  }
+  
+  /* Payment options */
+  div[style*="gridTemplateColumns: '1fr 1fr'"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     CustomerHandoff
+     --------------------------------------------------------------------------- */
+  
+  /* Handoff container */
+  div[style*="maxWidth: '500px'"] {
+    max-width: 100% !important;
+    padding: 20px 16px !important;
+  }
+  
+  /* Handoff title */
+  h1[style*="fontSize: '36px'"] {
+    font-size: 26px !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     StockLookup
+     --------------------------------------------------------------------------- */
+  
+  /* Input container */
+  div[style*="maxWidth: '600px'"][style*="margin: '0 auto'"] {
+    padding: 0 16px !important;
+  }
+  
+  /* Large input */
+  input[style*="fontSize: '32px'"],
+  input[style*="fontSize: '28px'"] {
+    font-size: 20px !important;
+    padding: 16px !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     AIAssistant
+     --------------------------------------------------------------------------- */
+  
+  /* Chat container */
+  div[style*="maxWidth: '800px'"] {
+    max-width: 100% !important;
+  }
+  
+  /* Message bubbles */
+  div[style*="maxWidth: '80%'"] {
+    max-width: 90% !important;
+  }
+  
+  /* Input area */
+  div[style*="padding: '16px 24px'"] {
+    padding: 12px 16px !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     TrafficLog
+     --------------------------------------------------------------------------- */
+  
+  /* Table container - horizontal scroll */
+  div[style*="overflowX: 'auto'"] {
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Table cells */
+  td, th {
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     GuidedQuiz
+     --------------------------------------------------------------------------- */
+  
+  /* Quiz options */
+  div[style*="gridTemplateColumns: 'repeat(2, 1fr)'"][style*="gap: '16px'"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Option cards */
+  div[style*="padding: '24px'"][style*="cursor: 'pointer'"] {
+    padding: 16px !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     FilterModal
+     --------------------------------------------------------------------------- */
+  
+  /* Modal content */
+  div[style*="maxWidth: '500px'"][style*="maxHeight: '90vh'"] {
+    max-width: 95% !important;
+    max-height: 85vh !important;
+    margin: 16px !important;
+  }
+}
+
+/* =============================================================================
+   TABLET STYLES (768px - 1023px)
+   ============================================================================= */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  
+  /* ---------------------------------------------------------------------------
+     KioskApp - Header & Footer
+     --------------------------------------------------------------------------- */
+  
+  header {
+    padding: 16px 24px !important;
+  }
+  
+  footer {
+    padding: 14px !important;
+    font-size: 13px !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     WelcomeScreen
+     --------------------------------------------------------------------------- */
+  
+  /* Hero title */
+  h1[style*="fontSize: '48px'"] {
+    font-size: 38px !important;
+  }
+  
+  /* Path cards - 2 columns */
+  div[style*="gap: '24px'"][style*="flexWrap"] {
+    gap: 20px !important;
+  }
+  
+  div[style*="flex: '1 1 320px'"] {
+    flex: 1 1 45% !important;
+    max-width: 48% !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     ModelBudgetSelector
+     --------------------------------------------------------------------------- */
+  
+  /* Main container */
+  div[style*="padding: '40px'"] {
+    padding: 24px !important;
+  }
+  
+  /* Model grid - 3 columns */
+  div[style*="gridTemplateColumns: 'repeat(4, 1fr)'"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  
+  /* Color grid - 4 columns */
+  div[style*="gridTemplateColumns: 'repeat(6, 1fr)'"] {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+  
+  /* Trade vehicle grid - keep 4 columns but smaller */
+  div[style*="gridTemplateColumns: '1fr 1fr 1fr 1fr'"] {
+    gap: 12px !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     InventoryResults
+     --------------------------------------------------------------------------- */
+  
+  /* Vehicle grid - 2 columns */
+  div[style*="gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))'"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 20px !important;
+    padding: 20px !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     VehicleDetail
+     --------------------------------------------------------------------------- */
+  
+  /* Main container */
+  div[style*="gridTemplateColumns"][style*="1fr 450px"] {
+    grid-template-columns: 1fr 350px !important;
+  }
+  
+  /* Image gallery */
+  div[style*="height: '500px'"] {
+    height: 350px !important;
+  }
+  
+  /* ---------------------------------------------------------------------------
+     SalesManagerDashboard
+     --------------------------------------------------------------------------- */
+  
+  /* Session list width */
+  div[style*="width: '320px'"] {
+    width: 260px !important;
+    min-width: 260px !important;
+  }
+  
+  /* 4-Square stays as grid but smaller padding */
+  div[style*="padding: '24px'"][style*="borderRadius: '12px'"] {
+    padding: 18px !important;
+  }
+}
+
+/* =============================================================================
+   DESKTOP ENHANCEMENTS (1024px+)
+   ============================================================================= */
+
+@media (min-width: 1024px) {
+  
+  /* Hover states for desktop */
+  button:hover {
+    opacity: 0.9;
+  }
+  
+  /* Card hover effects */
+  div[style*="cursor: 'pointer'"]:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* =============================================================================
+   LARGE DESKTOP / KIOSK (1400px+)
+   ============================================================================= */
+
+@media (min-width: 1400px) {
+  
+  /* InventoryResults - 3 columns */
+  div[style*="gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))'"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* =============================================================================
+   ORIENTATION SPECIFIC
+   ============================================================================= */
+
+@media (max-width: 767px) and (orientation: landscape) {
+  
+  /* Reduce vertical spacing in landscape mobile */
+  div[style*="marginBottom: '48px'"],
+  div[style*="margin-bottom: 48px"] {
+    margin-bottom: 24px !important;
+  }
+  
+  /* Smaller hero section */
+  div[style*="marginBottom: '40px'"] {
+    margin-bottom: 20px !important;
+  }
+  
+  /* Path cards side by side in landscape */
+  div[style*="gap: '24px'"][style*="flexWrap"] {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+  }
+  
+  div[style*="flex: '1 1 320px'"] {
+    flex: 0 0 280px !important;
+    max-width: 280px !important;
+  }
+}
+
+/* =============================================================================
+   PRINT STYLES (for receipts/summaries)
+   ============================================================================= */
+
+@media print {
+  
+  header, footer {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  * {
+    background: transparent !important;
+    color: black !important;
+    box-shadow: none !important;
+  }
+}
+
+/* =============================================================================
+   ACCESSIBILITY - Reduced Motion
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =============================================================================
+   SAFE AREA INSETS (iPhone X+ notch)
+   ============================================================================= */
+
+@supports (padding: max(0px)) {
+  
+  header {
+    padding-top: max(12px, env(safe-area-inset-top)) !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+  }
+  
+  footer {
+    padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+  }
+}
