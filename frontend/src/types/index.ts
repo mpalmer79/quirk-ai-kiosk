@@ -23,8 +23,11 @@ export interface Vehicle {
   fuel_type?: string;
   fuelType?: string;
   fuelEconomy?: string;
+  evRange?: string;
   mpg_city?: number;
   mpg_highway?: number;
+  mpgCity?: number;
+  mpgHighway?: number;
   body_style?: string;
   bodyStyle?: string;
   doors?: number;
