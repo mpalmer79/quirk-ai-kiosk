@@ -10,10 +10,6 @@ const TrafficLog = ({ navigateTo }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState(null); // 'today', 'vehicle', 'requested', 'completed', 'chat'
 
-  useEffect(() => {
-    loadData();
-  }, [activeFilter]);
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -52,6 +48,11 @@ const TrafficLog = ({ navigateTo }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilter]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
