@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, ChangeEvent, KeyboardEvent, CSSProperties } from 'react';
 import api from './api';
-import type { Vehicle, CustomerData, KioskComponentProps } from '../types';
+import type { Vehicle, KioskComponentProps } from '../types';
 
 type KeypadKey = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'clear' | 'backspace';
 
