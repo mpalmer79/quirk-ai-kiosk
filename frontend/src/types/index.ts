@@ -140,6 +140,12 @@ export interface CustomerData {
     requestedAt?: string;
     [key: string]: unknown;
   };
+  conversationLog?: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+    vehicles?: Array<{ stockNumber?: string; model?: string; price?: number }>;
+  }>;
 }
 
 // Protection Package Types
