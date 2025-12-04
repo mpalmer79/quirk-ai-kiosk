@@ -97,6 +97,10 @@ export interface CustomerData {
   protectionPackages?: string[];
   protectionTotal?: number;
   sortBy?: SortOption;
+  preferences?: {
+    bodyStyle?: string;
+    [key: string]: unknown;
+  };
 }
 
 // Protection Package Types
