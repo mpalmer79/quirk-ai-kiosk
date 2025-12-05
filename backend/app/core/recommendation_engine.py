@@ -220,3 +220,416 @@ class VehicleRecommender:
         return {
             "body_style": body_style,
             "fuel_type": fuel_type,
+            "drivetrain": drivetrain,
+            "price": price,
+            "price_bucket": self._get_bucket(price, self.price_buckets),
+            "mileage": mileage,
+            "mileage_bucket": self._get_bucket(mileage, self.mileage_buckets),
+            "year": year,
+            "features": features,
+            "is_performance": is_performance,
+            "is_luxury": is_luxury,
+            "make": self._normalize_string(self._get_field(vehicle, 'make', 'manufacturer')),
+            "model": self._normalize_string(self._get_field(vehicle, 'model', 'modelName', 'model_name')),
+            "trim": self._normalize_string(self._get_field(vehicle, 'trim', 'trimLevel', 'trim_level')),
+            "stock_number": self._get_field(vehicle, 'stockNumber', 'stock_number', 'stock', 'vin')
+        }
+    
+    def _detect_performance(self, vehicle: Dict[str, Any], features: List[str]) -> bool:
+        """Detect if a vehicle is a performance-oriented vehicle."""
+        # Check model names for known performance vehicles
+        model = self._normalize_string(self._get_field(vehicle, 'model', 'modelName'))
+        performance_models = ['corvette', 'camaro', 'mustang', 'challenger', 'charger', 
+                            'gt-r', 'gtr', 'm3', 'm4', 'm5', 'amg', 'rs', 'type r']
+        
+        if any(pm in model for pm in performance_models):
+            return True
+        
+        # Check trim for performance indicators
+        trim = self._normalize_string(self._get_field(vehicle, 'trim', 'trimLevel'))
+        performance_trims = ['ss', 'zl1', 'z06', 'z07', 'zr1', 'gt', 'sport', 'r/t', 'srt',
+                           'performance', 'track', 'competition', 'm sport']
+        
+        if any(pt in trim for pt in performance_trims):
+            return True
+        
+        # Check features list
+        features_text = ' '.join(features)
+        for pf in self.performance_features:
+            if pf in features_text:
+                return True
+        
+        return False
+    
+    def _detect_luxury(self, vehicle: Dict[str, Any], features: List[str], price: float) -> bool:
+        """Detect if a vehicle is a luxury vehicle."""
+        # Check make for luxury brands
+        make = self._normalize_string(self._get_field(vehicle, 'make', 'manufacturer'))
+        luxury_makes = ['lexus', 'mercedes', 'bmw', 'audi', 'porsche', 'cadillac',
+                       'lincoln', 'infiniti', 'acura', 'genesis', 'maserati', 
+                       'bentley', 'rolls-royce', 'land rover', 'jaguar']
+        
+        if any(lm in make for lm in luxury_makes):
+            return True
+        
+        # Check price threshold
+        if price >= self.luxury_price_threshold:
+            # Also check for luxury features
+            features_text = ' '.join(features)
+            luxury_feature_count = sum(1 for lf in self.luxury_features if lf in features_text)
+            if luxury_feature_count >= 2:
+                return True
+        
+        # Check model/trim for luxury indicators
+        model = self._normalize_string(self._get_field(vehicle, 'model', 'modelName'))
+        trim = self._normalize_string(self._get_field(vehicle, 'trim', 'trimLevel'))
+        luxury_indicators = ['premium', 'luxury', 'platinum', 'high country', 'denali',
+                           'limited', 'prestige', 'executive']
+        
+        combined = f"{model} {trim}"
+        if any(li in combined for li in luxury_indicators):
+            return True
+        
+        return False
+    
+    def calculate_similarity(
+        self, 
+        source_features: Dict[str, Any], 
+        target_features: Dict[str, Any]
+    ) -> Tuple[float, Dict[str, float]]:
+        """
+        Calculate weighted similarity score between two vehicles.
+        
+        Args:
+            source_features: Features of the reference vehicle
+            target_features: Features of the candidate vehicle
+            
+        Returns:
+            Tuple of (total_score, component_scores_dict)
+        """
+        scores = {}
+        
+        # Body style match (exact match required for full points)
+        if source_features["body_style"] and target_features["body_style"]:
+            scores["body_style"] = self.weights["body_style"] if \
+                source_features["body_style"] == target_features["body_style"] else 0.0
+        else:
+            scores["body_style"] = 0.0
+        
+        # Price range similarity (same bucket = full, adjacent = partial)
+        source_bucket = source_features["price_bucket"]
+        target_bucket = target_features["price_bucket"]
+        bucket_diff = abs(source_bucket - target_bucket)
+        
+        if bucket_diff == 0:
+            scores["price_range"] = self.weights["price_range"]
+        elif bucket_diff == 1:
+            scores["price_range"] = self.weights["price_range"] * self.adjacent_bucket_score
+        else:
+            scores["price_range"] = 0.0
+        
+        # Fuel type match
+        if source_features["fuel_type"] and target_features["fuel_type"]:
+            scores["fuel_type"] = self.weights["fuel_type"] if \
+                source_features["fuel_type"] == target_features["fuel_type"] else 0.0
+        else:
+            scores["fuel_type"] = 0.0
+        
+        # Drivetrain match
+        if source_features["drivetrain"] and target_features["drivetrain"]:
+            scores["drivetrain"] = self.weights["drivetrain"] if \
+                source_features["drivetrain"] == target_features["drivetrain"] else 0.0
+        else:
+            scores["drivetrain"] = 0.0
+        
+        # Feature overlap (Jaccard similarity)
+        source_set = set(source_features["features"])
+        target_set = set(target_features["features"])
+        
+        if source_set and target_set:
+            intersection = len(source_set & target_set)
+            union = len(source_set | target_set)
+            feature_similarity = intersection / union if union > 0 else 0.0
+            scores["features"] = self.weights["features"] * feature_similarity
+        else:
+            scores["features"] = 0.0
+        
+        # Performance match
+        if source_features["is_performance"] and target_features["is_performance"]:
+            scores["performance"] = self.weights["performance"]
+        elif not source_features["is_performance"] and not target_features["is_performance"]:
+            scores["performance"] = self.weights["performance"] * 0.5  # Partial credit for both non-performance
+        else:
+            scores["performance"] = 0.0
+        
+        # Year proximity (within 2 years = full, within 4 = partial)
+        if source_features["year"] and target_features["year"]:
+            year_diff = abs(source_features["year"] - target_features["year"])
+            if year_diff <= 2:
+                scores["year"] = self.weights["year"]
+            elif year_diff <= 4:
+                scores["year"] = self.weights["year"] * 0.5
+            else:
+                scores["year"] = 0.0
+        else:
+            scores["year"] = 0.0
+        
+        # Luxury match
+        if source_features["is_luxury"] and target_features["is_luxury"]:
+            scores["luxury"] = self.weights["luxury"]
+        elif not source_features["is_luxury"] and not target_features["is_luxury"]:
+            scores["luxury"] = self.weights["luxury"] * 0.5
+        else:
+            scores["luxury"] = 0.0
+        
+        total_score = sum(scores.values())
+        max_possible = sum(self.weights.values())
+        normalized_score = total_score / max_possible if max_possible > 0 else 0.0
+        
+        return normalized_score, scores
+    
+    def get_recommendations(
+        self,
+        source_vehicle: Dict[str, Any],
+        candidates: List[Dict[str, Any]],
+        limit: int = 6,
+        min_score: float = 0.3,
+        exclude_stock_numbers: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get vehicle recommendations based on a source vehicle.
+        
+        Args:
+            source_vehicle: The vehicle to base recommendations on
+            candidates: List of candidate vehicles to score
+            limit: Maximum number of recommendations to return
+            min_score: Minimum similarity score to include
+            exclude_stock_numbers: Stock numbers to exclude from results
+            
+        Returns:
+            List of recommendation dictionaries with scores and match reasons
+        """
+        exclude_set = set(exclude_stock_numbers or [])
+        source_features = self.extract_features(source_vehicle)
+        
+        # Add source vehicle's stock number to exclusions
+        if source_features["stock_number"]:
+            exclude_set.add(source_features["stock_number"])
+        
+        scored_vehicles = []
+        
+        for candidate in candidates:
+            candidate_features = self.extract_features(candidate)
+            
+            # Skip excluded vehicles
+            if candidate_features["stock_number"] in exclude_set:
+                continue
+            
+            score, component_scores = self.calculate_similarity(source_features, candidate_features)
+            
+            if score >= min_score:
+                # Generate match reasons based on top scoring components
+                match_reasons = self._generate_match_reasons(component_scores, candidate_features)
+                
+                scored_vehicles.append({
+                    "vehicle": candidate,
+                    "score": round(score, 3),
+                    "component_scores": {k: round(v, 3) for k, v in component_scores.items()},
+                    "match_reasons": match_reasons,
+                    "confidence": self._score_to_confidence(score)
+                })
+        
+        # Sort by score descending
+        scored_vehicles.sort(key=lambda x: x["score"], reverse=True)
+        
+        return scored_vehicles[:limit]
+    
+    def _generate_match_reasons(
+        self, 
+        component_scores: Dict[str, float], 
+        target_features: Dict[str, Any]
+    ) -> List[str]:
+        """Generate human-readable match reasons based on scores."""
+        reasons = []
+        
+        # Sort components by score
+        sorted_components = sorted(
+            component_scores.items(), 
+            key=lambda x: x[1], 
+            reverse=True
+        )
+        
+        for component, score in sorted_components[:3]:  # Top 3 reasons
+            if score <= 0:
+                continue
+                
+            if component == "body_style" and target_features.get("body_style"):
+                reasons.append(f"Same body style ({target_features['body_style']})")
+            elif component == "price_range":
+                reasons.append("Similar price range")
+            elif component == "fuel_type" and target_features.get("fuel_type"):
+                reasons.append(f"Same fuel type ({target_features['fuel_type']})")
+            elif component == "drivetrain" and target_features.get("drivetrain"):
+                reasons.append(f"Same drivetrain ({target_features['drivetrain']})")
+            elif component == "features":
+                reasons.append("Similar features")
+            elif component == "performance" and target_features.get("is_performance"):
+                reasons.append("Performance-oriented")
+            elif component == "year":
+                reasons.append("Similar model year")
+            elif component == "luxury" and target_features.get("is_luxury"):
+                reasons.append("Luxury vehicle")
+        
+        return reasons if reasons else ["General similarity"]
+    
+    def _score_to_confidence(self, score: float) -> str:
+        """Convert numeric score to confidence level."""
+        if score >= 0.8:
+            return "high"
+        elif score >= 0.5:
+            return "medium"
+        else:
+            return "low"
+    
+    def get_personalized_recommendations(
+        self,
+        browsing_history: List[Dict[str, Any]],
+        candidates: List[Dict[str, Any]],
+        limit: int = 6
+    ) -> List[Dict[str, Any]]:
+        """
+        Get recommendations based on a user's browsing history.
+        
+        Aggregates preferences from multiple viewed vehicles to generate
+        personalized recommendations.
+        
+        Args:
+            browsing_history: List of vehicles the user has viewed
+            candidates: List of candidate vehicles to score
+            limit: Maximum number of recommendations to return
+            
+        Returns:
+            List of recommendation dictionaries
+        """
+        if not browsing_history:
+            return []
+        
+        # Extract features from all browsed vehicles
+        history_features = [self.extract_features(v) for v in browsing_history]
+        
+        # Aggregate preferences
+        body_style_counts: Dict[str, int] = {}
+        fuel_type_counts: Dict[str, int] = {}
+        drivetrain_counts: Dict[str, int] = {}
+        price_buckets: List[int] = []
+        all_features: List[str] = []
+        performance_count = 0
+        luxury_count = 0
+        
+        for features in history_features:
+            if features["body_style"]:
+                body_style_counts[features["body_style"]] = \
+                    body_style_counts.get(features["body_style"], 0) + 1
+            if features["fuel_type"]:
+                fuel_type_counts[features["fuel_type"]] = \
+                    fuel_type_counts.get(features["fuel_type"], 0) + 1
+            if features["drivetrain"]:
+                drivetrain_counts[features["drivetrain"]] = \
+                    drivetrain_counts.get(features["drivetrain"], 0) + 1
+            
+            price_buckets.append(features["price_bucket"])
+            all_features.extend(features["features"])
+            
+            if features["is_performance"]:
+                performance_count += 1
+            if features["is_luxury"]:
+                luxury_count += 1
+        
+        # Create synthetic "ideal" vehicle profile
+        def get_most_common(counts: Dict[str, int]) -> str:
+            if not counts:
+                return ""
+            return max(counts.items(), key=lambda x: x[1])[0]
+        
+        avg_price_bucket = round(sum(price_buckets) / len(price_buckets)) if price_buckets else 3
+        
+        ideal_profile = {
+            "body_style": get_most_common(body_style_counts),
+            "fuel_type": get_most_common(fuel_type_counts),
+            "drivetrain": get_most_common(drivetrain_counts),
+            "price_bucket": avg_price_bucket,
+            "features": list(set(all_features)),  # Unique features
+            "is_performance": performance_count > len(browsing_history) / 2,
+            "is_luxury": luxury_count > len(browsing_history) / 2,
+            "year": 0,  # Not used for aggregate matching
+            "mileage_bucket": 0,
+            "make": "",
+            "model": "",
+            "trim": "",
+            "stock_number": ""
+        }
+        
+        # Get viewed stock numbers to exclude
+        viewed_stocks = [
+            f["stock_number"] for f in history_features 
+            if f["stock_number"]
+        ]
+        
+        # Score candidates against ideal profile
+        scored_vehicles = []
+        
+        for candidate in candidates:
+            candidate_features = self.extract_features(candidate)
+            
+            if candidate_features["stock_number"] in viewed_stocks:
+                continue
+            
+            score, component_scores = self.calculate_similarity(ideal_profile, candidate_features)
+            
+            if score >= 0.25:  # Lower threshold for personalized
+                match_reasons = self._generate_match_reasons(component_scores, candidate_features)
+                
+                scored_vehicles.append({
+                    "vehicle": candidate,
+                    "score": round(score, 3),
+                    "component_scores": {k: round(v, 3) for k, v in component_scores.items()},
+                    "match_reasons": match_reasons,
+                    "confidence": self._score_to_confidence(score),
+                    "personalized": True
+                })
+        
+        scored_vehicles.sort(key=lambda x: x["score"], reverse=True)
+        
+        return scored_vehicles[:limit]
+
+
+# Module-level convenience functions
+_default_recommender: Optional[VehicleRecommender] = None
+
+
+def get_recommender() -> VehicleRecommender:
+    """Get or create the default recommender instance."""
+    global _default_recommender
+    if _default_recommender is None:
+        _default_recommender = VehicleRecommender()
+    return _default_recommender
+
+
+def get_recommendations(
+    source_vehicle: Dict[str, Any],
+    candidates: List[Dict[str, Any]],
+    **kwargs
+) -> List[Dict[str, Any]]:
+    """Convenience function to get recommendations using default recommender."""
+    return get_recommender().get_recommendations(source_vehicle, candidates, **kwargs)
+
+
+def get_personalized_recommendations(
+    browsing_history: List[Dict[str, Any]],
+    candidates: List[Dict[str, Any]],
+    **kwargs
+) -> List[Dict[str, Any]]:
+    """Convenience function to get personalized recommendations."""
+    return get_recommender().get_personalized_recommendations(
+        browsing_history, candidates, **kwargs
+    )
