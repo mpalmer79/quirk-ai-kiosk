@@ -115,7 +115,7 @@ const SalesManagerDashboard: React.FC = () => {
     };
   }, [autoRefresh]);
 
-  useEffect(() => {
+useEffect(() => {
     if (selectedSession) {
       const updated = sessions.find(s => s.sessionId === selectedSession.sessionId);
       if (updated) {
@@ -124,6 +124,7 @@ const SalesManagerDashboard: React.FC = () => {
       // Also fetch full detail
       fetchSessionDetail(selectedSession.sessionId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, selectedSession?.sessionId]);
 
   const handleSessionSelect = (session: CustomerSession) => {
