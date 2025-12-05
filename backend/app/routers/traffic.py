@@ -19,7 +19,7 @@ import logging
 router = APIRouter()
 logger = logging.getLogger("quirk_kiosk.traffic")
 
-# Import database utilities
+# Import database module (not individual items - they need to be accessed dynamically)
 from app import database
 
 # Import model (will be None if not using DB)
@@ -237,8 +237,8 @@ def format_session_for_dashboard(session: Dict) -> Dict:
 
 async def get_db_session():
     """Get database session if available."""
-    if is_database_configured() and async_session_factory:
-        async with async_session_factory() as session:
+    if database.is_database_configured() and database.async_session_factory:
+        async with database.async_session_factory() as session:
             yield session
     else:
         yield None
@@ -501,9 +501,9 @@ async def log_session(session_data: SessionCreate):
     }
     
     # Try PostgreSQL first
-    if is_database_configured() and async_session_factory and TrafficSession:
+    if database.is_database_configured() and database.async_session_factory and TrafficSession:
         try:
-            async with async_session_factory() as db:
+            async with database.async_session_factory() as db:
                 await db_create_or_update_session(db, data)
                 return SessionResponse(
                     sessionId=session_id,
@@ -532,9 +532,9 @@ async def get_active_sessions(
     Get active kiosk sessions for Sales Manager Dashboard.
     """
     # Try PostgreSQL first
-    if is_database_configured() and async_session_factory and TrafficSession:
+    if database.is_database_configured() and database.async_session_factory and TrafficSession:
         try:
-            async with async_session_factory() as db:
+            async with database.async_session_factory() as db:
                 active = await db_get_active_sessions(db, timeout_minutes)
                 active.sort(key=lambda x: x.get('lastActivity', ''), reverse=True)
                 return {
@@ -592,9 +592,9 @@ async def get_traffic_log(
 ):
     """Get traffic log entries for admin dashboard."""
     # Try PostgreSQL first
-    if is_database_configured() and async_session_factory and TrafficSession:
+    if database.is_database_configured() and database.async_session_factory and TrafficSession:
         try:
-            async with async_session_factory() as db:
+            async with database.async_session_factory() as db:
                 sessions, total = await db_get_all_sessions(db, limit, offset)
                 
                 # Apply filters
@@ -657,9 +657,9 @@ async def get_traffic_log(
 async def get_session_detail(session_id: str):
     """Get details for a specific session including chat history."""
     # Try PostgreSQL first
-    if is_database_configured() and async_session_factory and TrafficSession:
+    if database.is_database_configured() and database.async_session_factory and TrafficSession:
         try:
-            async with async_session_factory() as db:
+            async with database.async_session_factory() as db:
                 session = await db_get_session(db, session_id)
                 if session:
                     return session
@@ -690,9 +690,9 @@ async def get_session_for_dashboard(session_id: str):
 async def get_traffic_stats():
     """Get traffic statistics for dashboard."""
     # Try PostgreSQL first
-    if is_database_configured() and async_session_factory and TrafficSession:
+    if database.is_database_configured() and database.async_session_factory and TrafficSession:
         try:
-            async with async_session_factory() as db:
+            async with database.async_session_factory() as db:
                 stats = await db_get_stats(db)
                 stats["timezone"] = "America/New_York"
                 stats["server_time"] = format_eastern_timestamp()
@@ -773,9 +773,9 @@ async def get_traffic_stats():
 async def delete_session(session_id: str):
     """Delete a session (admin only)."""
     # Try PostgreSQL first
-    if is_database_configured() and async_session_factory and TrafficSession:
+    if database.is_database_configured() and database.async_session_factory and TrafficSession:
         try:
-            async with async_session_factory() as db:
+            async with database.async_session_factory() as db:
                 deleted = await db_delete_session(db, session_id)
                 if deleted:
                     return {"status": "deleted", "sessionId": session_id, "storage": "postgresql"}
@@ -800,9 +800,9 @@ async def delete_session(session_id: str):
 async def clear_traffic_log():
     """Clear all traffic log entries (admin only)."""
     # Try PostgreSQL first
-    if is_database_configured() and async_session_factory and TrafficSession:
+    if database.is_database_configured() and database.async_session_factory and TrafficSession:
         try:
-            async with async_session_factory() as db:
+            async with database.async_session_factory() as db:
                 count = await db_clear_sessions(db)
                 return {"status": "cleared", "message": f"Deleted {count} sessions", "storage": "postgresql"}
         except Exception as e:
@@ -818,17 +818,17 @@ async def clear_traffic_log():
 @router.get("/storage-status")
 async def get_storage_status():
     """Check which storage backend is active."""
-    db_configured = is_database_configured()
+    db_configured = database.is_database_configured()
     db_connected = False
     
-    if db_configured and async_session_factory:
+    if db_configured and database.async_session_factory:
         try:
-            async with async_session_factory() as db:
+            async with database.async_session_factory() as db:
                 from sqlalchemy import text
                 await db.execute(text("SELECT 1"))
                 db_connected = True
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Database connection test failed: {e}")
     
     return {
         "postgresql_configured": db_configured,
