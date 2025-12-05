@@ -306,4 +306,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-For issues or questions, contact the Quirk Auto Dealers IT team or open a GitHub issue.
+For issues or questions, contact the Quirk Auto Dealers IT team.
