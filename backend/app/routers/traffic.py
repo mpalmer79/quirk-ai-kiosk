@@ -3,33 +3,47 @@ Traffic Router - Kiosk Session Tracking
 Logs customer interactions for internal dashboard
 
 All timestamps stored and displayed in Eastern Time (America/New_York)
+Supports PostgreSQL (primary) with JSON file fallback.
 """
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
+from sqlalchemy import select, delete, func
+from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 import json
 import os
+import logging
 
 router = APIRouter()
+logger = logging.getLogger("quirk_kiosk.traffic")
 
-# File-based storage for persistence
+# Import database utilities
+from app.database import is_database_configured, async_session_factory
+
+# Import model (will be None if not using DB)
+try:
+    from app.models.traffic_session import TrafficSession
+except ImportError:
+    TrafficSession = None
+
+# File-based storage fallback
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data')
 TRAFFIC_LOG_FILE = os.path.join(DATA_DIR, 'traffic_log.json')
 
 # Eastern Time offset (EST = UTC-5, EDT = UTC-4)
-# For simplicity, using EST. In production, use pytz for DST handling.
 EST_OFFSET = timedelta(hours=-5)
 
 # Active session timeout (minutes)
 ACTIVE_SESSION_TIMEOUT = 30
 
 
+# ============ Time Utilities ============
+
 def get_eastern_time() -> datetime:
     """Get current time in Eastern Time."""
     utc_now = datetime.now(timezone.utc)
-    # Simple EST offset - in production use pytz for DST
     est_now = utc_now + EST_OFFSET
     return est_now
 
@@ -47,7 +61,6 @@ def format_eastern_timestamp() -> str:
 def parse_timestamp(ts_str: str) -> datetime:
     """Parse a timestamp string into datetime."""
     try:
-        # Handle ISO format with timezone
         if '+' in ts_str or ts_str.endswith('Z'):
             return datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
         elif '-05:00' in ts_str:
@@ -58,35 +71,35 @@ def parse_timestamp(ts_str: str) -> datetime:
         return datetime.now()
 
 
+# ============ JSON Fallback Storage ============
+
 def load_traffic_log() -> List[Dict]:
-    """Load traffic log from JSON file."""
+    """Load traffic log from JSON file (fallback)."""
     try:
         if os.path.exists(TRAFFIC_LOG_FILE):
             with open(TRAFFIC_LOG_FILE, 'r') as f:
                 data = json.load(f)
-                print(f"Loaded {len(data)} sessions from traffic log")
                 return data
     except Exception as e:
-        print(f"Error loading traffic log: {e}")
+        logger.error(f"Error loading traffic log: {e}")
     return []
 
 
 def save_traffic_log(data: List[Dict]):
-    """Save traffic log to JSON file."""
+    """Save traffic log to JSON file (fallback)."""
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
         with open(TRAFFIC_LOG_FILE, 'w') as f:
             json.dump(data, f, indent=2, default=str)
-        print(f"Saved {len(data)} sessions to traffic log")
     except Exception as e:
-        print(f"Error saving traffic log: {e}")
+        logger.error(f"Error saving traffic log: {e}")
 
 
-# In-memory cache (synced with file)
-traffic_sessions = load_traffic_log()
+# In-memory cache for JSON fallback
+traffic_sessions_cache = load_traffic_log()
 
 
-# ============ Models ============
+# ============ Pydantic Models ============
 
 class VehicleInfo(BaseModel):
     stockNumber: Optional[str] = None
@@ -99,7 +112,6 @@ class VehicleInfo(BaseModel):
 
 
 class TradeInVehicle(BaseModel):
-    """Trade-in vehicle details (Year/Make/Model/Mileage)"""
     year: Optional[str] = None
     make: Optional[str] = None
     model: Optional[str] = None
@@ -107,14 +119,12 @@ class TradeInVehicle(BaseModel):
 
 
 class TradeInInfo(BaseModel):
-    """Full trade-in info including vehicle and payoff details"""
     hasTrade: Optional[bool] = None
     vehicle: Optional[TradeInVehicle] = None
     hasPayoff: Optional[bool] = None
     payoffAmount: Optional[float] = None
     monthlyPayment: Optional[float] = None
     financedWith: Optional[str] = None
-    # Legacy fields for backward compatibility
     year: Optional[int] = None
     make: Optional[str] = None
     model: Optional[str] = None
@@ -124,28 +134,26 @@ class TradeInInfo(BaseModel):
 
 
 class PaymentInfo(BaseModel):
-    type: Optional[str] = None  # 'lease' or 'finance'
+    type: Optional[str] = None
     monthly: Optional[float] = None
     term: Optional[int] = None
     downPayment: Optional[float] = None
 
 
 class BudgetInfo(BaseModel):
-    """Budget range info for 4-square"""
     min: Optional[int] = None
     max: Optional[int] = None
     downPaymentPercent: Optional[int] = None
 
 
 class VehicleInterest(BaseModel):
-    """Vehicle interest from ModelBudgetSelector"""
     model: Optional[str] = None
     cab: Optional[str] = None
     colors: Optional[List[str]] = None
 
 
 class ChatMessage(BaseModel):
-    role: str  # 'user' or 'assistant'
+    role: str
     content: str
     timestamp: Optional[str] = None
 
@@ -154,41 +162,24 @@ class SessionCreate(BaseModel):
     sessionId: Optional[str] = None
     customerName: Optional[str] = None
     phone: Optional[str] = None
-    path: Optional[str] = None  # stockLookup, modelBudget, guidedQuiz, browse, aiChat
-    currentStep: Optional[str] = None  # Current step in journey
+    path: Optional[str] = None
+    currentStep: Optional[str] = None
     vehicle: Optional[VehicleInfo] = None
-    vehicleInterest: Optional[VehicleInterest] = None  # New: model/cab/colors
-    budget: Optional[BudgetInfo] = None  # New: budget range
+    vehicleInterest: Optional[VehicleInterest] = None
+    budget: Optional[BudgetInfo] = None
     tradeIn: Optional[TradeInInfo] = None
     payment: Optional[PaymentInfo] = None
     vehicleRequested: Optional[bool] = False
     quizAnswers: Optional[Dict[str, Any]] = None
-    actions: Optional[List[str]] = None  # List of actions taken
-    chatHistory: Optional[List[ChatMessage]] = None  # AI chat conversation
+    actions: Optional[List[str]] = None
+    chatHistory: Optional[List[ChatMessage]] = None
 
 
 class SessionResponse(BaseModel):
     sessionId: str
     status: str
     message: str
-
-
-class TrafficLogEntry(BaseModel):
-    sessionId: str
-    customerName: Optional[str]
-    phone: Optional[str]
-    path: Optional[str]
-    currentStep: Optional[str]
-    vehicle: Optional[Dict]
-    vehicleInterest: Optional[Dict]
-    budget: Optional[Dict]
-    tradeIn: Optional[Dict]
-    payment: Optional[Dict]
-    vehicleRequested: bool
-    actions: List[str]
-    chatHistory: Optional[List[Dict]]
-    createdAt: str
-    updatedAt: str
+    storage: str  # 'postgresql' or 'json'
 
 
 # ============ Helper Functions ============
@@ -220,7 +211,6 @@ def format_session_for_dashboard(session: Dict) -> Dict:
         'tradeIn': {
             'hasTrade': trade_in.get('hasTrade'),
             'vehicle': trade_in.get('vehicle') if trade_in.get('vehicle') else (
-                # Backward compatibility with old format
                 {
                     'year': str(trade_in.get('year')) if trade_in.get('year') else None,
                     'make': trade_in.get('make'),
@@ -241,88 +231,296 @@ def format_session_for_dashboard(session: Dict) -> Dict:
             'trim': selected_vehicle.get('trim'),
             'price': selected_vehicle.get('salePrice') or selected_vehicle.get('msrp'),
         } if selected_vehicle else None,
+        'chatHistory': session.get('chatHistory'),
     }
+
+
+async def get_db_session():
+    """Get database session if available."""
+    if is_database_configured() and async_session_factory:
+        async with async_session_factory() as session:
+            yield session
+    else:
+        yield None
+
+
+# ============ Database Operations ============
+
+async def db_create_or_update_session(session: AsyncSession, data: Dict) -> str:
+    """Create or update session in PostgreSQL."""
+    session_id = data.get('sessionId')
+    
+    # Check if session exists
+    result = await session.execute(
+        select(TrafficSession).where(TrafficSession.session_id == session_id)
+    )
+    existing = result.scalar_one_or_none()
+    
+    now = format_eastern_timestamp()
+    
+    if existing:
+        # Update existing session
+        for key, value in data.items():
+            if value is not None:
+                db_key = {
+                    'sessionId': 'session_id',
+                    'customerName': 'customer_name',
+                    'currentStep': 'current_step',
+                    'vehicleInterest': 'vehicle_interest',
+                    'tradeIn': 'trade_in',
+                    'vehicleRequested': 'vehicle_requested',
+                    'chatHistory': 'chat_history',
+                    'quizAnswers': 'quiz_answers',
+                    'createdAt': 'created_at',
+                    'updatedAt': 'updated_at',
+                }.get(key, key)
+                if hasattr(existing, db_key):
+                    setattr(existing, db_key, value)
+        existing.updated_at = now
+        
+        # Merge chat history if both exist
+        if data.get('chatHistory') and existing.chat_history:
+            existing.chat_history = data['chatHistory']
+        
+        # Merge actions
+        if data.get('actions'):
+            existing_actions = existing.actions or []
+            new_actions = data['actions']
+            existing.actions = existing_actions + [a for a in new_actions if a not in existing_actions]
+        
+    else:
+        # Create new session
+        new_session = TrafficSession(
+            session_id=session_id,
+            customer_name=data.get('customerName'),
+            phone=data.get('phone'),
+            path=data.get('path'),
+            current_step=data.get('currentStep'),
+            vehicle_interest=data.get('vehicleInterest'),
+            budget=data.get('budget'),
+            trade_in=data.get('tradeIn'),
+            vehicle=data.get('vehicle'),
+            payment=data.get('payment'),
+            vehicle_requested=data.get('vehicleRequested', False),
+            actions=data.get('actions', []),
+            chat_history=data.get('chatHistory'),
+            quiz_answers=data.get('quizAnswers'),
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(new_session)
+    
+    await session.commit()
+    return session_id
+
+
+async def db_get_active_sessions(session: AsyncSession, timeout_minutes: int) -> List[Dict]:
+    """Get active sessions from PostgreSQL."""
+    now = get_eastern_time()
+    cutoff = now - timedelta(minutes=timeout_minutes)
+    cutoff_str = cutoff.strftime('%Y-%m-%dT%H:%M:%S')
+    
+    result = await session.execute(
+        select(TrafficSession).where(TrafficSession.updated_at >= cutoff_str)
+    )
+    sessions = result.scalars().all()
+    
+    return [format_session_for_dashboard(s.to_dict()) for s in sessions]
+
+
+async def db_get_all_sessions(session: AsyncSession, limit: int, offset: int) -> tuple:
+    """Get all sessions with pagination from PostgreSQL."""
+    # Get total count
+    count_result = await session.execute(select(func.count(TrafficSession.session_id)))
+    total = count_result.scalar()
+    
+    # Get paginated results
+    result = await session.execute(
+        select(TrafficSession)
+        .order_by(TrafficSession.updated_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    sessions = result.scalars().all()
+    
+    return [s.to_dict() for s in sessions], total
+
+
+async def db_get_session(session: AsyncSession, session_id: str) -> Optional[Dict]:
+    """Get a single session from PostgreSQL."""
+    result = await session.execute(
+        select(TrafficSession).where(TrafficSession.session_id == session_id)
+    )
+    db_session = result.scalar_one_or_none()
+    return db_session.to_dict() if db_session else None
+
+
+async def db_delete_session(session: AsyncSession, session_id: str) -> bool:
+    """Delete a session from PostgreSQL."""
+    result = await session.execute(
+        delete(TrafficSession).where(TrafficSession.session_id == session_id)
+    )
+    await session.commit()
+    return result.rowcount > 0
+
+
+async def db_clear_sessions(session: AsyncSession) -> int:
+    """Clear all sessions from PostgreSQL."""
+    result = await session.execute(delete(TrafficSession))
+    await session.commit()
+    return result.rowcount
+
+
+async def db_get_stats(session: AsyncSession) -> Dict:
+    """Get traffic statistics from PostgreSQL."""
+    today = get_eastern_date_str()
+    now = get_eastern_time()
+    active_cutoff = (now - timedelta(minutes=ACTIVE_SESSION_TIMEOUT)).strftime('%Y-%m-%dT%H:%M:%S')
+    
+    # Total count
+    total_result = await session.execute(select(func.count(TrafficSession.session_id)))
+    total = total_result.scalar()
+    
+    # Today count
+    today_result = await session.execute(
+        select(func.count(TrafficSession.session_id))
+        .where(TrafficSession.created_at.like(f"{today}%"))
+    )
+    today_count = today_result.scalar()
+    
+    # Active count
+    active_result = await session.execute(
+        select(func.count(TrafficSession.session_id))
+        .where(TrafficSession.updated_at >= active_cutoff)
+    )
+    active_count = active_result.scalar()
+    
+    # Get all sessions for detailed stats
+    all_result = await session.execute(select(TrafficSession))
+    all_sessions = all_result.scalars().all()
+    
+    by_path = {}
+    with_vehicle = 0
+    with_trade = 0
+    vehicle_requests = 0
+    completed = 0
+    with_chat = 0
+    
+    for s in all_sessions:
+        path = s.path or 'unknown'
+        by_path[path] = by_path.get(path, 0) + 1
+        if s.vehicle:
+            with_vehicle += 1
+        if s.trade_in:
+            with_trade += 1
+        if s.vehicle_requested:
+            vehicle_requests += 1
+        if s.phone:
+            completed += 1
+        if s.chat_history:
+            with_chat += 1
+    
+    return {
+        "total_sessions": total,
+        "active_now": active_count,
+        "today": today_count,
+        "today_date": today,
+        "by_path": by_path,
+        "with_vehicle_selected": with_vehicle,
+        "with_trade_in": with_trade,
+        "vehicle_requests": vehicle_requests,
+        "completed_handoffs": completed,
+        "with_ai_chat": with_chat,
+        "conversion_rate": round((completed / total * 100), 1) if total > 0 else 0,
+    }
+
+
+# ============ JSON Fallback Operations ============
+
+def json_create_or_update_session(data: Dict) -> str:
+    """Create or update session in JSON file."""
+    global traffic_sessions_cache
+    
+    session_id = data.get('sessionId')
+    now = format_eastern_timestamp()
+    
+    # Find existing session
+    existing_idx = None
+    for idx, s in enumerate(traffic_sessions_cache):
+        if s.get('sessionId') == session_id:
+            existing_idx = idx
+            break
+    
+    if existing_idx is not None:
+        # Update existing
+        existing = traffic_sessions_cache[existing_idx]
+        for key, value in data.items():
+            if value is not None:
+                existing[key] = value
+        existing['updatedAt'] = now
+        traffic_sessions_cache[existing_idx] = existing
+    else:
+        # Create new
+        data['createdAt'] = now
+        data['updatedAt'] = now
+        traffic_sessions_cache.append(data)
+    
+    save_traffic_log(traffic_sessions_cache)
+    return session_id
 
 
 # ============ Endpoints ============
 
 @router.post("/session", response_model=SessionResponse)
-async def create_or_update_session(session: SessionCreate):
+async def log_session(session_data: SessionCreate):
     """
-    Create or update a kiosk session.
-    Called when customer completes key actions.
-    All timestamps are in Eastern Time.
+    Log or update a kiosk session.
+    Uses PostgreSQL if configured, otherwise falls back to JSON file.
     """
-    global traffic_sessions
+    # Generate session ID if not provided
+    session_id = session_data.sessionId
+    if not session_id:
+        session_id = f"K{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
     
-    session_id = session.sessionId or str(uuid.uuid4())[:12].upper()
-    now = format_eastern_timestamp()
-    
-    # Find existing session or create new
-    existing_idx = None
-    for idx, s in enumerate(traffic_sessions):
-        if s.get('sessionId') == session_id:
-            existing_idx = idx
-            break
-    
-    session_data = {
+    # Prepare data dict
+    data = {
         'sessionId': session_id,
-        'customerName': session.customerName,
-        'phone': session.phone,
-        'path': session.path,
-        'currentStep': session.currentStep,
-        'vehicle': session.vehicle.dict() if session.vehicle else None,
-        'vehicleInterest': session.vehicleInterest.dict() if session.vehicleInterest else None,
-        'budget': session.budget.dict() if session.budget else None,
-        'tradeIn': session.tradeIn.dict() if session.tradeIn else None,
-        'payment': session.payment.dict() if session.payment else None,
-        'vehicleRequested': session.vehicleRequested or False,
-        'quizAnswers': session.quizAnswers,
-        'actions': session.actions or [],
-        'chatHistory': [msg.dict() for msg in session.chatHistory] if session.chatHistory else None,
-        'updatedAt': now,
+        'customerName': session_data.customerName,
+        'phone': session_data.phone,
+        'path': session_data.path,
+        'currentStep': session_data.currentStep,
+        'vehicle': session_data.vehicle.model_dump() if session_data.vehicle else None,
+        'vehicleInterest': session_data.vehicleInterest.model_dump() if session_data.vehicleInterest else None,
+        'budget': session_data.budget.model_dump() if session_data.budget else None,
+        'tradeIn': session_data.tradeIn.model_dump() if session_data.tradeIn else None,
+        'payment': session_data.payment.model_dump() if session_data.payment else None,
+        'vehicleRequested': session_data.vehicleRequested,
+        'actions': session_data.actions or [],
+        'chatHistory': [m.model_dump() for m in session_data.chatHistory] if session_data.chatHistory else None,
+        'quizAnswers': session_data.quizAnswers,
     }
     
-    if existing_idx is not None:
-        # Update existing - merge data
-        existing = traffic_sessions[existing_idx]
-        session_data['createdAt'] = existing.get('createdAt', now)
-        
-        # Merge actions
-        existing_actions = existing.get('actions', [])
-        new_actions = session.actions or []
-        session_data['actions'] = list(dict.fromkeys(existing_actions + new_actions))
-        
-        # Merge chat history - append new messages
-        existing_chat = existing.get('chatHistory') or []
-        new_chat = [msg.dict() for msg in session.chatHistory] if session.chatHistory else []
-        if new_chat:
-            # Only add messages that aren't already in the history
-            existing_contents = {(m.get('role'), m.get('content')) for m in existing_chat}
-            for msg in new_chat:
-                if (msg.get('role'), msg.get('content')) not in existing_contents:
-                    existing_chat.append(msg)
-            session_data['chatHistory'] = existing_chat
-        else:
-            session_data['chatHistory'] = existing_chat if existing_chat else None
-        
-        # Keep non-null values from existing if new value is null
-        for key in ['customerName', 'phone', 'path', 'currentStep', 'vehicle', 'vehicleInterest', 'budget', 'tradeIn', 'payment']:
-            if session_data.get(key) is None and existing.get(key) is not None:
-                session_data[key] = existing[key]
-        
-        traffic_sessions[existing_idx] = session_data
-    else:
-        session_data['createdAt'] = now
-        traffic_sessions.append(session_data)
+    # Try PostgreSQL first
+    if is_database_configured() and async_session_factory and TrafficSession:
+        try:
+            async with async_session_factory() as db:
+                await db_create_or_update_session(db, data)
+                return SessionResponse(
+                    sessionId=session_id,
+                    status="success",
+                    message="Session logged to PostgreSQL",
+                    storage="postgresql"
+                )
+        except Exception as e:
+            logger.error(f"PostgreSQL error, falling back to JSON: {e}")
     
-    # Persist to file
-    save_traffic_log(traffic_sessions)
-    
+    # Fallback to JSON
+    json_create_or_update_session(data)
     return SessionResponse(
         sessionId=session_id,
         status="success",
-        message="Session logged successfully"
+        message="Session logged to JSON file",
+        storage="json"
     )
 
 
@@ -332,22 +530,37 @@ async def get_active_sessions(
 ):
     """
     Get active kiosk sessions for Sales Manager Dashboard.
-    Returns sessions that have been updated within the timeout period.
-    Formatted for the 4-square worksheet view.
     """
-    global traffic_sessions
-    traffic_sessions = load_traffic_log()
+    # Try PostgreSQL first
+    if is_database_configured() and async_session_factory and TrafficSession:
+        try:
+            async with async_session_factory() as db:
+                active = await db_get_active_sessions(db, timeout_minutes)
+                active.sort(key=lambda x: x.get('lastActivity', ''), reverse=True)
+                return {
+                    "sessions": active,
+                    "count": len(active),
+                    "timeout_minutes": timeout_minutes,
+                    "server_time": format_eastern_timestamp(),
+                    "timezone": "America/New_York",
+                    "storage": "postgresql"
+                }
+        except Exception as e:
+            logger.error(f"PostgreSQL error, falling back to JSON: {e}")
+    
+    # Fallback to JSON
+    global traffic_sessions_cache
+    traffic_sessions_cache = load_traffic_log()
     
     now = get_eastern_time()
     cutoff = now - timedelta(minutes=timeout_minutes)
     
     active = []
-    for session in traffic_sessions:
+    for session in traffic_sessions_cache:
         updated_at = session.get('updatedAt', session.get('createdAt', ''))
         if updated_at:
             try:
                 session_time = parse_timestamp(updated_at)
-                # Remove timezone info for comparison if needed
                 if session_time.tzinfo:
                     session_time = session_time.replace(tzinfo=None)
                 cutoff_naive = cutoff.replace(tzinfo=None)
@@ -355,10 +568,8 @@ async def get_active_sessions(
                 if session_time >= cutoff_naive:
                     active.append(format_session_for_dashboard(session))
             except Exception as e:
-                print(f"Error parsing timestamp: {e}")
                 continue
     
-    # Sort by most recent activity first
     active.sort(key=lambda x: x.get('lastActivity', ''), reverse=True)
     
     return {
@@ -366,7 +577,8 @@ async def get_active_sessions(
         "count": len(active),
         "timeout_minutes": timeout_minutes,
         "server_time": format_eastern_timestamp(),
-        "timezone": "America/New_York"
+        "timezone": "America/New_York",
+        "storage": "json"
     }
 
 
@@ -376,22 +588,42 @@ async def get_traffic_log(
     offset: int = Query(0, ge=0),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    filter_today: bool = Query(False, description="Filter to today's sessions only"),
+    filter_today: bool = Query(False),
 ):
-    """
-    Get traffic log entries for admin dashboard.
-    Returns most recent sessions first.
-    All timestamps are in Eastern Time.
-    """
-    global traffic_sessions
+    """Get traffic log entries for admin dashboard."""
+    # Try PostgreSQL first
+    if is_database_configured() and async_session_factory and TrafficSession:
+        try:
+            async with async_session_factory() as db:
+                sessions, total = await db_get_all_sessions(db, limit, offset)
+                
+                # Apply filters
+                if filter_today:
+                    today = get_eastern_date_str()
+                    sessions = [s for s in sessions if s.get('createdAt', '').startswith(today)]
+                if date_from:
+                    sessions = [s for s in sessions if s.get('createdAt', '') >= date_from]
+                if date_to:
+                    sessions = [s for s in sessions if s.get('createdAt', '') <= date_to]
+                
+                return {
+                    "total": len(sessions),
+                    "limit": limit,
+                    "offset": offset,
+                    "sessions": sessions,
+                    "timezone": "America/New_York",
+                    "server_time": format_eastern_timestamp(),
+                    "storage": "postgresql"
+                }
+        except Exception as e:
+            logger.error(f"PostgreSQL error, falling back to JSON: {e}")
     
-    # Reload from file to get latest
-    traffic_sessions = load_traffic_log()
+    # Fallback to JSON
+    global traffic_sessions_cache
+    traffic_sessions_cache = load_traffic_log()
     
-    # Filter by date if provided
-    filtered = traffic_sessions
+    filtered = traffic_sessions_cache
     
-    # Filter to today only if requested
     if filter_today:
         today = get_eastern_date_str()
         filtered = [s for s in filtered if s.get('createdAt', '').startswith(today)]
@@ -402,14 +634,12 @@ async def get_traffic_log(
     if date_to:
         filtered = [s for s in filtered if s.get('createdAt', '') <= date_to]
     
-    # Sort by most recent first
     sorted_sessions = sorted(
         filtered,
         key=lambda x: x.get('updatedAt', x.get('createdAt', '')),
         reverse=True
     )
     
-    # Paginate
     paginated = sorted_sessions[offset:offset + limit]
     
     return {
@@ -418,17 +648,29 @@ async def get_traffic_log(
         "offset": offset,
         "sessions": paginated,
         "timezone": "America/New_York",
-        "server_time": format_eastern_timestamp()
+        "server_time": format_eastern_timestamp(),
+        "storage": "json"
     }
 
 
 @router.get("/log/{session_id}")
 async def get_session_detail(session_id: str):
     """Get details for a specific session including chat history."""
-    global traffic_sessions
-    traffic_sessions = load_traffic_log()
+    # Try PostgreSQL first
+    if is_database_configured() and async_session_factory and TrafficSession:
+        try:
+            async with async_session_factory() as db:
+                session = await db_get_session(db, session_id)
+                if session:
+                    return session
+        except Exception as e:
+            logger.error(f"PostgreSQL error, falling back to JSON: {e}")
     
-    for session in traffic_sessions:
+    # Fallback to JSON
+    global traffic_sessions_cache
+    traffic_sessions_cache = load_traffic_log()
+    
+    for session in traffic_sessions_cache:
         if session.get('sessionId') == session_id:
             return session
     
@@ -438,65 +680,58 @@ async def get_session_detail(session_id: str):
 @router.get("/dashboard/{session_id}")
 async def get_session_for_dashboard(session_id: str):
     """Get a single session formatted for the 4-square dashboard view."""
-    global traffic_sessions
-    traffic_sessions = load_traffic_log()
-    
-    for session in traffic_sessions:
-        if session.get('sessionId') == session_id:
-            return format_session_for_dashboard(session)
-    
-    return {"error": "Session not found"}
+    session = await get_session_detail(session_id)
+    if "error" in session:
+        return session
+    return format_session_for_dashboard(session)
 
 
 @router.get("/stats")
 async def get_traffic_stats():
-    """
-    Get traffic statistics for dashboard.
-    Uses Eastern Time for 'today' calculation.
-    """
-    global traffic_sessions
-    traffic_sessions = load_traffic_log()
+    """Get traffic statistics for dashboard."""
+    # Try PostgreSQL first
+    if is_database_configured() and async_session_factory and TrafficSession:
+        try:
+            async with async_session_factory() as db:
+                stats = await db_get_stats(db)
+                stats["timezone"] = "America/New_York"
+                stats["server_time"] = format_eastern_timestamp()
+                stats["storage"] = "postgresql"
+                return stats
+        except Exception as e:
+            logger.error(f"PostgreSQL error, falling back to JSON: {e}")
     
-    total = len(traffic_sessions)
+    # Fallback to JSON
+    global traffic_sessions_cache
+    traffic_sessions_cache = load_traffic_log()
     
-    # Count by path
+    total = len(traffic_sessions_cache)
     by_path = {}
-    # Count with vehicle selected
     with_vehicle = 0
-    # Count with trade-in
     with_trade = 0
-    # Count with vehicle requested
     vehicle_requests = 0
-    # Count with phone (completed handoff)
     completed = 0
-    # Count with chat history
     with_chat = 0
     
-    # Today's sessions (in Eastern Time)
     today = get_eastern_date_str()
     today_count = 0
     
-    # Active sessions count (last 30 min)
     now = get_eastern_time()
     active_cutoff = now - timedelta(minutes=ACTIVE_SESSION_TIMEOUT)
     active_count = 0
     
-    for session in traffic_sessions:
+    for session in traffic_sessions_cache:
         path = session.get('path') or 'unknown'
         by_path[path] = by_path.get(path, 0) + 1
         
         if session.get('vehicle'):
             with_vehicle += 1
-        
         if session.get('tradeIn'):
             with_trade += 1
-        
         if session.get('vehicleRequested'):
             vehicle_requests += 1
-        
         if session.get('phone'):
             completed += 1
-        
         if session.get('chatHistory'):
             with_chat += 1
         
@@ -504,7 +739,6 @@ async def get_traffic_stats():
         if created.startswith(today):
             today_count += 1
         
-        # Check if active
         updated_at = session.get('updatedAt', created)
         if updated_at:
             try:
@@ -530,30 +764,75 @@ async def get_traffic_stats():
         "with_ai_chat": with_chat,
         "conversion_rate": round((completed / total * 100), 1) if total > 0 else 0,
         "timezone": "America/New_York",
-        "server_time": format_eastern_timestamp()
+        "server_time": format_eastern_timestamp(),
+        "storage": "json"
     }
 
 
 @router.delete("/log/{session_id}")
 async def delete_session(session_id: str):
     """Delete a session (admin only)."""
-    global traffic_sessions
-    traffic_sessions = load_traffic_log()
+    # Try PostgreSQL first
+    if is_database_configured() and async_session_factory and TrafficSession:
+        try:
+            async with async_session_factory() as db:
+                deleted = await db_delete_session(db, session_id)
+                if deleted:
+                    return {"status": "deleted", "sessionId": session_id, "storage": "postgresql"}
+        except Exception as e:
+            logger.error(f"PostgreSQL error, falling back to JSON: {e}")
     
-    original_len = len(traffic_sessions)
-    traffic_sessions = [s for s in traffic_sessions if s.get('sessionId') != session_id]
+    # Fallback to JSON
+    global traffic_sessions_cache
+    traffic_sessions_cache = load_traffic_log()
     
-    if len(traffic_sessions) < original_len:
-        save_traffic_log(traffic_sessions)
-        return {"status": "deleted", "sessionId": session_id}
+    original_len = len(traffic_sessions_cache)
+    traffic_sessions_cache = [s for s in traffic_sessions_cache if s.get('sessionId') != session_id]
+    
+    if len(traffic_sessions_cache) < original_len:
+        save_traffic_log(traffic_sessions_cache)
+        return {"status": "deleted", "sessionId": session_id, "storage": "json"}
     
     return {"error": "Session not found"}
 
 
 @router.delete("/log")
 async def clear_traffic_log():
-    """Clear all traffic log entries (admin only - use with caution)."""
-    global traffic_sessions
-    traffic_sessions = []
-    save_traffic_log(traffic_sessions)
-    return {"status": "cleared", "message": "All traffic log entries deleted"}
+    """Clear all traffic log entries (admin only)."""
+    # Try PostgreSQL first
+    if is_database_configured() and async_session_factory and TrafficSession:
+        try:
+            async with async_session_factory() as db:
+                count = await db_clear_sessions(db)
+                return {"status": "cleared", "message": f"Deleted {count} sessions", "storage": "postgresql"}
+        except Exception as e:
+            logger.error(f"PostgreSQL error, falling back to JSON: {e}")
+    
+    # Fallback to JSON
+    global traffic_sessions_cache
+    traffic_sessions_cache = []
+    save_traffic_log(traffic_sessions_cache)
+    return {"status": "cleared", "message": "All traffic log entries deleted", "storage": "json"}
+
+
+@router.get("/storage-status")
+async def get_storage_status():
+    """Check which storage backend is active."""
+    db_configured = is_database_configured()
+    db_connected = False
+    
+    if db_configured and async_session_factory:
+        try:
+            async with async_session_factory() as db:
+                from sqlalchemy import text
+                await db.execute(text("SELECT 1"))
+                db_connected = True
+        except:
+            pass
+    
+    return {
+        "postgresql_configured": db_configured,
+        "postgresql_connected": db_connected,
+        "active_storage": "postgresql" if db_connected else "json",
+        "json_fallback_available": True,
+    }
