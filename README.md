@@ -1,181 +1,309 @@
-# 🚀 Quirk AI Kiosk  
-A next-generation AI-powered showroom experience for Quirk dealerships.
+# QUIRK AI Kiosk
 
-The **Quirk AI Kiosk** is a unified, production-ready monorepo that powers an interactive in-store kiosk experience. Customers can browse inventory, compare vehicles, submit leads, and receive AI-generated vehicle recommendations — all through a secure, locked-down touchscreen interface.
+**AI-Powered Showroom Experience for Quirk Auto Dealers**
 
-This repo contains **three major services**:
+An interactive in-store kiosk system that enables customers to browse inventory, compare vehicles, get AI-powered recommendations, estimate trade-in values, and calculate payments — all through a touchscreen interface designed for the dealership showroom floor.
 
-1. **Frontend Kiosk App** (React)
-2. **Backend Gateway API** (FastAPI)
-3. **AI Recommendation Service** (Python)
+[![Backend CI](https://github.com/mpalmer79/quirk-ai-kiosk/actions/workflows/ci-backend.yml/badge.svg)](https://github.com/mpalmer79/quirk-ai-kiosk/actions/workflows/ci-backend.yml)
+[![Frontend CI](https://github.com/mpalmer79/quirk-ai-kiosk/actions/workflows/ci-frontend.yml/badge.svg)](https://github.com/mpalmer79/quirk-ai-kiosk/actions/workflows/ci-frontend.yml)
 
 ---
 
-# 🏗️ Architecture Overview
+## Overview
 
-| Component | Purpose | Tech Stack | Deployment |
-|----------|---------|------------|-------------|
-| **Frontend** | Customer-facing kiosk UI | React, Vite, Tailwind | Bundled + deployed to kiosk devices (DMP) |
-| **Backend Gateway** | API routing, auth, logging, lead submission | FastAPI, Python | Docker container on central server |
-| **AI Service** | Real-time vehicle recommendation engine | Python, custom ML model | Docker container on high-performance node |
+The QUIRK AI Kiosk is a production-ready monorepo powering Quirk Auto Dealers' in-store customer experience. The system is designed with the understanding that **the customer is already in the showroom** — the AI assistant acts as a knowledgeable salesperson, not a website chatbot.
 
-All services communicate over **internal REST endpoints**. The system is deployed using a modular multi-container design.
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **AI Sales Assistant** | Claude-powered conversational AI that understands customer needs and recommends vehicles |
+| **Smart Recommendations** | Entity extraction from conversations to provide personalized vehicle suggestions |
+| **Live Inventory** | Real-time PBS inventory integration with 250+ Chevrolet vehicles |
+| **Trade-In Estimator** | Guided trade-in data collection for sales team handoff |
+| **Payment Calculator** | Finance and lease calculators with real-time payment estimates |
+| **Sales Manager Dashboard** | Admin interface for lead management and traffic analytics |
+| **Text-to-Speech** | Accessibility feature for AI responses |
 
 ---
 
-# 📁 Project Structure
+## Architecture
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        QUIRK AI KIOSK                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  │   Frontend   │    │   Backend    │    │  AI Service  │      │
+│  │    (React)   │◄──►│  (FastAPI)   │◄──►│   (Python)   │      │
+│  └──────────────┘    └──────────────┘    └──────────────┘      │
+│         │                   │                   │               │
+│         ▼                   ▼                   ▼               │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  │  Railway/    │    │   Railway    │    │   Claude     │      │
+│  │  Vercel      │    │   Deploy     │    │   API        │      │
+│  └──────────────┘    └──────────────┘    └──────────────┘      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
+| Service | Tech Stack | Deployment | URL |
+|---------|------------|------------|-----|
+| **Frontend** | React, TypeScript, Tailwind | Railway/Vercel | `quirk-frontend-production.up.railway.app` |
+| **Backend** | FastAPI, Python 3.11 | Railway | `quirk-backend-production.up.railway.app` |
+| **AI Service** | Anthropic Claude API | Integrated | Via Backend |
+
+---
+
+## Project Structure
 ```
 quirk-ai-kiosk/
-│
-├── frontend/               # React Kiosk UI
-│   ├── public/
+├── frontend/                    # React Kiosk Application
 │   ├── src/
+│   │   ├── components/
+│   │   │   ├── AIAssistant.tsx         # Claude-powered chat interface
+│   │   │   ├── Kioskapp.tsx            # Main kiosk container
+│   │   │   ├── Inventoryresults.tsx    # Vehicle grid display
+│   │   │   ├── Vehicledetail.tsx       # Individual vehicle view
+│   │   │   ├── ModelBudgetSelector.tsx # Model/budget filtering
+│   │   │   ├── TradeInestimator.js     # Trade-in data collection
+│   │   │   ├── Paymentcalculator.js    # Finance/lease calculator
+│   │   │   ├── SalesManagerDashboard.tsx # Admin dashboard
+│   │   │   ├── Stocklookup.tsx         # Stock number search
+│   │   │   └── api.ts                  # API client layer
+│   │   └── ...
 │   ├── Dockerfile
-│   └── .env.development
+│   └── package.json
 │
-├── backend/                # API Gateway
+├── backend/                     # FastAPI Backend Service
 │   ├── app/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── .env.development
-│
-├── ai_service/             # Vehicle Recommendation Engine
-│   ├── predictor/
-│   ├── models/
+│   │   ├── main.py                     # FastAPI application entry
+│   │   ├── core/
+│   │   │   └── recommendation_engine.py # Weighted similarity scoring
+│   │   ├── routers/
+│   │   │   ├── inventory.py            # /api/v1/inventory
+│   │   │   ├── ai.py                   # /api/v1/ai (Claude integration)
+│   │   │   ├── ai_v2.py                # /api/v2/ai (structured outputs)
+│   │   │   ├── recommendations.py      # /api/v1/recommendations
+│   │   │   ├── recommendations_v2.py   # /api/v2/recommendations
+│   │   │   ├── smart_recommendations.py # /api/v3/smart
+│   │   │   ├── leads.py                # Lead submission
+│   │   │   ├── analytics.py            # Analytics endpoints
+│   │   │   └── traffic.py              # Traffic logging
+│   │   └── services/
+│   │       ├── entity_extraction.py    # NLP entity extraction
+│   │       ├── inventory_enrichment.py # Derive missing vehicle fields
+│   │       └── smart_recommendations.py # Conversation-aware recs
+│   ├── config/
+│   │   └── recommender_config.json     # Recommendation weights
+│   ├── data/
+│   │   └── inventory.xlsx              # PBS inventory data
+│   ├── tests/                          # Pytest test suite
 │   ├── Dockerfile
 │   └── requirements.txt
 │
+├── ai_service/                  # Standalone AI Service (Optional)
+│   ├── predictor/
+│   │   └── server.py
+│   └── Dockerfile
+│
 ├── docker-compose.yml
-├── README.md
-└── LICENSE
+└── README.md
 ```
 
 ---
 
-# ⚙️ Local Development Setup
+## API Reference
 
-You’ll need:
+### V1 Endpoints (Core)
 
-- Docker
-- Docker Compose
-- Node 18+ (optional if you want to run frontend natively)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/inventory` | GET | List all vehicles with filtering |
+| `/api/v1/inventory/{stock_number}` | GET | Get vehicle by stock number |
+| `/api/v1/inventory/search` | GET | Search inventory |
+| `/api/v1/inventory/stats` | GET | Inventory statistics |
+| `/api/v1/recommendations/{stock_number}` | GET | Similar vehicle recommendations |
+| `/api/v1/ai/chat` | POST | AI assistant chat |
+| `/api/v1/leads` | POST | Submit customer lead |
+| `/api/v1/traffic/log` | POST | Log kiosk traffic |
 
-### 1. Create Local Environment Files
+### V2 Endpoints (Enhanced)
 
-#### **`backend/.env.development`**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v2/ai/chat` | POST | Structured AI responses with intent detection |
+| `/api/v2/recommendations/{stock_number}` | GET | Enhanced recommendations |
+| `/api/v2/recommendations/personalized` | POST | Browsing history-based recommendations |
+
+### V3 Endpoints (Smart AI)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v3/smart/from-conversation` | POST | Recommendations from chat context |
+| `/api/v3/smart/similar/{stock_number}` | POST | AI-enhanced similar vehicles |
+| `/api/v3/smart/extract-entities` | POST | Extract budget, preferences from text |
+
+### Interactive Documentation
+
+- **Swagger UI**: `https://quirk-backend-production.up.railway.app/docs`
+- **ReDoc**: `https://quirk-backend-production.up.railway.app/redoc`
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 18+
+- Python 3.11+
+- Docker (optional)
+
+### Frontend Setup
+```bash
+cd frontend
+npm install
+npm start
 ```
-PBS_API_KEY=mock-pbs-key-dev
-CRM_API_KEY=mock-crm-key-dev
-LOG_LEVEL=info
+
+Frontend runs at `http://localhost:3000`
+
+### Backend Setup
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 ```
 
-#### **`frontend/.env.development`**
+Backend runs at `http://localhost:8000`
+
+### Environment Variables
+
+**Frontend** (`frontend/.env.development`):
 ```
 REACT_APP_API_URL=http://localhost:8000/api/v1
 ```
 
-#### **`ai_service/.env.development`**
+**Backend** (`backend/.env.development`):
 ```
-MODEL_PATH=./models/default-model.pkl
+ANTHROPIC_API_KEY=your-claude-api-key
+ENVIRONMENT=development
+LOG_LEVEL=info
 ```
 
-> Production secrets are not stored here. These values are mock-key safe defaults for local use.
-
----
-
-# 🧪 Running the Entire Stack (Local Demo)
-
-From the repo root:
-
+### Running Tests
 ```bash
-docker-compose build
-docker-compose up
-```
-
-After startup:
-
-| Service | Local URL |
-|---------|-----------|
-| **Frontend** | http://localhost:3000 |
-| **Backend Gateway** | http://localhost:8000 |
-| **AI Service** | http://localhost:5000 |
-
----
-
-# 🔧 Running Services Individually
-
-### Frontend
-```
-cd frontend
-npm install
-npm run dev
-```
-
-### Backend Gateway
-```
 cd backend
-uvicorn app.main:app --reload --port 8000
+pytest -v
 ```
 
-### AI Recommender
+### Docker Compose
+```bash
+docker-compose up --build
 ```
-cd ai_service
-python predictor/server.py
-```
 
 ---
 
-# 🤖 Vehicle Recommendation Engine
+## AI Features
 
-The AI service consumes structured inventory data and customer preference signals to generate:
+### Conversational AI (Claude)
 
-- Ranked vehicle recommendations  
-- Similar-vehicle suggestions  
-- Feature-weighted scoring outputs  
+The AI Assistant uses Anthropic's Claude to provide natural, context-aware conversations. Key behaviors:
 
-Model files are stored separately to keep the repo lightweight.
+- **Showroom Context**: Understands customer is already in-store
+- **Trade-In Flow**: Guides customers through trade-in data collection without giving valuations
+- **Vehicle Recommendations**: Suggests vehicles based on stated needs
+- **Staff Handoff**: Triggers notifications for sales, appraisal, or finance needs
 
----
+### Entity Extraction
 
-# 🧱 Production Deployment Strategy
+The system automatically extracts structured data from conversations:
 
-- **Kiosk Frontend**  
-  Bundled and deployed through the dealership’s Device Management Platform (DMP). Runs in secure kiosk-mode.
+| Entity | Example Input | Extracted |
+|--------|---------------|-----------|
+| Budget | "under 50k" | `max_price: 50000` |
+| Vehicle Type | "need a truck for towing" | `type: truck, use_case: towing` |
+| Trade-In | "trading my 2019 F-150" | `year: 2019, make: Ford` |
+| Family Size | "I have 3 kids" | `family_size: 5, min_seating: 5` |
+| Urgency | "need something today" | `urgency: ready_to_buy` |
 
-- **Backend Gateway**  
-  Docker container deployed to Quirk’s internal server environment.
+### Smart Recommendations
 
-- **AI Service**  
-  Runs in an isolated container on a dedicated compute node for real-time inference.
+Recommendations use weighted scoring across:
 
-- **Logging**  
-  Centralized logging (stdout + gateway instrumentation) for audit and improvement.
-
----
-
-# 📦 Data & Mocking
-
-Local development uses:
-
-- Mock PBS inventory data  
-- Mock CRM lead submission  
-- Local fallback model  
-
-This allows full kiosk simulation with zero external dependencies.
+- Body style match (2.0x weight)
+- Price range similarity (1.5x)
+- Fuel type match (1.5x)
+- Drivetrain match (1.0x)
+- Feature overlap (1.0x)
+- Performance/luxury alignment (0.75x)
 
 ---
 
-# 🧭 Roadmap
+## Deployment
 
-- 🔒 Full auth handshake (kiosk → gateway)  
-- 📈 Dealer-specific recommendation tuning  
-- ⚡ PBS real-time inventory sync  
-- 📤 Automated CRM lead submission  
-- 🖼 Enhanced comparison UI  
+### Railway (Current Production)
+
+The project is deployed on Railway with automatic deployments from the `main` branch.
+
+| Service | Railway URL |
+|---------|-------------|
+| Backend | `quirk-backend-production.up.railway.app` |
+| Frontend | `quirk-frontend-production.up.railway.app` |
+
+### CI/CD
+
+GitHub Actions workflows handle:
+
+- **Backend**: Lint, test, build Docker image, deploy to Railway
+- **Frontend**: Lint, test, build, deploy to Railway/Vercel
+- **AI Service**: Build and push container
 
 ---
 
-# 📝 License
+## Inventory Data
 
-This project is licensed under the **MIT License**.
+The system loads vehicle inventory from `backend/data/inventory.xlsx` (PBS export format).
+
+### Supported Fields
+
+| Field | Description |
+|-------|-------------|
+| Stock Number | Unique identifier (e.g., M37410) |
+| Year | Model year |
+| Make | Manufacturer (Chevrolet) |
+| Model | Vehicle model |
+| Trim | Trim level |
+| MSRP | Price |
+| Body | Body description with drivetrain |
+| Body Type | Category code (PKUP, APURP, VAN) |
+
+### Enrichment
+
+Missing fields are automatically derived:
+
+- **Drivetrain**: Extracted from Body field (4WD, AWD, 2WD)
+- **Fuel Type**: Detected from Model name (EV → Electric)
+- **Features**: Inferred from Trim (Z71 → Off-Road Package)
+- **Seating/Towing**: Looked up by model
+
+---
+
+## Contributing
+
+1. Create a feature branch from `main`
+2. Make changes with appropriate tests
+3. Ensure CI passes
+4. Submit pull request
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+## Support
+
+For issues or questions, contact the Quirk Auto Dealers IT team or open a GitHub issue.
