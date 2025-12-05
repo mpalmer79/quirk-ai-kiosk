@@ -7,6 +7,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("quirk_kiosk")
 
 # Import routers - the original working routers
 from app.routers import inventory, recommendations, leads, analytics, traffic, ai
@@ -14,20 +22,28 @@ from app.routers import inventory, recommendations, leads, analytics, traffic, a
 # Import v2 routers
 from app.routers import recommendations_v2, ai_v2
 
+# Import v3 smart recommendations router
+from app.routers import smart_recommendations
+
+
 # Lifespan handler for startup/shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 Quirk AI Kiosk API starting...")
+    logger.info("🚀 Quirk AI Kiosk API starting...")
+    logger.info("📊 Loading inventory enrichment service...")
+    logger.info("🧠 Initializing entity extraction service...")
+    logger.info("✅ All services initialized")
     yield
     # Shutdown
-    print("👋 Quirk AI Kiosk API shutting down...")
+    logger.info("👋 Quirk AI Kiosk API shutting down...")
+
 
 # Create FastAPI app
 app = FastAPI(
     title="Quirk AI Kiosk API",
-    description="Backend API for Quirk AI Kiosk customer journey",
-    version="2.0.0",
+    description="Backend API for Quirk AI Kiosk customer journey with AI-powered recommendations",
+    version="2.1.0",
     lifespan=lifespan
 )
 
@@ -68,6 +84,10 @@ app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
 app.include_router(recommendations_v2.router, prefix="/api/v2/recommendations", tags=["recommendations-v2"])
 app.include_router(ai_v2.router, prefix="/api/v2/ai", tags=["ai-v2"])
 
+# V3 Routes (Smart AI Recommendations)
+app.include_router(smart_recommendations.router, prefix="/api/v3/smart", tags=["smart-recommendations"])
+
+
 # Root endpoint
 @app.get("/")
 async def root():
@@ -75,8 +95,14 @@ async def root():
         "service": "Quirk AI Kiosk API",
         "status": "running",
         "docs": "/docs",
-        "version": "2.0.0"
+        "version": "2.1.0",
+        "features": {
+            "v1": ["inventory", "recommendations", "leads", "analytics", "traffic", "ai"],
+            "v2": ["enhanced-recommendations", "structured-ai"],
+            "v3": ["smart-recommendations", "entity-extraction", "conversation-analysis"]
+        }
     }
+
 
 # Health check at /api/health
 @app.get("/api/health")
@@ -85,8 +111,17 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "service": "quirk-kiosk-api"
+        "service": "quirk-kiosk-api",
+        "version": "2.1.0",
+        "components": {
+            "inventory": "ok",
+            "ai": "ok",
+            "recommendations": "ok",
+            "smart_recommendations": "ok",
+            "entity_extraction": "ok"
+        }
     }
+
 
 # Run with uvicorn
 if __name__ == "__main__":
