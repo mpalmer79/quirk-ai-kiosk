@@ -83,8 +83,8 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   const logSessionStart = async (name: string | null, phone: string | null, path?: string): Promise<void> => {
     try {
       await api.logTrafficSession({
-        customerName: name,
-        phone: phone,
+        customerName: name || undefined,
+        phone: phone || undefined,
         path: path || 'welcome',
         currentStep: 'name_entered',
         actions: name ? ['entered_name'] : ['skipped_name'],
@@ -137,8 +137,8 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     // LOG PATH SELECTION TO BACKEND
     try {
       await api.logTrafficSession({
-        customerName: customerName || null,
-        phone: customerPhone || null,
+        customerName: customerName || undefined,
+        phone: customerPhone || undefined,
         path: path,
         currentStep: path,
         actions: [`selected_${path}`],
@@ -161,8 +161,8 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     // LOG BROWSE TO BACKEND
     try {
       await api.logTrafficSession({
-        customerName: customerName || null,
-        phone: customerPhone || null,
+        customerName: customerName || undefined,
+        phone: customerPhone || undefined,
         path: 'browse',
         currentStep: 'inventory',
         actions: ['browse_all'],
