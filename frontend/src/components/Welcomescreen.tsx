@@ -37,9 +37,30 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   
   // Name capture state
   const [customerName, setCustomerName] = useState<string>(customerData?.customerName || '');
+  const [customerPhone, setCustomerPhone] = useState<string>(customerData?.phone || '');
   const [nameSubmitted, setNameSubmitted] = useState<boolean>(!!customerData?.customerName);
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Format phone number as (XXX) XXX-XXXX
+  const formatPhoneNumber = (value: string): string => {
+    // Remove all non-digits
+    const digits = value.replace(/\D/g, '');
+    
+    // Limit to 10 digits
+    const limited = digits.slice(0, 10);
+    
+    // Format based on length
+    if (limited.length === 0) return '';
+    if (limited.length <= 3) return `(${limited}`;
+    if (limited.length <= 6) return `(${limited.slice(0, 3)}) ${limited.slice(3)}`;
+    return `(${limited.slice(0, 3)}) ${limited.slice(3, 6)}-${limited.slice(6)}`;
+  };
+
+  const handlePhoneChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setCustomerPhone(formatted);
+  };
 
   useEffect(() => {
     setIsVisible(true);
@@ -62,31 +83,21 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     }
   };
 
-  // NEW: Log session to backend when customer enters name
-  const logSessionStart = async (name: string | null, path?: string): Promise<void> => {
-    try {
-      await api.logTrafficSession({
-        customerName: name,
-        path: path || 'welcome',
-        currentStep: 'name_entered',
-        actions: name ? ['entered_name'] : ['skipped_name'],
-      });
-      console.log('Session logged:', name || 'Anonymous');
-    } catch (err) {
-      console.error('Failed to log session:', err);
-    }
-  };
-
-  const handleNameSubmit = async (): Promise<void> => {
+  const handleNameSubmit = (): void => {
     const trimmedName = customerName.trim();
+    const phoneDigits = customerPhone.replace(/\D/g, '');
+    
     if (trimmedName) {
       // Capitalize first letter
       const formattedName = trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
-      updateCustomerData({ customerName: formattedName });
+      updateCustomerData({ 
+        customerName: formattedName,
+        phone: phoneDigits.length === 10 ? customerPhone : undefined
+      });
       setCustomerName(formattedName);
-      
-      // LOG SESSION TO BACKEND
-      await logSessionStart(formattedName);
+    } else if (phoneDigits.length === 10) {
+      // Phone only, no name
+      updateCustomerData({ phone: customerPhone });
     }
     setNameSubmitted(true);
   };
@@ -97,27 +108,12 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     }
   };
 
-  const handleSkipName = async (): Promise<void> => {
-    // LOG SESSION TO BACKEND (anonymous)
-    await logSessionStart(null);
+  const handleSkipName = (): void => {
     setNameSubmitted(true);
   };
 
-  const handlePathSelect = async (path: 'stockLookup' | 'modelBudget' | 'aiAssistant'): Promise<void> => {
+  const handlePathSelect = (path: 'stockLookup' | 'modelBudget' | 'aiAssistant'): void => {
     updateCustomerData({ path });
-    
-    // LOG PATH SELECTION TO BACKEND
-    try {
-      await api.logTrafficSession({
-        customerName: customerName || null,
-        path: path,
-        currentStep: path,
-        actions: [`selected_${path}`],
-      });
-    } catch (err) {
-      console.error('Failed to log path selection:', err);
-    }
-    
     const routes: Record<string, string> = {
       stockLookup: 'stockLookup',
       modelBudget: 'modelBudget',
@@ -126,21 +122,8 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     navigateTo(routes[path]);
   };
 
-  const handleBrowseAll = async (): Promise<void> => {
+  const handleBrowseAll = (): void => {
     updateCustomerData({ path: 'browse' });
-    
-    // LOG BROWSE TO BACKEND
-    try {
-      await api.logTrafficSession({
-        customerName: customerName || null,
-        path: 'browse',
-        currentStep: 'inventory',
-        actions: ['browse_all'],
-      });
-    } catch (err) {
-      console.error('Failed to log browse:', err);
-    }
-    
     navigateTo('inventory');
   };
 
@@ -243,7 +226,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
         }}>
           {/* AI Avatar */}
           <div style={styles.largeAiAvatar}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
               <circle cx="9" cy="10" r="1.5" fill="#ffffff" stroke="none" />
               <circle cx="15" cy="10" r="1.5" fill="#ffffff" stroke="none" />
@@ -273,24 +256,29 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
               value={customerName}
               onChange={(e: ChangeEvent<HTMLInputElement>) => {
                 setCustomerName(e.target.value);
-                setIsTyping(e.target.value.length > 0);
+                setIsTyping(e.target.value.length > 0 || customerPhone.length > 0);
               }}
               onKeyPress={handleNameKeyPress}
               maxLength={20}
               autoComplete="off"
               autoCapitalize="words"
             />
-            
-            {isTyping && (
-              <button 
-                style={styles.nameSubmitButton}
-                onClick={handleNameSubmit}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-              </button>
-            )}
+          </div>
+
+          {/* Phone Input */}
+          <p style={styles.phonePrompt}>
+            Enter Phone Number
+          </p>
+          <div style={styles.phoneInputContainer}>
+            <input
+              type="tel"
+              style={styles.phoneInput}
+              placeholder="(Optional) but saves your progress"
+              value={customerPhone}
+              onChange={handlePhoneChange}
+              maxLength={14}
+              autoComplete="off"
+            />
           </div>
 
           {/* Continue / Skip */}
@@ -335,7 +323,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     );
   }
 
-  // Phase 2: Path Selection Screen (rest of existing code...)
+  // Phase 2: Main Welcome Screen with Personalization
   return (
     <div style={styles.container}>
       {/* Background Image */}
@@ -350,31 +338,43 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       }}>
         <div style={styles.greeting}>
           <div style={styles.aiAvatar}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
               <circle cx="9" cy="10" r="1.5" fill="#ffffff" stroke="none" />
               <circle cx="15" cy="10" r="1.5" fill="#ffffff" stroke="none" />
               <path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round" />
             </svg>
           </div>
-          <h1 style={styles.heroTitle}>{getGreeting()}</h1>
+          <h1 style={styles.heroTitle}>
+            {getGreeting()}
+          </h1>
         </div>
-        <h2 style={styles.heroSubtitle}>How can I help you today?</h2>
-        <p style={styles.heroText}>Choose an option below to get started</p>
+        
+        <h2 style={styles.heroSubtitle}>
+          {customerName ? 'Welcome to Quirk Chevrolet' : 'Welcome to Quirk Chevrolet'}
+        </h2>
+        
+        <p style={styles.heroText}>
+          How can I help you find your perfect vehicle today?
+        </p>
       </div>
 
-      {/* Path Cards */}
-      <div style={styles.pathsContainer}>
-        {paths.map((path) => (
-          <div
+      {/* Path Selection Cards */}
+      <div style={{
+        ...styles.pathsContainer,
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+        transition: 'all 0.6s ease 0.2s',
+      }}>
+        {paths.map((path, index) => (
+          <button
             key={path.id}
             style={{
               ...styles.pathCard,
-              background: hoveredPath === path.id 
-                ? path.gradient 
-                : 'rgba(0,0,0,0.6)',
+              background: hoveredPath === path.id ? path.gradient : 'rgba(0,0,0,0.7)',
+              borderColor: hoveredPath === path.id ? 'transparent' : 'rgba(255,255,255,0.2)',
               transform: hoveredPath === path.id ? 'scale(1.02) translateY(-4px)' : 'scale(1)',
-              borderColor: hoveredPath === path.id ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
+              transitionDelay: `${index * 0.1}s`,
             }}
             onMouseEnter={() => setHoveredPath(path.id)}
             onMouseLeave={() => setHoveredPath(null)}
@@ -386,100 +386,105 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
             }}>
               {path.icon}
             </div>
+            
             <h3 style={styles.pathTitle}>{path.title}</h3>
             <p style={styles.pathSubtitle}>{path.subtitle}</p>
             <p style={styles.pathDescription}>{path.description}</p>
-            <div style={{
-              ...styles.pathArrow,
-              transform: hoveredPath === path.id ? 'translateX(4px)' : 'translateX(0)',
-            }}>
+            
+            <div style={styles.pathArrow}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M5 12h14M12 5l7 7-7 7"/>
               </svg>
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
-      {/* Stats Bar */}
-      {stats && (
-        <div style={styles.statsBar}>
-          <button
-            style={{
-              ...styles.statButton,
-              ...(hoveredStat === 'total' ? styles.statButtonHover : {}),
-            }}
-            onMouseEnter={() => setHoveredStat('total')}
-            onMouseLeave={() => setHoveredStat(null)}
-            onClick={() => handleStatClick('total')}
-          >
-            <div style={styles.statItem}>
-              <span style={styles.statNumber}>{stats.total || 0}</span>
-              <span style={styles.statLabel}>Vehicles In Stock</span>
-            </div>
-          </button>
-          
-          <div style={styles.statDivider} />
-          
-          <button
-            style={{
-              ...styles.statButton,
-              ...(hoveredStat === 'suv' ? styles.statButtonHover : {}),
-            }}
-            onMouseEnter={() => setHoveredStat('suv')}
-            onMouseLeave={() => setHoveredStat(null)}
-            onClick={() => handleStatClick('suv')}
-          >
-            <div style={styles.statItem}>
-              <span style={styles.statNumber}>{stats.byBodyStyle?.SUV || 0}</span>
-              <span style={styles.statLabel}>SUVs</span>
-            </div>
-          </button>
-          
-          <div style={styles.statDivider} />
-          
-          <button
-            style={{
-              ...styles.statButton,
-              ...(hoveredStat === 'truck' ? styles.statButtonHover : {}),
-            }}
-            onMouseEnter={() => setHoveredStat('truck')}
-            onMouseLeave={() => setHoveredStat(null)}
-            onClick={() => handleStatClick('truck')}
-          >
-            <div style={styles.statItem}>
-              <span style={styles.statNumber}>{stats.byBodyStyle?.Truck || 0}</span>
-              <span style={styles.statLabel}>Trucks</span>
-            </div>
-          </button>
-          
-          <div style={styles.statDivider} />
-          
-          <button
-            style={{
-              ...styles.statButton,
-              ...(hoveredStat === 'price' ? styles.statButtonHover : {}),
-            }}
-            onMouseEnter={() => setHoveredStat('price')}
-            onMouseLeave={() => setHoveredStat(null)}
-            onClick={() => handleStatClick('price')}
-          >
-            <div style={styles.statItem}>
-              <span style={styles.statNumber}>
-                ${stats.priceRange?.min ? Math.round(stats.priceRange.min / 1000) : 0}k+
-              </span>
-              <span style={styles.statLabel}>Starting At</span>
-            </div>
-          </button>
-        </div>
-      )}
+      {/* Stats Bar - Clickable Stats */}
+      <div style={{
+        ...styles.statsBar,
+        opacity: isVisible ? 1 : 0,
+        transition: 'all 0.6s ease 0.4s',
+      }}>
+        {/* Total Vehicles */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'total' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('total')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('total')}
+        >
+          <span style={styles.statNumber}>{stats?.total || '---'}</span>
+          <span style={styles.statLabel}>Vehicles In Stock</span>
+        </button>
 
-      {/* Browse All Link */}
-      <button 
-        style={styles.browseLink}
+        <div style={styles.statDivider} />
+
+        {/* SUVs */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'suv' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('suv')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('suv')}
+        >
+          <span style={styles.statNumber}>{stats?.byBodyStyle?.SUV || '---'}</span>
+          <span style={styles.statLabel}>SUVs</span>
+        </button>
+
+        <div style={styles.statDivider} />
+
+        {/* Trucks */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'truck' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('truck')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('truck')}
+        >
+          <span style={styles.statNumber}>{stats?.byBodyStyle?.Truck || '---'}</span>
+          <span style={styles.statLabel}>Trucks</span>
+        </button>
+
+        <div style={styles.statDivider} />
+
+        {/* Starting Price */}
+        <button 
+          style={{
+            ...styles.statItem,
+            ...styles.statButton,
+            ...(hoveredStat === 'price' ? styles.statButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredStat('price')}
+          onMouseLeave={() => setHoveredStat(null)}
+          onClick={() => handleStatClick('price')}
+        >
+          <span style={styles.statNumber}>
+            {stats?.priceRange?.min ? `$${Math.round(stats.priceRange.min / 1000)}K` : '---'}
+          </span>
+          <span style={styles.statLabel}>Starting At</span>
+        </button>
+      </div>
+
+      {/* Just Browsing Link */}
+      <button
+        style={{
+          ...styles.browseLink,
+          opacity: isVisible ? 1 : 0,
+          transition: 'all 0.6s ease 0.5s',
+        }}
         onClick={handleBrowseAll}
       >
-        Or browse all inventory →
+        Just browsing? View all {stats?.total || ''} vehicles →
       </button>
 
       <style>{`
@@ -493,18 +498,16 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   );
 };
 
-// Styles object (keeping the existing styles - truncated for brevity)
 const styles: Record<string, CSSProperties> = {
   container: {
-    minHeight: '100vh',
+    flex: 1,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '40px 20px',
+    padding: '40px',
     position: 'relative',
     overflow: 'hidden',
-    fontFamily: "'Montserrat', sans-serif",
   },
   backgroundImage: {
     position: 'absolute',
@@ -512,9 +515,10 @@ const styles: Record<string, CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundImage: 'url("/showroom.jpg")',
+    backgroundImage: 'url(/showroom.jpg)',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
     zIndex: 0,
   },
   backgroundOverlay: {
@@ -523,63 +527,87 @@ const styles: Record<string, CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.85) 100%)',
+    background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.75) 50%, rgba(0,0,0,0.85) 100%)',
     zIndex: 1,
   },
+  // Name Capture Styles
   nameCaptureSection: {
-    position: 'relative',
-    zIndex: 2,
     textAlign: 'center',
     maxWidth: '500px',
-    width: '100%',
-    padding: '40px',
+    padding: '20px 40px',
+    position: 'relative',
+    zIndex: 2,
     transition: 'all 0.6s ease',
   },
   largeAiAvatar: {
-    width: '100px',
-    height: '100px',
+    width: '80px',
+    height: '80px',
     borderRadius: '50%',
     background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     color: '#ffffff',
-    margin: '0 auto 24px',
+    margin: '0 auto 16px',
     boxShadow: '0 8px 32px rgba(27, 115, 64, 0.4)',
   },
   nameTitle: {
-    fontSize: '32px',
+    fontSize: '28px',
     fontWeight: '700',
     color: '#ffffff',
-    margin: '0 0 8px 0',
+    margin: '0 0 4px 0',
     textShadow: '0 2px 4px rgba(0,0,0,0.5)',
   },
   nameSubtitle: {
-    fontSize: '24px',
+    fontSize: '20px',
     fontWeight: '600',
     color: 'rgba(255,255,255,0.9)',
-    margin: '0 0 32px 0',
+    margin: '0 0 20px 0',
     textShadow: '0 2px 4px rgba(0,0,0,0.5)',
   },
   namePrompt: {
-    fontSize: '20px',
+    fontSize: '16px',
     color: 'rgba(255,255,255,0.8)',
-    margin: '0 0 20px 0',
+    margin: '0 0 12px 0',
   },
   nameInputContainer: {
     position: 'relative',
     width: '100%',
-    marginBottom: '24px',
+    marginBottom: '16px',
   },
   nameInput: {
     width: '100%',
-    padding: '20px 60px 20px 24px',
+    padding: '16px 24px',
     background: 'rgba(255,255,255,0.1)',
     border: '2px solid rgba(255,255,255,0.2)',
     borderRadius: '16px',
     color: '#ffffff',
-    fontSize: '24px',
+    fontSize: '20px',
     fontWeight: '600',
+    textAlign: 'center',
+    transition: 'all 0.2s ease',
+    backdropFilter: 'blur(10px)',
+    boxSizing: 'border-box',
+  },
+  phonePrompt: {
+    fontSize: '16px',
+    color: 'rgba(255,255,255,0.8)',
+    margin: '0 0 12px 0',
+  },
+  phoneInputContainer: {
+    position: 'relative',
+    width: '100%',
+    marginBottom: '20px',
+  },
+  phoneInput: {
+    width: '100%',
+    padding: '16px 24px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '2px solid rgba(255,255,255,0.2)',
+    borderRadius: '16px',
+    color: '#ffffff',
+    fontSize: '18px',
+    fontWeight: '500',
     textAlign: 'center',
     transition: 'all 0.2s ease',
     backdropFilter: 'blur(10px)',
@@ -605,12 +633,12 @@ const styles: Record<string, CSSProperties> = {
   nameActions: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
-    marginBottom: '24px',
+    gap: '8px',
+    marginBottom: '16px',
   },
   continueButton: {
     width: '100%',
-    padding: '18px 32px',
+    padding: '16px 32px',
     background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
     border: 'none',
     borderRadius: '12px',
@@ -628,7 +656,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '14px',
     fontWeight: '500',
     cursor: 'pointer',
-    padding: '12px',
+    padding: '8px',
     transition: 'color 0.2s ease',
   },
   privacyNote: {
@@ -640,6 +668,7 @@ const styles: Record<string, CSSProperties> = {
     color: 'rgba(255,255,255,0.4)',
     margin: 0,
   },
+  // Main Welcome Styles
   heroSection: {
     textAlign: 'center',
     marginBottom: '48px',
