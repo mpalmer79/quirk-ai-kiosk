@@ -102,6 +102,7 @@ export interface TradeVehicleInfo {
 
 export interface CustomerData {
   customerName?: string;
+  phone?: string;
   selectedModel?: string;
   selectedCab?: string;
   colorPreferences?: string[];
