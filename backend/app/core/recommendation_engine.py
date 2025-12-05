@@ -140,8 +140,8 @@ class VehicleRecommender:
     
     def _get_vehicle_price(self, vehicle: Dict[str, Any]) -> float:
         """Extract price from vehicle data, handling different field names."""
-        # Try different price field names (camelCase and snake_case)
-        price_fields = ['salePrice', 'sale_price', 'price', 'msrp', 'MSRP']
+        # Try different price field names (camelCase, snake_case, and Excel format)
+        price_fields = ['salePrice', 'sale_price', 'price', 'msrp', 'MSRP', 'Price']
         for field in price_fields:
             if field in vehicle and vehicle[field]:
                 try:
@@ -152,7 +152,7 @@ class VehicleRecommender:
     
     def _get_vehicle_mileage(self, vehicle: Dict[str, Any]) -> float:
         """Extract mileage from vehicle data, handling different field names."""
-        mileage_fields = ['mileage', 'odometer', 'miles']
+        mileage_fields = ['mileage', 'Mileage', 'odometer', 'Odometer', 'miles', 'Miles']
         for field in mileage_fields:
             if field in vehicle and vehicle[field]:
                 try:
@@ -172,7 +172,7 @@ class VehicleRecommender:
         """
         Extract normalized features from a vehicle record.
         
-        Handles both camelCase and snake_case field names for compatibility
+        Handles camelCase, snake_case, and Excel format field names for compatibility
         with different data sources.
         
         Args:
@@ -182,23 +182,24 @@ class VehicleRecommender:
             Normalized feature dictionary
         """
         # Get basic fields with fallbacks for different naming conventions
+        # Include Excel format with spaces and capitalization
         body_style = self._normalize_string(
-            self._get_field(vehicle, 'bodyStyle', 'body_style', 'body', 'type')
+            self._get_field(vehicle, 'bodyStyle', 'body_style', 'Body Style', 'Body Type', 'body', 'type')
         )
         fuel_type = self._normalize_string(
-            self._get_field(vehicle, 'fuelType', 'fuel_type', 'fuel')
+            self._get_field(vehicle, 'fuelType', 'fuel_type', 'Fuel Type', 'fuel')
         )
         drivetrain = self._normalize_string(
-            self._get_field(vehicle, 'drivetrain', 'driveTrain', 'drive_train', 'drive')
+            self._get_field(vehicle, 'drivetrain', 'driveTrain', 'drive_train', 'Drivetrain', 'drive')
         )
         
         # Get price and mileage
         price = self._get_vehicle_price(vehicle)
         mileage = self._get_vehicle_mileage(vehicle)
         
-        # Get year
+        # Get year - include Excel format
         year = 0
-        year_val = self._get_field(vehicle, 'year', 'modelYear', 'model_year')
+        year_val = self._get_field(vehicle, 'year', 'Year', 'modelYear', 'model_year')
         if year_val:
             try:
                 year = int(year_val)
@@ -206,10 +207,26 @@ class VehicleRecommender:
                 pass
         
         # Extract features list
-        features_raw = self._get_field(vehicle, 'features', 'options', 'equipment') or []
+        features_raw = self._get_field(vehicle, 'features', 'Features', 'options', 'equipment') or []
         if isinstance(features_raw, str):
             features_raw = [f.strip() for f in features_raw.split(',')]
         features = [self._normalize_string(f) for f in features_raw if f]
+        
+        # Get make, model, trim - include Excel format
+        make = self._normalize_string(
+            self._get_field(vehicle, 'make', 'Make', 'manufacturer')
+        )
+        model = self._normalize_string(
+            self._get_field(vehicle, 'model', 'Model', 'modelName', 'model_name')
+        )
+        trim = self._normalize_string(
+            self._get_field(vehicle, 'trim', 'Trim', 'trimLevel', 'trim_level')
+        )
+        
+        # Get stock number - include Excel format with space
+        stock_number = self._get_field(
+            vehicle, 'stockNumber', 'stock_number', 'Stock Number', 'stock', 'vin', 'VIN'
+        )
         
         # Detect performance vehicle
         is_performance = self._detect_performance(vehicle, features)
@@ -229,16 +246,18 @@ class VehicleRecommender:
             "features": features,
             "is_performance": is_performance,
             "is_luxury": is_luxury,
-            "make": self._normalize_string(self._get_field(vehicle, 'make', 'manufacturer')),
-            "model": self._normalize_string(self._get_field(vehicle, 'model', 'modelName', 'model_name')),
-            "trim": self._normalize_string(self._get_field(vehicle, 'trim', 'trimLevel', 'trim_level')),
-            "stock_number": self._get_field(vehicle, 'stockNumber', 'stock_number', 'stock', 'vin')
+            "make": make,
+            "model": model,
+            "trim": trim,
+            "stock_number": stock_number
         }
     
     def _detect_performance(self, vehicle: Dict[str, Any], features: List[str]) -> bool:
         """Detect if a vehicle is a performance-oriented vehicle."""
         # Check model names for known performance vehicles
-        model = self._normalize_string(self._get_field(vehicle, 'model', 'modelName'))
+        model = self._normalize_string(
+            self._get_field(vehicle, 'model', 'Model', 'modelName')
+        )
         performance_models = ['corvette', 'camaro', 'mustang', 'challenger', 'charger', 
                             'gt-r', 'gtr', 'm3', 'm4', 'm5', 'amg', 'rs', 'type r']
         
@@ -246,9 +265,11 @@ class VehicleRecommender:
             return True
         
         # Check trim for performance indicators
-        trim = self._normalize_string(self._get_field(vehicle, 'trim', 'trimLevel'))
+        trim = self._normalize_string(
+            self._get_field(vehicle, 'trim', 'Trim', 'trimLevel')
+        )
         performance_trims = ['ss', 'zl1', 'z06', 'z07', 'zr1', 'gt', 'sport', 'r/t', 'srt',
-                           'performance', 'track', 'competition', 'm sport']
+                           'performance', 'track', 'competition', 'm sport', 'stingray']
         
         if any(pt in trim for pt in performance_trims):
             return True
@@ -264,7 +285,9 @@ class VehicleRecommender:
     def _detect_luxury(self, vehicle: Dict[str, Any], features: List[str], price: float) -> bool:
         """Detect if a vehicle is a luxury vehicle."""
         # Check make for luxury brands
-        make = self._normalize_string(self._get_field(vehicle, 'make', 'manufacturer'))
+        make = self._normalize_string(
+            self._get_field(vehicle, 'make', 'Make', 'manufacturer')
+        )
         luxury_makes = ['lexus', 'mercedes', 'bmw', 'audi', 'porsche', 'cadillac',
                        'lincoln', 'infiniti', 'acura', 'genesis', 'maserati', 
                        'bentley', 'rolls-royce', 'land rover', 'jaguar']
@@ -272,23 +295,27 @@ class VehicleRecommender:
         if any(lm in make for lm in luxury_makes):
             return True
         
-        # Check price threshold
-        if price >= self.luxury_price_threshold:
-            # Also check for luxury features
-            features_text = ' '.join(features)
-            luxury_feature_count = sum(1 for lf in self.luxury_features if lf in features_text)
-            if luxury_feature_count >= 2:
-                return True
-        
-        # Check model/trim for luxury indicators
-        model = self._normalize_string(self._get_field(vehicle, 'model', 'modelName'))
-        trim = self._normalize_string(self._get_field(vehicle, 'trim', 'trimLevel'))
-        luxury_indicators = ['premium', 'luxury', 'platinum', 'high country', 'denali',
-                           'limited', 'prestige', 'executive']
+        # Check model/trim for luxury indicators FIRST (before price check)
+        model = self._normalize_string(
+            self._get_field(vehicle, 'model', 'Model', 'modelName')
+        )
+        trim = self._normalize_string(
+            self._get_field(vehicle, 'trim', 'Trim', 'trimLevel')
+        )
+        # Added "premier" to luxury indicators
+        luxury_indicators = ['premium', 'premier', 'luxury', 'platinum', 'high country', 
+                           'denali', 'limited', 'prestige', 'executive']
         
         combined = f"{model} {trim}"
         if any(li in combined for li in luxury_indicators):
             return True
+        
+        # Check price threshold with luxury features
+        if price >= self.luxury_price_threshold:
+            features_text = ' '.join(features)
+            luxury_feature_count = sum(1 for lf in self.luxury_features if lf in features_text)
+            if luxury_feature_count >= 2:
+                return True
         
         return False
     
@@ -421,8 +448,18 @@ class VehicleRecommender:
         for candidate in candidates:
             candidate_features = self.extract_features(candidate)
             
-            # Skip excluded vehicles
-            if candidate_features["stock_number"] in exclude_set:
+            # Skip excluded vehicles - check both extracted and raw stock numbers
+            candidate_stock = candidate_features["stock_number"]
+            if candidate_stock and candidate_stock in exclude_set:
+                continue
+            
+            # Also check raw field names for stock number
+            raw_stock = (
+                candidate.get("Stock Number") or 
+                candidate.get("stockNumber") or 
+                candidate.get("stock_number")
+            )
+            if raw_stock and raw_stock in exclude_set:
                 continue
             
             score, component_scores = self.calculate_similarity(source_features, candidate_features)
@@ -570,10 +607,15 @@ class VehicleRecommender:
         }
         
         # Get viewed stock numbers to exclude
-        viewed_stocks = [
-            f["stock_number"] for f in history_features 
-            if f["stock_number"]
-        ]
+        viewed_stocks = set()
+        for f in history_features:
+            if f["stock_number"]:
+                viewed_stocks.add(f["stock_number"])
+        # Also get raw stock numbers from browsing history
+        for v in browsing_history:
+            raw_stock = v.get("Stock Number") or v.get("stockNumber") or v.get("stock_number")
+            if raw_stock:
+                viewed_stocks.add(raw_stock)
         
         # Score candidates against ideal profile
         scored_vehicles = []
@@ -581,7 +623,11 @@ class VehicleRecommender:
         for candidate in candidates:
             candidate_features = self.extract_features(candidate)
             
-            if candidate_features["stock_number"] in viewed_stocks:
+            # Check both extracted and raw stock numbers
+            candidate_stock = candidate_features["stock_number"]
+            raw_stock = candidate.get("Stock Number") or candidate.get("stockNumber")
+            
+            if candidate_stock in viewed_stocks or raw_stock in viewed_stocks:
                 continue
             
             score, component_scores = self.calculate_similarity(ideal_profile, candidate_features)
