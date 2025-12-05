@@ -1,0 +1,42 @@
+{
+  "weights": {
+    "body_style": 2.0,
+    "price_range": 1.5,
+    "fuel_type": 1.5,
+    "drivetrain": 1.0,
+    "features": 1.0,
+    "performance": 0.75,
+    "year": 0.5,
+    "luxury": 0.5
+  },
+  "price_buckets": [0, 25000, 35000, 45000, 60000, 80000, 100000, 999999],
+  "mileage_buckets": [0, 15000, 30000, 50000, 75000, 100000, 999999],
+  "year_brackets": [0, 1, 2, 3, 5],
+  "performance_features": [
+    "performance exhaust",
+    "magnetic ride",
+    "brembo",
+    "recaro",
+    "sport mode",
+    "adaptive suspension",
+    "performance package",
+    "track mode",
+    "launch control",
+    "carbon fiber"
+  ],
+  "luxury_features": [
+    "premium audio",
+    "heated steering wheel",
+    "ventilated seats",
+    "panoramic roof",
+    "heads-up display",
+    "massaging seats",
+    "ambient lighting",
+    "premium leather",
+    "wood trim"
+  ],
+  "luxury_price_threshold": 55000,
+  "adjacent_bucket_score": 0.5,
+  "version": "1.0.0",
+  "experiment_id": null
+}
