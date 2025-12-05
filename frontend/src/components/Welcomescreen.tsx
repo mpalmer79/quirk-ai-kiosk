@@ -44,13 +44,9 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
 
   // Format phone number as (XXX) XXX-XXXX
   const formatPhoneNumber = (value: string): string => {
-    // Remove all non-digits
     const digits = value.replace(/\D/g, '');
-    
-    // Limit to 10 digits
     const limited = digits.slice(0, 10);
     
-    // Format based on length
     if (limited.length === 0) return '';
     if (limited.length <= 3) return `(${limited}`;
     if (limited.length <= 6) return `(${limited.slice(0, 3)}) ${limited.slice(3)}`;
@@ -83,21 +79,42 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     }
   };
 
-  const handleNameSubmit = (): void => {
+  // Log session to backend when customer enters name
+  const logSessionStart = async (name: string | null, phone: string | null, path?: string): Promise<void> => {
+    try {
+      await api.logTrafficSession({
+        customerName: name,
+        phone: phone,
+        path: path || 'welcome',
+        currentStep: 'name_entered',
+        actions: name ? ['entered_name'] : ['skipped_name'],
+      });
+      console.log('Session logged:', name || 'Anonymous', phone || 'No phone');
+    } catch (err) {
+      console.error('Failed to log session:', err);
+    }
+  };
+
+  const handleNameSubmit = async (): Promise<void> => {
     const trimmedName = customerName.trim();
     const phoneDigits = customerPhone.replace(/\D/g, '');
+    const formattedPhone = phoneDigits.length === 10 ? customerPhone : null;
     
     if (trimmedName) {
       // Capitalize first letter
       const formattedName = trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
       updateCustomerData({ 
         customerName: formattedName,
-        phone: phoneDigits.length === 10 ? customerPhone : undefined
+        phone: formattedPhone || undefined
       });
       setCustomerName(formattedName);
-    } else if (phoneDigits.length === 10) {
+      
+      // LOG SESSION TO BACKEND
+      await logSessionStart(formattedName, formattedPhone);
+    } else if (formattedPhone) {
       // Phone only, no name
-      updateCustomerData({ phone: customerPhone });
+      updateCustomerData({ phone: formattedPhone });
+      await logSessionStart(null, formattedPhone);
     }
     setNameSubmitted(true);
   };
@@ -108,12 +125,28 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     }
   };
 
-  const handleSkipName = (): void => {
+  const handleSkipName = async (): Promise<void> => {
+    // LOG SESSION TO BACKEND (anonymous)
+    await logSessionStart(null, null);
     setNameSubmitted(true);
   };
 
-  const handlePathSelect = (path: 'stockLookup' | 'modelBudget' | 'aiAssistant'): void => {
+  const handlePathSelect = async (path: 'stockLookup' | 'modelBudget' | 'aiAssistant'): Promise<void> => {
     updateCustomerData({ path });
+    
+    // LOG PATH SELECTION TO BACKEND
+    try {
+      await api.logTrafficSession({
+        customerName: customerName || null,
+        phone: customerPhone || null,
+        path: path,
+        currentStep: path,
+        actions: [`selected_${path}`],
+      });
+    } catch (err) {
+      console.error('Failed to log path selection:', err);
+    }
+    
     const routes: Record<string, string> = {
       stockLookup: 'stockLookup',
       modelBudget: 'modelBudget',
@@ -122,8 +155,22 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     navigateTo(routes[path]);
   };
 
-  const handleBrowseAll = (): void => {
+  const handleBrowseAll = async (): Promise<void> => {
     updateCustomerData({ path: 'browse' });
+    
+    // LOG BROWSE TO BACKEND
+    try {
+      await api.logTrafficSession({
+        customerName: customerName || null,
+        phone: customerPhone || null,
+        path: 'browse',
+        currentStep: 'inventory',
+        actions: ['browse_all'],
+      });
+    } catch (err) {
+      console.error('Failed to log browse:', err);
+    }
+    
     navigateTo('inventory');
   };
 
@@ -224,19 +271,20 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
         }}>
-          {/* AI Avatar */}
-          <div style={styles.largeAiAvatar}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <circle cx="9" cy="10" r="1.5" fill="#ffffff" stroke="none" />
-              <circle cx="15" cy="10" r="1.5" fill="#ffffff" stroke="none" />
-              <path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round" />
-            </svg>
+          {/* Title with inline avatar */}
+          <div style={styles.titleRow}>
+            <div style={styles.inlineAvatar}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="9" cy="10" r="1.5" fill="#ffffff" stroke="none" />
+                <circle cx="15" cy="10" r="1.5" fill="#ffffff" stroke="none" />
+                <path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h1 style={styles.nameTitle}>
+              Hi, I'm your <span style={styles.highlight}>Quirk AI</span> assistant
+            </h1>
           </div>
-
-          <h1 style={styles.nameTitle}>
-            Hi, I'm your <span style={styles.highlight}>Quirk AI</span> assistant
-          </h1>
           
           <h2 style={styles.nameSubtitle}>
             Welcome to Quirk Chevrolet!
@@ -273,7 +321,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
             <input
               type="tel"
               style={styles.phoneInput}
-              placeholder="(Optional) but saves your progress"
+              placeholder="(Optional) This saves your progress"
               value={customerPhone}
               onChange={handlePhoneChange}
               maxLength={14}
@@ -323,7 +371,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     );
   }
 
-  // Phase 2: Main Welcome Screen with Personalization
+  // Phase 2: Path Selection Screen
   return (
     <div style={styles.container}>
       {/* Background Image */}
@@ -338,43 +386,31 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       }}>
         <div style={styles.greeting}>
           <div style={styles.aiAvatar}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
               <circle cx="9" cy="10" r="1.5" fill="#ffffff" stroke="none" />
               <circle cx="15" cy="10" r="1.5" fill="#ffffff" stroke="none" />
               <path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round" />
             </svg>
           </div>
-          <h1 style={styles.heroTitle}>
-            {getGreeting()}
-          </h1>
+          <h1 style={styles.heroTitle}>{getGreeting()}</h1>
         </div>
-        
-        <h2 style={styles.heroSubtitle}>
-          {customerName ? 'Welcome to Quirk Chevrolet' : 'Welcome to Quirk Chevrolet'}
-        </h2>
-        
-        <p style={styles.heroText}>
-          How can I help you find your perfect vehicle today?
-        </p>
+        <h2 style={styles.heroSubtitle}>How can I help you today?</h2>
+        <p style={styles.heroText}>Choose an option below to get started</p>
       </div>
 
-      {/* Path Selection Cards */}
-      <div style={{
-        ...styles.pathsContainer,
-        opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-        transition: 'all 0.6s ease 0.2s',
-      }}>
-        {paths.map((path, index) => (
-          <button
+      {/* Path Cards */}
+      <div style={styles.pathsContainer}>
+        {paths.map((path) => (
+          <div
             key={path.id}
             style={{
               ...styles.pathCard,
-              background: hoveredPath === path.id ? path.gradient : 'rgba(0,0,0,0.7)',
-              borderColor: hoveredPath === path.id ? 'transparent' : 'rgba(255,255,255,0.2)',
+              background: hoveredPath === path.id 
+                ? path.gradient 
+                : 'rgba(0,0,0,0.6)',
               transform: hoveredPath === path.id ? 'scale(1.02) translateY(-4px)' : 'scale(1)',
-              transitionDelay: `${index * 0.1}s`,
+              borderColor: hoveredPath === path.id ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
             }}
             onMouseEnter={() => setHoveredPath(path.id)}
             onMouseLeave={() => setHoveredPath(null)}
@@ -386,105 +422,100 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
             }}>
               {path.icon}
             </div>
-            
             <h3 style={styles.pathTitle}>{path.title}</h3>
             <p style={styles.pathSubtitle}>{path.subtitle}</p>
             <p style={styles.pathDescription}>{path.description}</p>
-            
-            <div style={styles.pathArrow}>
+            <div style={{
+              ...styles.pathArrow,
+              transform: hoveredPath === path.id ? 'translateX(4px)' : 'translateX(0)',
+            }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M5 12h14M12 5l7 7-7 7"/>
               </svg>
             </div>
-          </button>
+          </div>
         ))}
       </div>
 
-      {/* Stats Bar - Clickable Stats */}
-      <div style={{
-        ...styles.statsBar,
-        opacity: isVisible ? 1 : 0,
-        transition: 'all 0.6s ease 0.4s',
-      }}>
-        {/* Total Vehicles */}
-        <button 
-          style={{
-            ...styles.statItem,
-            ...styles.statButton,
-            ...(hoveredStat === 'total' ? styles.statButtonHover : {}),
-          }}
-          onMouseEnter={() => setHoveredStat('total')}
-          onMouseLeave={() => setHoveredStat(null)}
-          onClick={() => handleStatClick('total')}
-        >
-          <span style={styles.statNumber}>{stats?.total || '---'}</span>
-          <span style={styles.statLabel}>Vehicles In Stock</span>
-        </button>
+      {/* Stats Bar */}
+      {stats && (
+        <div style={styles.statsBar}>
+          <button
+            style={{
+              ...styles.statButton,
+              ...(hoveredStat === 'total' ? styles.statButtonHover : {}),
+            }}
+            onMouseEnter={() => setHoveredStat('total')}
+            onMouseLeave={() => setHoveredStat(null)}
+            onClick={() => handleStatClick('total')}
+          >
+            <div style={styles.statItem}>
+              <span style={styles.statNumber}>{stats.total || 0}</span>
+              <span style={styles.statLabel}>Vehicles In Stock</span>
+            </div>
+          </button>
+          
+          <div style={styles.statDivider} />
+          
+          <button
+            style={{
+              ...styles.statButton,
+              ...(hoveredStat === 'suv' ? styles.statButtonHover : {}),
+            }}
+            onMouseEnter={() => setHoveredStat('suv')}
+            onMouseLeave={() => setHoveredStat(null)}
+            onClick={() => handleStatClick('suv')}
+          >
+            <div style={styles.statItem}>
+              <span style={styles.statNumber}>{stats.byBodyStyle?.SUV || 0}</span>
+              <span style={styles.statLabel}>SUVs</span>
+            </div>
+          </button>
+          
+          <div style={styles.statDivider} />
+          
+          <button
+            style={{
+              ...styles.statButton,
+              ...(hoveredStat === 'truck' ? styles.statButtonHover : {}),
+            }}
+            onMouseEnter={() => setHoveredStat('truck')}
+            onMouseLeave={() => setHoveredStat(null)}
+            onClick={() => handleStatClick('truck')}
+          >
+            <div style={styles.statItem}>
+              <span style={styles.statNumber}>{stats.byBodyStyle?.Truck || 0}</span>
+              <span style={styles.statLabel}>Trucks</span>
+            </div>
+          </button>
+          
+          <div style={styles.statDivider} />
+          
+          <button
+            style={{
+              ...styles.statButton,
+              ...(hoveredStat === 'price' ? styles.statButtonHover : {}),
+            }}
+            onMouseEnter={() => setHoveredStat('price')}
+            onMouseLeave={() => setHoveredStat(null)}
+            onClick={() => handleStatClick('price')}
+          >
+            <div style={styles.statItem}>
+              <span style={styles.statNumber}>
+                ${stats.priceRange?.min ? Math.round(stats.priceRange.min / 1000) : 0}k+
+              </span>
+              <span style={styles.statLabel}>Starting At</span>
+            </div>
+          </button>
+        </div>
+      )}
 
-        <div style={styles.statDivider} />
-
-        {/* SUVs */}
-        <button 
-          style={{
-            ...styles.statItem,
-            ...styles.statButton,
-            ...(hoveredStat === 'suv' ? styles.statButtonHover : {}),
-          }}
-          onMouseEnter={() => setHoveredStat('suv')}
-          onMouseLeave={() => setHoveredStat(null)}
-          onClick={() => handleStatClick('suv')}
-        >
-          <span style={styles.statNumber}>{stats?.byBodyStyle?.SUV || '---'}</span>
-          <span style={styles.statLabel}>SUVs</span>
-        </button>
-
-        <div style={styles.statDivider} />
-
-        {/* Trucks */}
-        <button 
-          style={{
-            ...styles.statItem,
-            ...styles.statButton,
-            ...(hoveredStat === 'truck' ? styles.statButtonHover : {}),
-          }}
-          onMouseEnter={() => setHoveredStat('truck')}
-          onMouseLeave={() => setHoveredStat(null)}
-          onClick={() => handleStatClick('truck')}
-        >
-          <span style={styles.statNumber}>{stats?.byBodyStyle?.Truck || '---'}</span>
-          <span style={styles.statLabel}>Trucks</span>
-        </button>
-
-        <div style={styles.statDivider} />
-
-        {/* Starting Price */}
-        <button 
-          style={{
-            ...styles.statItem,
-            ...styles.statButton,
-            ...(hoveredStat === 'price' ? styles.statButtonHover : {}),
-          }}
-          onMouseEnter={() => setHoveredStat('price')}
-          onMouseLeave={() => setHoveredStat(null)}
-          onClick={() => handleStatClick('price')}
-        >
-          <span style={styles.statNumber}>
-            {stats?.priceRange?.min ? `$${Math.round(stats.priceRange.min / 1000)}K` : '---'}
-          </span>
-          <span style={styles.statLabel}>Starting At</span>
-        </button>
-      </div>
-
-      {/* Just Browsing Link */}
-      <button
-        style={{
-          ...styles.browseLink,
-          opacity: isVisible ? 1 : 0,
-          transition: 'all 0.6s ease 0.5s',
-        }}
+      {/* Browse All Link */}
+      <button 
+        style={styles.browseLink}
         onClick={handleBrowseAll}
       >
-        Just browsing? View all {stats?.total || ''} vehicles →
+        Or browse all inventory →
       </button>
 
       <style>{`
@@ -498,16 +529,18 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   );
 };
 
+// Styles object
 const styles: Record<string, CSSProperties> = {
   container: {
-    flex: 1,
+    minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '40px',
+    padding: '20px',
     position: 'relative',
     overflow: 'hidden',
+    fontFamily: "'Montserrat', sans-serif",
   },
   backgroundImage: {
     position: 'absolute',
@@ -515,10 +548,9 @@ const styles: Record<string, CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundImage: 'url(/showroom.jpg)',
+    backgroundImage: 'url("/showroom.jpg")',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
     zIndex: 0,
   },
   backgroundOverlay: {
@@ -527,42 +559,48 @@ const styles: Record<string, CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.75) 50%, rgba(0,0,0,0.85) 100%)',
+    background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.85) 100%)',
     zIndex: 1,
   },
-  // Name Capture Styles
   nameCaptureSection: {
-    textAlign: 'center',
-    maxWidth: '500px',
-    padding: '20px 40px',
     position: 'relative',
     zIndex: 2,
+    textAlign: 'center',
+    maxWidth: '500px',
+    width: '100%',
+    padding: '20px 40px',
     transition: 'all 0.6s ease',
   },
-  largeAiAvatar: {
-    width: '80px',
-    height: '80px',
+  titleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    marginBottom: '8px',
+  },
+  inlineAvatar: {
+    width: '48px',
+    height: '48px',
     borderRadius: '50%',
     background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#ffffff',
-    margin: '0 auto 16px',
-    boxShadow: '0 8px 32px rgba(27, 115, 64, 0.4)',
+    flexShrink: 0,
+    boxShadow: '0 4px 16px rgba(27, 115, 64, 0.4)',
   },
   nameTitle: {
     fontSize: '28px',
     fontWeight: '700',
     color: '#ffffff',
-    margin: '0 0 4px 0',
+    margin: 0,
     textShadow: '0 2px 4px rgba(0,0,0,0.5)',
   },
   nameSubtitle: {
     fontSize: '20px',
     fontWeight: '600',
     color: 'rgba(255,255,255,0.9)',
-    margin: '0 0 20px 0',
+    margin: '0 0 24px 0',
     textShadow: '0 2px 4px rgba(0,0,0,0.5)',
   },
   namePrompt: {
@@ -573,7 +611,7 @@ const styles: Record<string, CSSProperties> = {
   nameInputContainer: {
     position: 'relative',
     width: '100%',
-    marginBottom: '16px',
+    marginBottom: '20px',
   },
   nameInput: {
     width: '100%',
@@ -613,23 +651,6 @@ const styles: Record<string, CSSProperties> = {
     backdropFilter: 'blur(10px)',
     boxSizing: 'border-box',
   },
-  nameSubmitButton: {
-    position: 'absolute',
-    right: '12px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    width: '44px',
-    height: '44px',
-    borderRadius: '12px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
-    border: 'none',
-    color: '#ffffff',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s ease',
-  },
   nameActions: {
     display: 'flex',
     flexDirection: 'column',
@@ -668,7 +689,6 @@ const styles: Record<string, CSSProperties> = {
     color: 'rgba(255,255,255,0.4)',
     margin: 0,
   },
-  // Main Welcome Styles
   heroSection: {
     textAlign: 'center',
     marginBottom: '48px',
