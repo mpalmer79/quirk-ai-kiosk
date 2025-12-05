@@ -11,6 +11,9 @@ import os
 # Import routers - the original working routers
 from app.routers import inventory, recommendations, leads, analytics, traffic, ai
 
+# Import v2 routers
+from app.routers import recommendations_v2, ai_v2
+
 # Lifespan handler for startup/shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,7 +27,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Quirk AI Kiosk API",
     description="Backend API for Quirk AI Kiosk customer journey",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -53,13 +56,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers with /api/v1 prefix (this is what the frontend expects)
+# V1 Routes (Original)
 app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["inventory"])
 app.include_router(recommendations.router, prefix="/api/v1/recommendations", tags=["recommendations"])
 app.include_router(leads.router, prefix="/api/v1/leads", tags=["leads"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(traffic.router, prefix="/api/v1/traffic", tags=["traffic"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
+
+# V2 Routes (Enhanced)
+app.include_router(recommendations_v2.router, prefix="/api/v2/recommendations", tags=["recommendations-v2"])
+app.include_router(ai_v2.router, prefix="/api/v2/ai", tags=["ai-v2"])
 
 # Root endpoint
 @app.get("/")
@@ -68,7 +75,7 @@ async def root():
         "service": "Quirk AI Kiosk API",
         "status": "running",
         "docs": "/docs",
-        "version": "1.0.0"
+        "version": "2.0.0"
     }
 
 # Health check at /api/health
