@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from './api';
 
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: string;
+}
+
 interface TradeInVehicle {
   year: string | null;
   make: string | null;
@@ -41,6 +47,23 @@ interface CustomerSession {
     trim: string | null;
     price: number | null;
   } | null;
+  chatHistory?: ChatMessage[];
+}
+
+interface SessionDetail {
+  sessionId: string;
+  customerName?: string;
+  phone?: string;
+  path?: string;
+  currentStep?: string;
+  createdAt: string;
+  updatedAt: string;
+  vehicleInterest?: any;
+  budget?: any;
+  tradeIn?: any;
+  vehicle?: any;
+  chatHistory?: ChatMessage[];
+  actions?: string[];
 }
 
 const SalesManagerDashboard: React.FC = () => {
@@ -49,11 +72,14 @@ const SalesManagerDashboard: React.FC = () => {
   const [selectedSession, setSelectedSession] = useState<CustomerSession | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [showChatTranscript, setShowChatTranscript] = useState(false);
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   // Fetch active sessions
   const fetchSessions = async () => {
     try {
-      const data = await api.getActiveSessions(30); // 30 minute timeout
+      const data = await api.getActiveSessions(30);
       setSessions(data.sessions || []);
       setLastUpdate(new Date().toLocaleTimeString());
     } catch (err) {
@@ -63,10 +89,22 @@ const SalesManagerDashboard: React.FC = () => {
     }
   };
 
+  // Fetch full session detail including chat history
+  const fetchSessionDetail = async (sessionId: string) => {
+    setLoadingDetail(true);
+    try {
+      const detail = await api.getTrafficSession(sessionId);
+      setSessionDetail(detail);
+    } catch (err) {
+      console.error('Error fetching session detail:', err);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
   useEffect(() => {
     fetchSessions();
     
-    // Auto-refresh every 5 seconds
     let interval: ReturnType<typeof setInterval>;
     if (autoRefresh) {
       interval = setInterval(fetchSessions, 5000);
@@ -77,16 +115,22 @@ const SalesManagerDashboard: React.FC = () => {
     };
   }, [autoRefresh]);
 
-// Update selected session when sessions refresh
   useEffect(() => {
     if (selectedSession) {
       const updated = sessions.find(s => s.sessionId === selectedSession.sessionId);
       if (updated) {
         setSelectedSession(updated);
       }
+      // Also fetch full detail
+      fetchSessionDetail(selectedSession.sessionId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions]);
+  }, [sessions, selectedSession?.sessionId]);
+
+  const handleSessionSelect = (session: CustomerSession) => {
+    setSelectedSession(session);
+    setShowChatTranscript(false);
+    fetchSessionDetail(session.sessionId);
+  };
 
   const getStepLabel = (step: string): string => {
     const steps: Record<string, string> = {
@@ -101,11 +145,13 @@ const SalesManagerDashboard: React.FC = () => {
       'vehicleDetail': 'Viewing Vehicle',
       'handoff': 'Ready for Handoff',
       'aiChat': 'AI Assistant Chat',
+      'aiAssistant': 'AI Assistant Chat',
       'modelBudget': 'Model & Budget Flow',
       'stockLookup': 'Stock Lookup',
       'guidedQuiz': 'Guided Quiz',
       'browse': 'Browsing',
       'browsing': 'Browsing',
+      'name_entered': 'Just Started',
     };
     return steps[step] || step || 'Browsing';
   };
@@ -124,6 +170,66 @@ const SalesManagerDashboard: React.FC = () => {
   const formatCurrency = (val: number | null): string => {
     if (val === null || val === undefined) return '—';
     return `$${val.toLocaleString()}`;
+  };
+
+  const formatTime = (timestamp: string | undefined): string => {
+    if (!timestamp) return '';
+    try {
+      return new Date(timestamp).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return '';
+    }
+  };
+
+  const isAIChatSession = (step: string): boolean => {
+    return ['aiChat', 'aiAssistant', 'AI Assistant Chat'].includes(step);
+  };
+
+  const renderChatTranscript = () => {
+    const chatHistory = sessionDetail?.chatHistory || [];
+    
+    if (chatHistory.length === 0) {
+      return (
+        <div style={styles.noChat}>
+          <p>No conversation history available yet.</p>
+          <p style={styles.noChatSubtext}>The customer hasn't started chatting with the AI assistant.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div style={styles.chatTranscriptContainer}>
+        <div style={styles.chatHeader}>
+          <h3 style={styles.chatTitle}>💬 Customer Chat with Quirk AI</h3>
+          <span style={styles.chatCount}>{chatHistory.length} messages</span>
+        </div>
+        <div style={styles.chatMessages}>
+          {chatHistory.map((msg, idx) => (
+            <div 
+              key={idx} 
+              style={{
+                ...styles.chatMessage,
+                ...(msg.role === 'user' ? styles.userMessage : styles.assistantMessage)
+              }}
+            >
+              <div style={styles.chatMessageHeader}>
+                <span style={styles.chatRole}>
+                  {msg.role === 'user' 
+                    ? `👤 ${selectedSession?.customerName || 'Customer'}` 
+                    : '🤖 Quirk AI'}
+                </span>
+                <span style={styles.chatTime}>{formatTime(msg.timestamp)}</span>
+              </div>
+              <p style={styles.chatContent}>{msg.content}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   const renderFourSquare = (session: CustomerSession) => (
@@ -148,6 +254,37 @@ const SalesManagerDashboard: React.FC = () => {
           <span style={{...styles.infoValue, color: '#4ade80'}}>{getStepLabel(session.currentStep)}</span>
         </div>
       </div>
+
+      {/* Chat Transcript Link - Show if AI Chat session */}
+      {isAIChatSession(session.currentStep) && (
+        <button 
+          style={styles.viewChatButton}
+          onClick={() => setShowChatTranscript(!showChatTranscript)}
+        >
+          <span>💬</span>
+          <span>{showChatTranscript ? 'Hide Chat Transcript' : 'View Customer Chat with Quirk AI'}</span>
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+            style={{ transform: showChatTranscript ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+          >
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+      )}
+
+      {/* Chat Transcript Panel */}
+      {showChatTranscript && (
+        loadingDetail ? (
+          <div style={styles.loadingChat}>Loading conversation...</div>
+        ) : (
+          renderChatTranscript()
+        )
+      )}
 
       {/* Vehicle Interest Section */}
       <div style={styles.vehicleSection}>
@@ -231,6 +368,10 @@ const SalesManagerDashboard: React.FC = () => {
           <div style={styles.quadrantContent}>
             {session.selectedVehicle ? (
               <span style={styles.bigPrice}>{formatCurrency(session.selectedVehicle.price)}</span>
+            ) : session.budget?.max ? (
+              <>
+                <span style={styles.budgetRange}>Budget: {formatCurrency(session.budget.min)} - {formatCurrency(session.budget.max)}</span>
+              </>
             ) : (
               <span style={styles.pending}>No vehicle selected</span>
             )}
@@ -263,6 +404,11 @@ const SalesManagerDashboard: React.FC = () => {
                 </span>
                 <span style={styles.subValue}>Target Range /mo</span>
               </>
+            ) : session.tradeIn?.monthlyPayment ? (
+              <>
+                <span style={styles.bigValue}>{formatCurrency(session.tradeIn.monthlyPayment)}</span>
+                <span style={styles.subValue}>Current Payment (Trade)</span>
+              </>
             ) : (
               <span style={styles.pending}>Pending...</span>
             )}
@@ -279,22 +425,23 @@ const SalesManagerDashboard: React.FC = () => {
           <div style={styles.spinner} />
           <p>Loading active sessions...</p>
         </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   return (
     <div style={styles.container}>
+      {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.title}>📊 Sales Manager Dashboard</h1>
-        <div style={styles.headerControls}>
+        <h1 style={styles.headerTitle}>📊 Sales Manager Dashboard</h1>
+        <div style={styles.headerActions}>
           <span style={styles.lastUpdate}>Last update: {lastUpdate}</span>
           <label style={styles.autoRefreshLabel}>
             <input
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
+              style={styles.checkbox}
             />
             Auto-refresh (5s)
           </label>
@@ -304,16 +451,16 @@ const SalesManagerDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Content */}
       <div style={styles.content}>
         {/* Sessions List */}
         <div style={styles.sessionsList}>
-          <h2 style={styles.sectionHeader}>
-            Active Kiosk Sessions ({sessions.length})
-          </h2>
+          <h3 style={styles.sectionHeader}>ACTIVE KIOSK SESSIONS ({sessions.length})</h3>
+          
           {sessions.length === 0 ? (
             <div style={styles.emptyState}>
-              <p>No active kiosk sessions</p>
-              <span>Sessions will appear here when customers start using the kiosk</span>
+              <p>No active sessions</p>
+              <p style={{ fontSize: '13px', marginTop: '8px' }}>Sessions will appear when customers use the kiosk</p>
             </div>
           ) : (
             sessions.map((session) => (
@@ -321,18 +468,16 @@ const SalesManagerDashboard: React.FC = () => {
                 key={session.sessionId}
                 style={{
                   ...styles.sessionCard,
-                  ...(selectedSession?.sessionId === session.sessionId ? styles.sessionCardActive : {}),
+                  ...(selectedSession?.sessionId === session.sessionId ? styles.sessionCardActive : {})
                 }}
-                onClick={() => setSelectedSession(session)}
+                onClick={() => handleSessionSelect(session)}
               >
                 <div style={styles.sessionCardHeader}>
-                  <span style={styles.sessionName}>
-                    {session.customerName || 'Guest Customer'}
-                  </span>
+                  <span style={styles.sessionName}>{session.customerName || 'Anonymous'}</span>
                   <span style={styles.sessionStatus}>{getStepLabel(session.currentStep)}</span>
                 </div>
                 <div style={styles.sessionCardDetails}>
-                  <span>{session.vehicleInterest?.model || 'Browsing'}</span>
+                  <span>{getStepLabel(session.currentStep)}</span>
                   <span>{getTimeSince(session.lastActivity)}</span>
                 </div>
               </button>
@@ -340,7 +485,7 @@ const SalesManagerDashboard: React.FC = () => {
           )}
         </div>
 
-        {/* 4-Square Detail View */}
+        {/* Detail Panel */}
         <div style={styles.detailPanel}>
           {selectedSession ? (
             renderFourSquare(selectedSession)
@@ -352,7 +497,6 @@ const SalesManagerDashboard: React.FC = () => {
           )}
         </div>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
@@ -362,21 +506,22 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: '100vh',
     background: '#0a0a0a',
     color: '#ffffff',
-    padding: '20px',
+    padding: '24px',
+    fontFamily: "'Inter', -apple-system, sans-serif",
   },
   loadingContainer: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    height: '50vh',
+    minHeight: '400px',
     gap: '16px',
   },
   spinner: {
     width: '40px',
     height: '40px',
-    border: '4px solid rgba(255,255,255,0.1)',
-    borderTopColor: '#1B7340',
+    border: '3px solid rgba(255,255,255,0.1)',
+    borderTopColor: '#4ade80',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
@@ -390,12 +535,12 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
     gap: '16px',
   },
-  title: {
+  headerTitle: {
     fontSize: '24px',
     fontWeight: '700',
     margin: 0,
   },
-  headerControls: {
+  headerActions: {
     display: 'flex',
     alignItems: 'center',
     gap: '16px',
@@ -410,8 +555,13 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.8)',
     cursor: 'pointer',
+  },
+  checkbox: {
+    width: '16px',
+    height: '16px',
+    accentColor: '#4ade80',
   },
   refreshButton: {
     padding: '8px 16px',
@@ -552,6 +702,102 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: '600',
     color: '#ffffff',
   },
+  viewChatButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    width: '100%',
+    padding: '16px 20px',
+    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(109, 40, 217, 0.2) 100%)',
+    border: '1px solid rgba(139, 92, 246, 0.4)',
+    borderRadius: '10px',
+    color: '#a78bfa',
+    fontSize: '15px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    marginBottom: '20px',
+    transition: 'all 0.2s ease',
+  },
+  chatTranscriptContainer: {
+    background: 'rgba(139, 92, 246, 0.1)',
+    borderRadius: '10px',
+    padding: '20px',
+    marginBottom: '20px',
+    border: '1px solid rgba(139, 92, 246, 0.2)',
+  },
+  chatHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '16px',
+    paddingBottom: '12px',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+  },
+  chatTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    margin: 0,
+    color: '#a78bfa',
+  },
+  chatCount: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  chatMessages: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    maxHeight: '400px',
+    overflowY: 'auto',
+  },
+  chatMessage: {
+    padding: '12px 16px',
+    borderRadius: '10px',
+  },
+  userMessage: {
+    background: 'rgba(27, 115, 64, 0.2)',
+    marginLeft: '20px',
+  },
+  assistantMessage: {
+    background: 'rgba(255,255,255,0.05)',
+    marginRight: '20px',
+  },
+  chatMessageHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '6px',
+  },
+  chatRole: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  chatTime: {
+    fontSize: '11px',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  chatContent: {
+    fontSize: '14px',
+    lineHeight: '1.5',
+    color: '#ffffff',
+    margin: 0,
+    whiteSpace: 'pre-wrap',
+  },
+  noChat: {
+    textAlign: 'center',
+    padding: '30px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  noChatSubtext: {
+    fontSize: '13px',
+    marginTop: '8px',
+  },
+  loadingChat: {
+    textAlign: 'center',
+    padding: '20px',
+    color: 'rgba(255,255,255,0.5)',
+  },
   vehicleSection: {
     padding: '16px',
     background: 'rgba(37, 99, 235, 0.1)',
@@ -680,6 +926,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '32px',
     fontWeight: '700',
     color: '#4ade80',
+  },
+  budgetRange: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#60a5fa',
   },
   bigValue: {
     fontSize: '28px',
