@@ -7,13 +7,37 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import logging
+import pandas as pd
+from pathlib import Path
 
 from app.services.smart_recommendations import get_smart_recommendation_service
 from app.services.entity_extraction import get_entity_extractor
-from app.routers.inventory import load_inventory  # Reuse existing inventory loader
 
 router = APIRouter()
 logger = logging.getLogger("quirk_ai.smart_recs")
+
+
+def load_inventory_data() -> List[Dict[str, Any]]:
+    """Load inventory from Excel file"""
+    try:
+        possible_paths = [
+            Path("data/inventory.xlsx"),
+            Path("backend/data/inventory.xlsx"),
+            Path("/app/data/inventory.xlsx"),
+            Path(__file__).parent.parent.parent / "data" / "inventory.xlsx",
+        ]
+        
+        for path in possible_paths:
+            if path.exists():
+                df = pd.read_excel(path)
+                return df.to_dict('records')
+        
+        logger.warning("Inventory file not found")
+        return []
+        
+    except Exception as e:
+        logger.error(f"Error loading inventory: {e}")
+        return []
 
 
 # Request/Response Models
@@ -87,7 +111,7 @@ async def get_recommendations_from_conversation(request: ConversationRecommendat
     """
     try:
         # Load inventory
-        inventory = load_inventory()
+        inventory = load_inventory_data()
         
         if not inventory:
             raise HTTPException(status_code=503, detail="Inventory not available")
@@ -129,7 +153,7 @@ async def get_similar_vehicles(stock_number: str, limit: int = 6):
     - Performance characteristics
     """
     try:
-        inventory = load_inventory()
+        inventory = load_inventory_data()
         
         if not inventory:
             raise HTTPException(status_code=503, detail="Inventory not available")
@@ -204,9 +228,11 @@ async def extract_entities(request: EntityExtractionRequest):
 @router.get("/health")
 async def smart_recs_health():
     """Health check for smart recommendations service."""
+    inventory = load_inventory_data()
     return {
         "status": "healthy",
         "service": "smart-recommendations",
+        "inventory_count": len(inventory),
         "features": [
             "conversation_analysis",
             "entity_extraction",
