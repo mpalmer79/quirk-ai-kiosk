@@ -20,7 +20,7 @@ router = APIRouter()
 logger = logging.getLogger("quirk_kiosk.traffic")
 
 # Import database utilities
-from app.database import is_database_configured, async_session_factory
+from app import database
 
 # Import model (will be None if not using DB)
 try:
