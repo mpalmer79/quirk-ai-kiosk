@@ -31,10 +31,87 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [inventory, setInventory] = useState<Vehicle[]>([]);
   const [isListening, setIsListening] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const sendMessageRef = useRef<(content: string) => void>();
+  const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // Text-to-Speech function
+  const speakText = useCallback((text: string) => {
+    if (!audioEnabled || !window.speechSynthesis) return;
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    // Clean text for speech (remove emojis, special characters)
+    const cleanText = text
+      .replace(/[\u{1F600}-\u{1F6FF}]/gu, '') // Remove emojis
+      .replace(/[#*_~`]/g, '') // Remove markdown characters
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+    
+    if (!cleanText) return;
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0; // Speed (0.1 to 10)
+    utterance.pitch = 1.0; // Pitch (0 to 2)
+    utterance.volume = 1.0; // Volume (0 to 1)
+    
+    // Try to use a natural-sounding voice
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(voice => 
+      voice.name.includes('Google') || 
+      voice.name.includes('Samantha') || 
+      voice.name.includes('Alex') ||
+      voice.name.includes('Daniel') ||
+      (voice.lang.startsWith('en') && voice.localService)
+    ) || voices.find(voice => voice.lang.startsWith('en'));
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    speechSynthRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, [audioEnabled]);
+
+  // Stop speaking
+  const stopSpeaking = useCallback(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  }, []);
+
+  // Toggle audio mode
+  const toggleAudio = useCallback(() => {
+    if (audioEnabled) {
+      stopSpeaking();
+    }
+    setAudioEnabled(prev => !prev);
+  }, [audioEnabled, stopSpeaking]);
+
+  // Load voices when available (needed for some browsers)
+  useEffect(() => {
+    const loadVoices = () => {
+      window.speechSynthesis?.getVoices();
+    };
+    
+    loadVoices();
+    window.speechSynthesis?.addEventListener('voiceschanged', loadVoices);
+    
+    return () => {
+      window.speechSynthesis?.removeEventListener('voiceschanged', loadVoices);
+      stopSpeaking();
+    };
+  }, [stopSpeaking]);
 
   // Build inventory context for AI
   const buildInventoryContext = useCallback((): string => {
@@ -112,6 +189,9 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading) return;
 
+    // Stop any ongoing speech when user sends a message
+    stopSpeaking();
+
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -144,34 +224,43 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // Speak the response if audio is enabled
+      speakText(response.message);
+      
     } catch (error) {
       console.error('AI Chat error:', error);
       
       // Fallback response with local search
       const matchingVehicles = searchInventory(content);
       
+      const fallbackContent = matchingVehicles.length > 0 
+        ? `I found ${matchingVehicles.length} vehicles that might match what you're looking for! Take a look below. Would you like more details on any of these?`
+        : `I'd be happy to help you find the perfect vehicle. Could you tell me more about what you're looking for? For example, do you need a truck for towing, an SUV for the family, or something sporty?`;
+      
       const fallbackMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: matchingVehicles.length > 0 
-          ? `I found ${matchingVehicles.length} vehicles that might match what you're looking for! Take a look below. Would you like more details on any of these?`
-          : `I'd be happy to help you find the perfect vehicle. Could you tell me more about what you're looking for? For example, do you need a truck for towing, an SUV for the family, or something sporty?`,
+        content: fallbackContent,
         vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
         timestamp: new Date(),
       };
       
       setMessages(prev => [...prev, fallbackMessage]);
+      
+      // Speak the fallback response if audio is enabled
+      speakText(fallbackContent);
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, messages, customerData?.customerName, buildInventoryContext, searchInventory]);
+  }, [isLoading, messages, customerData?.customerName, buildInventoryContext, searchInventory, speakText, stopSpeaking]);
 
   // Keep sendMessageRef updated with latest sendMessage
   useEffect(() => {
     sendMessageRef.current = sendMessage;
   }, [sendMessage]);
 
-  // Initialize Web Speech API
+  // Initialize Web Speech API for voice input
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -211,6 +300,9 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       return;
     }
     
+    // Stop speaking when user wants to talk
+    stopSpeaking();
+    
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
@@ -238,15 +330,22 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
 
   // Add welcome message on mount
   useEffect(() => {
+    const welcomeContent = customerData?.customerName 
+      ? `Hi ${customerData.customerName}! I'm your AI assistant at Quirk Chevrolet. Tell me what you're looking for in a vehicle - whether it's towing capacity, fuel efficiency, family space, or just something fun to drive. I'll search our ${inventory.length || 'entire'} vehicle inventory to find the perfect match for you!`
+      : `Hi there! I'm your AI assistant at Quirk Chevrolet. Tell me what you're looking for in a vehicle - whether it's towing capacity, fuel efficiency, family space, or just something fun to drive. I'll search our inventory to find the perfect match for you!`;
+    
     const welcomeMessage: Message = {
       id: 'welcome',
       role: 'assistant',
-      content: customerData?.customerName 
-        ? `Hi ${customerData.customerName}! 👋 I'm your AI assistant at Quirk Chevrolet. Tell me what you're looking for in a vehicle - whether it's towing capacity, fuel efficiency, family space, or just something fun to drive. I'll search our ${inventory.length || 'entire'} vehicle inventory to find the perfect match for you!`
-        : `Hi there! 👋 I'm your AI assistant at Quirk Chevrolet. Tell me what you're looking for in a vehicle - whether it's towing capacity, fuel efficiency, family space, or just something fun to drive. I'll search our inventory to find the perfect match for you!`,
+      content: welcomeContent,
       timestamp: new Date(),
     };
     setMessages([welcomeMessage]);
+    
+    // Speak welcome message if audio is enabled
+    if (audioEnabled) {
+      setTimeout(() => speakText(welcomeContent), 500);
+    }
     
     // Log initial AI chat session
     api.logTrafficSession({
@@ -260,23 +359,23 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   useEffect(() => {
     // Only log if there are user messages (more than just the welcome message)
     if (messages.length > 1) {
-      const chatHistory = messages.map(m => ({
-        role: m.role as 'user' | 'assistant',
+      // Store conversation log in customer data for handoff
+      const conversationLog = messages.map(m => ({
+        role: m.role,
         content: m.content,
         timestamp: m.timestamp.toISOString(),
+        vehicles: m.vehicles?.map(v => ({
+          stockNumber: v.stockNumber || v.stock_number,
+          model: v.model,
+          price: v.salePrice || v.sale_price || v.price,
+        })),
       }));
       
-      // Log to traffic system
-      api.logTrafficSession({
-        path: 'aiChat',
-        customerName: customerData?.customerName,
-        chatHistory,
-        actions: ['ai_chat_message'],
-      });
+      updateCustomerData({ conversationLog });
     }
-  }, [messages, customerData?.customerName]);
+  }, [messages, updateCustomerData]);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -294,13 +393,9 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   };
 
   const handleVehicleClick = (vehicle: Vehicle) => {
-    updateCustomerData({ selectedVehicle: vehicle, path: 'aiChat' });
+    stopSpeaking();
+    updateCustomerData({ selectedVehicle: vehicle });
     navigateTo('vehicleDetail');
-  };
-
-  const handleSuggestedPrompt = (prompt: string) => {
-    setInputValue(prompt);
-    sendMessage(prompt);
   };
 
   return (
@@ -309,29 +404,62 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       <div style={styles.header}>
         <div style={styles.headerIcon}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="10" r="1" fill="currentColor"/>
-            <circle cx="8" cy="10" r="1" fill="currentColor"/>
-            <circle cx="16" cy="10" r="1" fill="currentColor"/>
+            <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2z"/>
+            <path d="M7.5 14a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM16.5 14a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/>
           </svg>
         </div>
         <div>
-          <h1 style={styles.title}>Chat with AI Assistant</h1>
-          <p style={styles.subtitle}>Tell me what you're looking for in natural language</p>
+          <h1 style={styles.title}>QUIRK AI Assistant</h1>
+          <p style={styles.subtitle}>Ask me anything about our vehicles</p>
         </div>
+        
+        {/* Audio Toggle Button */}
+        <button
+          style={{
+            ...styles.audioToggle,
+            background: audioEnabled 
+              ? 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)' 
+              : 'rgba(255,255,255,0.1)',
+            borderColor: audioEnabled ? '#1B7340' : 'rgba(255,255,255,0.2)',
+          }}
+          onClick={toggleAudio}
+          title={audioEnabled ? 'Turn off voice responses' : 'Turn on voice responses'}
+        >
+          {isSpeaking ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <path d="M15.54 8.46a5 5 0 010 7.07"/>
+              <path d="M19.07 4.93a10 10 0 010 14.14"/>
+            </svg>
+          ) : audioEnabled ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <path d="M15.54 8.46a5 5 0 010 7.07"/>
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <line x1="23" y1="9" x2="17" y2="15"/>
+              <line x1="17" y1="9" x2="23" y2="15"/>
+            </svg>
+          )}
+          <span style={styles.audioLabel}>
+            {audioEnabled ? (isSpeaking ? 'Speaking...' : 'Audio On') : 'Audio Off'}
+          </span>
+        </button>
       </div>
 
-      {/* Messages Container */}
+      {/* Messages */}
       <div style={styles.messagesContainer}>
         {messages.map((message) => (
-          <div
+          <div 
             key={message.id}
             style={{
               ...styles.messageWrapper,
               justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
             }}
           >
-            <div
+            <div 
               style={{
                 ...styles.messageBubble,
                 ...(message.role === 'user' ? styles.userBubble : styles.assistantBubble),
@@ -340,10 +468,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
               {message.role === 'assistant' && (
                 <div style={styles.aiAvatar}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <circle cx="9" cy="10" r="1.5" fill="currentColor"/>
-                    <circle cx="15" cy="10" r="1.5" fill="currentColor"/>
-                    <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                    <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1"/>
                   </svg>
                 </div>
               )}
@@ -352,42 +477,39 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
               {/* Vehicle Cards */}
               {message.vehicles && message.vehicles.length > 0 && (
                 <div style={styles.vehicleGrid}>
-                  {message.vehicles.map((vehicle, idx) => (
-                    <button
-                      key={`${vehicle.stockNumber || vehicle.stock_number}-${idx}`}
-                      style={styles.vehicleCard}
-                      onClick={() => handleVehicleClick(vehicle)}
-                    >
-                      <div style={styles.vehicleInfo}>
-                        <span style={styles.vehicleYear}>{vehicle.year}</span>
-                        <span style={styles.vehicleModel}>{vehicle.make} {vehicle.model}</span>
-                        <span style={styles.vehicleTrim}>{vehicle.trim}</span>
-                      </div>
-                      <div style={styles.vehicleDetails}>
-                        <span style={styles.vehicleColor}>
-                          {vehicle.exteriorColor || vehicle.exterior_color}
-                        </span>
-                        <span style={styles.vehiclePrice}>
-                          ${(vehicle.salePrice || vehicle.sale_price || vehicle.price || vehicle.msrp || 0).toLocaleString()}
-                        </span>
-                      </div>
-                      <div style={styles.viewButton}>
-                        View Details →
-                      </div>
-                    </button>
-                  ))}
+                  {message.vehicles.map((vehicle, idx) => {
+                    const price = vehicle.salePrice || vehicle.sale_price || vehicle.price || vehicle.msrp || 0;
+                    return (
+                      <button
+                        key={`${vehicle.stockNumber || vehicle.stock_number || idx}`}
+                        style={styles.vehicleCard}
+                        onClick={() => handleVehicleClick(vehicle)}
+                      >
+                        <div style={styles.vehicleInfo}>
+                          <span style={styles.vehicleYear}>{vehicle.year} Chevrolet</span>
+                          <span style={styles.vehicleModel}>{vehicle.model}</span>
+                          <span style={styles.vehicleTrim}>{vehicle.trim}</span>
+                        </div>
+                        <div style={styles.vehicleDetails}>
+                          <span style={styles.vehicleColor}>{vehicle.exteriorColor || vehicle.exterior_color}</span>
+                          <span style={styles.vehiclePrice}>${price.toLocaleString()}</span>
+                        </div>
+                        <span style={styles.viewButton}>View Details →</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
         ))}
         
-        {/* Loading Indicator */}
+        {/* Loading indicator */}
         {isLoading && (
-          <div style={styles.messageWrapper}>
+          <div style={{ ...styles.messageWrapper, justifyContent: 'flex-start' }}>
             <div style={{ ...styles.messageBubble, ...styles.assistantBubble }}>
               <div style={styles.loadingDots}>
-                <span style={styles.dot}>●</span>
+                <span style={{ ...styles.dot, animationDelay: '0s' }}>●</span>
                 <span style={{ ...styles.dot, animationDelay: '0.2s' }}>●</span>
                 <span style={{ ...styles.dot, animationDelay: '0.4s' }}>●</span>
               </div>
@@ -398,7 +520,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Prompts */}
+      {/* Suggested Prompts (show when no user messages) */}
       {messages.length <= 1 && (
         <div style={styles.suggestionsContainer}>
           <p style={styles.suggestionsLabel}>Try asking:</p>
@@ -407,7 +529,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
               <button
                 key={idx}
                 style={styles.suggestionButton}
-                onClick={() => handleSuggestedPrompt(prompt)}
+                onClick={() => sendMessage(prompt)}
               >
                 {prompt}
               </button>
@@ -421,59 +543,56 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         <input
           ref={inputRef}
           type="text"
-          style={styles.input}
-          placeholder={isListening ? "Listening..." : "Describe your ideal vehicle..."}
+          placeholder={isListening ? "Listening..." : "Type or speak your question..."}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyPress={handleKeyPress}
-          disabled={isLoading || isListening}
+          style={{
+            ...styles.input,
+            borderColor: isListening ? '#4ade80' : 'rgba(255,255,255,0.2)',
+          }}
         />
+        
+        {/* Microphone Button */}
         <button
           style={{
             ...styles.micButton,
-            background: isListening 
-              ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' 
-              : 'rgba(255,255,255,0.1)',
-            animation: isListening ? 'pulse 1s infinite' : 'none',
+            background: isListening ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255,255,255,0.1)',
+            borderColor: isListening ? '#4ade80' : 'rgba(255,255,255,0.2)',
           }}
           onClick={toggleVoiceInput}
-          disabled={isLoading}
-          title={isListening ? "Stop listening" : "Voice input"}
+          title={isListening ? "Stop listening" : "Start voice input"}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            {isListening ? (
-              // Stop icon when listening
-              <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>
-            ) : (
-              // Microphone icon
-              <>
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                <line x1="12" y1="19" x2="12" y2="23"/>
-                <line x1="8" y1="23" x2="16" y2="23"/>
-              </>
-            )}
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#4ade80' : 'currentColor'} strokeWidth="2">
+            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+            <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
           </svg>
         </button>
+        
+        {/* Send Button */}
         <button
           style={{
             ...styles.sendButton,
             opacity: inputValue.trim() && !isLoading ? 1 : 0.5,
+            cursor: inputValue.trim() && !isLoading ? 'pointer' : 'not-allowed',
           }}
           onClick={() => sendMessage(inputValue)}
           disabled={!inputValue.trim() || isLoading}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22,2 15,22 11,13 2,9 22,2"/>
           </svg>
         </button>
       </div>
 
       {/* Start Over Button */}
-      {resetJourney && (
+      {messages.length > 2 && resetJourney && (
         <div style={styles.startOverContainer}>
-          <button style={styles.startOverButton} onClick={resetJourney}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button style={styles.startOverButton} onClick={() => { stopSpeaking(); resetJourney(); }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
             </svg>
             Start Over
@@ -531,6 +650,23 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '14px',
     color: 'rgba(255,255,255,0.6)',
     margin: '4px 0 0 0',
+  },
+  audioToggle: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    borderRadius: '12px',
+    border: '1px solid',
+    color: '#ffffff',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  audioLabel: {
+    fontSize: '13px',
   },
   messagesContainer: {
     flex: 1,
