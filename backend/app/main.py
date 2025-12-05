@@ -25,6 +25,9 @@ from app.routers import recommendations_v2, ai_v2
 # Import v3 smart recommendations router
 from app.routers import smart_recommendations
 
+# Import database
+from app.database import init_database, close_database, is_database_configured
+
 
 # Lifespan handler for startup/shutdown
 @asynccontextmanager
@@ -33,17 +36,31 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Quirk AI Kiosk API starting...")
     logger.info("📊 Loading inventory enrichment service...")
     logger.info("🧠 Initializing entity extraction service...")
+    
+    # Initialize database
+    if is_database_configured():
+        logger.info("🗄️  Connecting to PostgreSQL database...")
+        db_success = await init_database()
+        if db_success:
+            logger.info("✅ PostgreSQL database connected")
+        else:
+            logger.warning("⚠️  PostgreSQL connection failed - using JSON fallback")
+    else:
+        logger.info("📁 No DATABASE_URL configured - using JSON file storage")
+    
     logger.info("✅ All services initialized")
     yield
+    
     # Shutdown
     logger.info("👋 Quirk AI Kiosk API shutting down...")
+    await close_database()
 
 
 # Create FastAPI app
 app = FastAPI(
     title="Quirk AI Kiosk API",
     description="Backend API for Quirk AI Kiosk customer journey with AI-powered recommendations",
-    version="2.1.0",
+    version="2.2.0",
     lifespan=lifespan
 )
 
@@ -95,12 +112,13 @@ async def root():
         "service": "Quirk AI Kiosk API",
         "status": "running",
         "docs": "/docs",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "features": {
             "v1": ["inventory", "recommendations", "leads", "analytics", "traffic", "ai"],
             "v2": ["enhanced-recommendations", "structured-ai"],
             "v3": ["smart-recommendations", "entity-extraction", "conversation-analysis"]
-        }
+        },
+        "storage": "postgresql" if is_database_configured() else "json"
     }
 
 
@@ -112,13 +130,14 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "service": "quirk-kiosk-api",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "components": {
             "inventory": "ok",
             "ai": "ok",
             "recommendations": "ok",
             "smart_recommendations": "ok",
-            "entity_extraction": "ok"
+            "entity_extraction": "ok",
+            "database": "postgresql" if is_database_configured() else "json_fallback"
         }
     }
 
