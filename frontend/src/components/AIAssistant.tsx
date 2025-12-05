@@ -424,7 +424,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     return context;
   }, [inventory]);
 
-  // Search inventory based on criteria
+ // Search inventory based on criteria
   const searchInventory = useCallback((query: string): Vehicle[] => {
     const lowerQuery = query.toLowerCase();
     
@@ -453,7 +453,6 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       return (matchesQuery || isTruck || isSUV || isElectric || isSporty) && matchesPrice;
     }).slice(0, 6);
   }, [inventory]);
-
   // Send message to AI
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading) return;
