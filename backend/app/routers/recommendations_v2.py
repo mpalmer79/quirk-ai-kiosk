@@ -1,207 +1,230 @@
 """
-Recommendations Router - AI-powered vehicle recommendations
-Uses unified recommendation engine for consistent behavior across services
+Quirk AI Kiosk - Enhanced Recommendations Router (V2)
+Improved vehicle recommendations with unified recommendation engine
 """
-from fastapi import APIRouter, HTTPException, Query
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
-from app.routers.inventory import INVENTORY
-from app.core.recommendation_engine import VehicleRecommender, RecommendationResult
+import logging
+import pandas as pd
+from pathlib import Path
+
+from app.core.recommendation_engine import VehicleRecommender
 
 router = APIRouter()
+logger = logging.getLogger("quirk_ai.recommendations_v2")
 
-# Initialize unified recommender
+# Initialize recommender
 recommender = VehicleRecommender()
 
 
+def load_inventory() -> List[Dict[str, Any]]:
+    """Load inventory from Excel file"""
+    try:
+        possible_paths = [
+            Path("data/inventory.xlsx"),
+            Path("backend/data/inventory.xlsx"),
+            Path("/app/data/inventory.xlsx"),
+            Path(__file__).parent.parent.parent / "data" / "inventory.xlsx",
+        ]
+        
+        for path in possible_paths:
+            if path.exists():
+                df = pd.read_excel(path)
+                return df.to_dict('records')
+        
+        logger.warning("Inventory file not found")
+        return []
+        
+    except Exception as e:
+        logger.error(f"Error loading inventory: {e}")
+        return []
+
+
+# Request/Response Models
 class RecommendationRequest(BaseModel):
-    sessionId: Optional[str] = None
-    viewedVehicles: List[str] = []
+    """Request for vehicle recommendations"""
+    stockNumber: Optional[str] = None
+    preferences: Optional[Dict[str, Any]] = None
+    limit: int = Field(default=6, ge=1, le=20)
 
 
-class PreferencesRequest(BaseModel):
-    bodyStyle: Optional[str] = None
-    priceMin: Optional[float] = None
-    priceMax: Optional[float] = None
-    fuelType: Optional[str] = None
-    drivetrain: Optional[str] = None
+class VehicleSuggestion(BaseModel):
+    """A single vehicle suggestion"""
+    vehicle: Dict[str, Any]
+    score: float
+    match_reasons: List[str]
+    confidence: str
 
 
 class RecommendationResponse(BaseModel):
-    """Structured recommendation response with explainability"""
-    vehicle: Dict[str, Any]
-    similarityScore: float
-    matchReason: str
-    matchReasons: List[str]
-    confidence: str
-    featureContributions: Optional[Dict[str, float]] = None
+    """Response with vehicle recommendations"""
+    recommendations: List[VehicleSuggestion]
+    total_candidates: int
+    source_vehicle: Optional[Dict[str, Any]] = None
 
 
-def result_to_response(result: RecommendationResult) -> Dict[str, Any]:
-    """Convert internal result to API response format"""
-    return {
-        **result.vehicle,
-        "similarityScore": result.similarity_score,
-        "matchReason": result.match_reasons[0] if result.match_reasons else "Popular choice",
-        "matchReasons": result.match_reasons,
-        "confidence": result.confidence,
-        "featureContributions": result.feature_contributions,
-    }
+class PersonalizedRequest(BaseModel):
+    """Request for personalized recommendations based on browsing history"""
+    browsingHistory: List[Dict[str, Any]] = Field(..., description="List of viewed vehicles")
+    limit: int = Field(default=6, ge=1, le=20)
 
 
 @router.get("/{vehicle_id}")
-async def get_recommendations(
-    vehicle_id: str,
-    limit: int = Query(5, ge=1, le=10, description="Number of recommendations"),
-    include_analytics: bool = Query(False, description="Include feature contribution data")
-):
+async def get_recommendations_for_vehicle(vehicle_id: str, limit: int = 6):
     """
-    Get AI recommendations based on a specific vehicle.
-    Uses unified content-based filtering engine.
+    Get vehicle recommendations based on a source vehicle.
+    
+    Args:
+        vehicle_id: Stock number of the source vehicle
+        limit: Maximum number of recommendations to return
     """
-    # Find the source vehicle
-    source_vehicle = next((v for v in INVENTORY if v["id"] == vehicle_id), None)
-    if not source_vehicle:
-        raise HTTPException(status_code=404, detail="Vehicle not found")
-    
-    # Get recommendations from unified engine
-    results = recommender.recommend(
-        source=source_vehicle,
-        candidates=INVENTORY,
-        limit=limit
-    )
-    
-    # Convert to response format
-    recommendations = []
-    for result in results:
-        rec = result_to_response(result)
-        if not include_analytics:
-            rec.pop("featureContributions", None)
-        recommendations.append(rec)
-    
-    return {
-        "sourceVehicle": source_vehicle,
-        "recommendations": recommendations,
-        "algorithm": "unified-content-filtering",
-        "engineVersion": recommender.get_config().get("version", "1.0.0"),
-    }
+    try:
+        inventory = load_inventory()
+        
+        if not inventory:
+            raise HTTPException(status_code=503, detail="Inventory not available")
+        
+        # Find source vehicle
+        source_vehicle = None
+        for v in inventory:
+            stock = v.get('Stock Number') or v.get('stockNumber', '')
+            if stock.upper() == vehicle_id.upper():
+                source_vehicle = v
+                break
+        
+        if not source_vehicle:
+            raise HTTPException(status_code=404, detail=f"Vehicle {vehicle_id} not found")
+        
+        # Get recommendations
+        recommendations = recommender.get_recommendations(
+            source_vehicle=source_vehicle,
+            candidates=inventory,
+            limit=limit
+        )
+        
+        return {
+            "recommendations": recommendations,
+            "total_candidates": len(inventory),
+            "source_vehicle": {
+                "stockNumber": vehicle_id,
+                "year": source_vehicle.get('Year'),
+                "make": source_vehicle.get('Make'),
+                "model": source_vehicle.get('Model'),
+                "trim": source_vehicle.get('Trim'),
+                "price": source_vehicle.get('MSRP'),
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/personalized")
-async def get_personalized_recommendations(request: RecommendationRequest):
+async def get_personalized_recommendations(request: PersonalizedRequest):
     """
     Get personalized recommendations based on browsing history.
-    Analyzes viewed vehicles to find patterns.
     """
-    if not request.viewedVehicles:
-        # Return featured vehicles if no browsing history
+    try:
+        if not request.browsingHistory:
+            raise HTTPException(status_code=400, detail="Browsing history required")
+        
+        inventory = load_inventory()
+        
+        if not inventory:
+            raise HTTPException(status_code=503, detail="Inventory not available")
+        
+        recommendations = recommender.get_personalized_recommendations(
+            browsing_history=request.browsingHistory,
+            candidates=inventory,
+            limit=request.limit
+        )
+        
         return {
-            "recommendations": INVENTORY[:5],
-            "basedOn": "featured",
+            "recommendations": recommendations,
+            "based_on_vehicles": len(request.browsingHistory),
+            "total_candidates": len(inventory)
         }
-    
-    # Get viewed vehicles
-    viewed = [v for v in INVENTORY if v["id"] in request.viewedVehicles]
-    if not viewed:
-        return {
-            "recommendations": INVENTORY[:5],
-            "basedOn": "featured",
-        }
-    
-    # Get personalized recommendations from unified engine
-    results = recommender.recommend_personalized(
-        viewed=viewed,
-        candidates=INVENTORY,
-        limit=5
-    )
-    
-    # Analyze preferences for response
-    body_styles = {}
-    fuel_types = {}
-    avg_price = 0
-    
-    for v in viewed:
-        body_styles[v.get("bodyStyle", "unknown")] = body_styles.get(v.get("bodyStyle", "unknown"), 0) + 1
-        fuel_types[v.get("fuelType", "unknown")] = fuel_types.get(v.get("fuelType", "unknown"), 0) + 1
-        avg_price += v.get("price", 0)
-    
-    avg_price = avg_price / len(viewed) if viewed else 0
-    preferred_body = max(body_styles, key=body_styles.get) if body_styles else None
-    preferred_fuel = max(fuel_types, key=fuel_types.get) if fuel_types else None
-    
-    recommendations = [result_to_response(r) for r in results]
-    
-    return {
-        "recommendations": recommendations,
-        "basedOn": "browsing_history",
-        "preferences": {
-            "bodyStyle": preferred_body,
-            "fuelType": preferred_fuel,
-            "avgPrice": round(avg_price, 0),
-        },
-        "algorithm": "unified-personalized-filtering",
-    }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting personalized recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/preferences")
-async def get_recommendations_by_preferences(preferences: PreferencesRequest):
+async def get_recommendations_by_preferences(request: RecommendationRequest):
     """
-    Get recommendations based on explicit customer preferences.
-    Combines filtering with similarity scoring.
+    Get recommendations based on explicit preferences.
     """
-    candidates = INVENTORY.copy()
-    
-    # Apply hard filters first
-    if preferences.bodyStyle:
-        candidates = [v for v in candidates if v.get("bodyStyle", "").lower() == preferences.bodyStyle.lower()]
-    if preferences.fuelType:
-        candidates = [v for v in candidates if v.get("fuelType", "").lower() == preferences.fuelType.lower()]
-    if preferences.drivetrain:
-        candidates = [v for v in candidates if v.get("drivetrain", "").lower() == preferences.drivetrain.lower()]
-    if preferences.priceMin:
-        candidates = [v for v in candidates if v.get("price", 0) >= preferences.priceMin]
-    if preferences.priceMax:
-        candidates = [v for v in candidates if v.get("price", 0) <= preferences.priceMax]
-    
-    # If we have preferences, create a synthetic "ideal" vehicle for similarity scoring
-    if preferences.bodyStyle or preferences.priceMin or preferences.priceMax:
-        ideal_vehicle = {
-            "bodyStyle": preferences.bodyStyle or "suv",
-            "price": (preferences.priceMin or 30000 + preferences.priceMax or 60000) / 2 if preferences.priceMin or preferences.priceMax else 40000,
-            "fuelType": preferences.fuelType or "gas",
-            "drivetrain": preferences.drivetrain or "fwd",
-            "features": [],
-            "year": 2024,
-            "mileage": 0,
+    try:
+        inventory = load_inventory()
+        
+        if not inventory:
+            raise HTTPException(status_code=503, detail="Inventory not available")
+        
+        if not request.preferences:
+            # Return random selection if no preferences
+            import random
+            sample = random.sample(inventory, min(request.limit, len(inventory)))
+            return {
+                "recommendations": [{"vehicle": v, "score": 0.5, "match_reasons": ["Random selection"], "confidence": "low"} for v in sample],
+                "total_candidates": len(inventory)
+            }
+        
+        # Filter based on preferences
+        filtered = inventory
+        prefs = request.preferences
+        
+        # Price filter
+        if prefs.get('maxPrice'):
+            filtered = [v for v in filtered if (v.get('MSRP') or 0) <= prefs['maxPrice']]
+        
+        if prefs.get('minPrice'):
+            filtered = [v for v in filtered if (v.get('MSRP') or 0) >= prefs['minPrice']]
+        
+        # Model filter
+        if prefs.get('model'):
+            model_lower = prefs['model'].lower()
+            filtered = [v for v in filtered if model_lower in (v.get('Model') or '').lower()]
+        
+        # Body type filter
+        if prefs.get('bodyType'):
+            body_lower = prefs['bodyType'].lower()
+            filtered = [v for v in filtered if body_lower in (v.get('Body Type') or '').lower()]
+        
+        # Sort by price
+        filtered.sort(key=lambda v: v.get('MSRP') or 0)
+        
+        recommendations = [
+            {
+                "vehicle": v,
+                "score": 0.7,
+                "match_reasons": ["Matches preferences"],
+                "confidence": "medium"
+            }
+            for v in filtered[:request.limit]
+        ]
+        
+        return {
+            "recommendations": recommendations,
+            "total_candidates": len(filtered),
+            "filters_applied": list(prefs.keys())
         }
         
-        results = recommender.recommend(
-            source=ideal_vehicle,
-            candidates=candidates,
-            limit=10
-        )
-        
-        recommendations = [result_to_response(r) for r in results]
-    else:
-        # No preferences - sort by value (savings)
-        candidates.sort(
-            key=lambda x: (x.get("msrp", x.get("price", 0)) - x.get("price", 0)),
-            reverse=True
-        )
-        recommendations = candidates[:10]
-    
-    return {
-        "recommendations": recommendations,
-        "total": len(candidates),
-        "filters": preferences.model_dump(exclude_none=True),
-        "algorithm": "unified-preference-filtering",
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting preference recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/analytics/config")
 async def get_recommender_config():
-    """Get current recommender configuration (for debugging/tuning)"""
-    return {
-        "config": recommender.get_config(),
-        "status": "active",
-    }
+    """Get current recommender configuration."""
+    return recommender.get_config()
