@@ -172,14 +172,15 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
           const targetCab = customerData.selectedCab.toLowerCase();
           vehicleList = vehicleList.filter((vehicle: Vehicle) => {
             // Check multiple possible field names for cab/body info
-            const cab = (
-              vehicle.cabType || 
-              vehicle.bodyStyle || 
-              vehicle.body_style || 
-              (vehicle as Record<string, unknown>).body ||
-              (vehicle as Record<string, unknown>).Body ||
-              ''
-            ).toString().toLowerCase();
+           const cab = (
+  (vehicle as Record<string, unknown>).cabStyle ||
+  vehicle.cabType || 
+  vehicle.bodyStyle || 
+  vehicle.body_style || 
+  (vehicle as Record<string, unknown>).body ||
+  (vehicle as Record<string, unknown>).Body ||
+  ''
+).toString().toLowerCase(); 
             
             // Handle abbreviation mapping: "Regular" → also match "Reg"
             const cabMappings: Record<string, string[]> = {
