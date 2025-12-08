@@ -1,6 +1,17 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import VehicleDetail from '../components/Vehicledetail';
+
+// Mock the api module
+jest.mock('../components/api', () => ({
+  __esModule: true,
+  default: {
+    getInventory: jest.fn(),
+  },
+  logTrafficSession: jest.fn().mockResolvedValue(undefined),
+}));
+
+import { logTrafficSession } from '../components/api';
 
 const mockNavigateTo = jest.fn();
 const mockUpdateCustomerData = jest.fn();
@@ -15,25 +26,19 @@ const defaultVehicle = {
   exteriorColor: 'Summit White',
   interiorColor: 'Jet Black',
   engine: '5.3L EcoTec3 V8',
-  transmission: '10-Speed Automatic',
   drivetrain: '4WD',
-  fuelEconomy: '16 city / 22 hwy',
   msrp: 52995,
   salePrice: 47495,
-  savings: 5500,
-  monthlyLease: 398,
-  monthlyFinance: 612,
   status: 'In Stock',
-  mileage: 12,
   gradient: 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
   features: [
     'Trailering Package',
     'Heated Front Seats',
-    'Apple CarPlay & Android Auto',
+    'Apple CarPlay',
   ],
   rebates: [
-    { name: 'Customer Cash', amount: 2500 },
-    { name: 'Bonus Cash', amount: 1500 },
+    { name: 'Customer Cash', amount: 3000 },
+    { name: 'Bonus Cash', amount: 1000 },
   ],
 };
 
@@ -58,24 +63,26 @@ describe('VehicleDetail Component', () => {
   });
 
   describe('Initial Render', () => {
-    test('renders vehicle title with year, make, and model', () => {
+    test('renders vehicle title with NEW prefix, year, make, model, and trim', () => {
       renderVehicleDetail();
-      expect(screen.getByText('2025 Chevrolet Silverado 1500')).toBeInTheDocument();
-    });
-
-    test('renders vehicle trim', () => {
-      renderVehicleDetail();
-      expect(screen.getByText('LT Crew Cab 4WD')).toBeInTheDocument();
+      expect(screen.getByText(/NEW 2025 Chevrolet Silverado 1500 LT Crew Cab 4WD/)).toBeInTheDocument();
     });
 
     test('renders stock number', () => {
       renderVehicleDetail();
+      expect(screen.getByText(/STOCK:/)).toBeInTheDocument();
       expect(screen.getByText('24789')).toBeInTheDocument();
+    });
+
+    test('renders VIN', () => {
+      renderVehicleDetail();
+      expect(screen.getByText(/VIN:/)).toBeInTheDocument();
+      expect(screen.getByText('1GCUDDED5RZ123456')).toBeInTheDocument();
     });
 
     test('renders back button', () => {
       renderVehicleDetail();
-      expect(screen.getByText('Back to Results')).toBeInTheDocument();
+      expect(screen.getByText('Back to Inventory')).toBeInTheDocument();
     });
 
     test('renders vehicle status', () => {
@@ -95,33 +102,7 @@ describe('VehicleDetail Component', () => {
     });
   });
 
-  describe('Vehicle Specifications', () => {
-    test('displays engine information', () => {
-      renderVehicleDetail();
-      expect(screen.getByText('Engine')).toBeInTheDocument();
-      expect(screen.getByText('5.3L EcoTec3 V8')).toBeInTheDocument();
-    });
-
-    test('displays transmission information', () => {
-      renderVehicleDetail();
-      expect(screen.getByText('Transmission')).toBeInTheDocument();
-      expect(screen.getByText('10-Speed Automatic')).toBeInTheDocument();
-    });
-
-    test('displays drivetrain information', () => {
-      renderVehicleDetail();
-      expect(screen.getByText('Drivetrain')).toBeInTheDocument();
-      expect(screen.getByText('4WD')).toBeInTheDocument();
-    });
-
-    test('displays fuel economy information', () => {
-      renderVehicleDetail();
-      expect(screen.getByText('Fuel Economy')).toBeInTheDocument();
-      expect(screen.getByText('16 city / 22 hwy')).toBeInTheDocument();
-    });
-  });
-
-  describe('Color Information', () => {
+  describe('Vehicle Specifications (Basic Info)', () => {
     test('displays exterior color', () => {
       renderVehicleDetail();
       expect(screen.getByText('Exterior')).toBeInTheDocument();
@@ -133,6 +114,18 @@ describe('VehicleDetail Component', () => {
       expect(screen.getByText('Interior')).toBeInTheDocument();
       expect(screen.getByText('Jet Black')).toBeInTheDocument();
     });
+
+    test('displays engine information', () => {
+      renderVehicleDetail();
+      expect(screen.getByText('Engine')).toBeInTheDocument();
+      expect(screen.getByText('5.3L EcoTec3 V8')).toBeInTheDocument();
+    });
+
+    test('displays drivetrain information', () => {
+      renderVehicleDetail();
+      expect(screen.getByText('Drivetrain')).toBeInTheDocument();
+      expect(screen.getByText('4WD')).toBeInTheDocument();
+    });
   });
 
   describe('Pricing Information', () => {
@@ -142,39 +135,56 @@ describe('VehicleDetail Component', () => {
       expect(screen.getByText('$52,995')).toBeInTheDocument();
     });
 
-    test('displays sale price', () => {
+    test('displays Quirk Price', () => {
       renderVehicleDetail();
-      expect(screen.getByText('Your Price')).toBeInTheDocument();
-      expect(screen.getByText('$47,495')).toBeInTheDocument();
-    });
-
-    test('displays savings badge', () => {
-      renderVehicleDetail();
-      expect(screen.getByText(/You Save \$5,500/)).toBeInTheDocument();
+      expect(screen.getByText('Quirk Price')).toBeInTheDocument();
     });
 
     test('displays rebates', () => {
       renderVehicleDetail();
       expect(screen.getByText('Customer Cash')).toBeInTheDocument();
-      expect(screen.getByText('-$2,500')).toBeInTheDocument();
+      expect(screen.getByText('-$3,000')).toBeInTheDocument();
       expect(screen.getByText('Bonus Cash')).toBeInTheDocument();
-      expect(screen.getByText('-$1,500')).toBeInTheDocument();
+      expect(screen.getByText('-$1,000')).toBeInTheDocument();
+    });
+
+    test('displays calculated Quirk Price (MSRP minus rebates)', () => {
+      renderVehicleDetail();
+      // $52,995 - $3,000 - $1,000 = $48,995
+      expect(screen.getByText('$48,995')).toBeInTheDocument();
     });
   });
 
-  describe('Payment Estimates', () => {
-    test('displays lease payment estimate', () => {
+  describe('Conditional Offers', () => {
+    test('displays Conditional Offers toggle button', () => {
       renderVehicleDetail();
-      expect(screen.getByText('Lease')).toBeInTheDocument();
-      expect(screen.getByText('$398')).toBeInTheDocument();
-      expect(screen.getByText('/mo for 39 mo')).toBeInTheDocument();
+      expect(screen.getByText('Conditional Offers')).toBeInTheDocument();
     });
 
-    test('displays finance payment estimate', () => {
+    test('conditional offers are hidden by default', () => {
       renderVehicleDetail();
-      expect(screen.getByText('Finance')).toBeInTheDocument();
-      expect(screen.getByText('$612')).toBeInTheDocument();
-      expect(screen.getByText('/mo for 72 mo')).toBeInTheDocument();
+      expect(screen.queryByText('Select Market Chevy Loyalty Cash')).not.toBeInTheDocument();
+    });
+
+    test('clicking toggle shows conditional offers', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Conditional Offers'));
+      
+      expect(screen.getByText('Select Market Chevy Loyalty Cash')).toBeInTheDocument();
+      expect(screen.getByText('Trade Assistance')).toBeInTheDocument();
+      expect(screen.getByText('GM First Responder Offer')).toBeInTheDocument();
+      expect(screen.getByText('GM Military Offer')).toBeInTheDocument();
+    });
+
+    test('clicking toggle again hides conditional offers', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText('Conditional Offers'));
+      expect(screen.getByText('Select Market Chevy Loyalty Cash')).toBeInTheDocument();
+      
+      fireEvent.click(screen.getByText('Conditional Offers'));
+      expect(screen.queryByText('Select Market Chevy Loyalty Cash')).not.toBeInTheDocument();
     });
   });
 
@@ -184,19 +194,25 @@ describe('VehicleDetail Component', () => {
       expect(screen.getByText('Key Features')).toBeInTheDocument();
     });
 
-    test('displays vehicle features', () => {
+    test('displays vehicle features as tags', () => {
       renderVehicleDetail();
       expect(screen.getByText('Trailering Package')).toBeInTheDocument();
       expect(screen.getByText('Heated Front Seats')).toBeInTheDocument();
-      expect(screen.getByText('Apple CarPlay & Android Auto')).toBeInTheDocument();
+      expect(screen.getByText('Apple CarPlay')).toBeInTheDocument();
     });
   });
 
-  describe('VIN Display', () => {
-    test('displays VIN label and number', () => {
+  describe('Photo Gallery', () => {
+    test('displays photo count badge', () => {
       renderVehicleDetail();
-      expect(screen.getByText('VIN:')).toBeInTheDocument();
-      expect(screen.getByText('1GCUDDED5RZ123456')).toBeInTheDocument();
+      expect(screen.getByText('(4) Photos')).toBeInTheDocument();
+    });
+
+    test('displays thumbnail images', () => {
+      renderVehicleDetail();
+      // Component renders 4 thumbnail placeholders
+      const thumbnails = document.querySelectorAll('[style*="width: 100px"]');
+      expect(thumbnails.length).toBe(4);
     });
   });
 
@@ -204,15 +220,20 @@ describe('VehicleDetail Component', () => {
     test('back button navigates to inventory', () => {
       renderVehicleDetail();
       
-      fireEvent.click(screen.getByText('Back to Results'));
+      fireEvent.click(screen.getByText('Back to Inventory'));
       expect(mockNavigateTo).toHaveBeenCalledWith('inventory');
     });
   });
 
   describe('Action Buttons', () => {
-    test('renders Request This Vehicle button', () => {
+    test('renders Let\'s See It! button', () => {
       renderVehicleDetail();
-      expect(screen.getByText('Request This Vehicle')).toBeInTheDocument();
+      expect(screen.getByText("Let's See It!")).toBeInTheDocument();
+    });
+
+    test('renders hint text below Let\'s See It button', () => {
+      renderVehicleDetail();
+      expect(screen.getByText(/Tap to have this vehicle brought to the showroom/)).toBeInTheDocument();
     });
 
     test('renders Calculate Payment button', () => {
@@ -225,11 +246,6 @@ describe('VehicleDetail Component', () => {
       expect(screen.getByText('Value My Trade')).toBeInTheDocument();
     });
 
-    test('renders Talk to a Sales Consultant button', () => {
-      renderVehicleDetail();
-      expect(screen.getByText('Talk to a Sales Consultant')).toBeInTheDocument();
-    });
-
     test('Calculate Payment navigates to payment calculator', () => {
       renderVehicleDetail();
       
@@ -237,127 +253,146 @@ describe('VehicleDetail Component', () => {
       expect(mockNavigateTo).toHaveBeenCalledWith('paymentCalculator');
     });
 
-    test('Value My Trade navigates to trade-in', () => {
+    test('Value My Trade navigates to modelBudget', () => {
       renderVehicleDetail();
       
       fireEvent.click(screen.getByText('Value My Trade'));
-      expect(mockNavigateTo).toHaveBeenCalledWith('tradeIn');
-    });
-
-    test('Talk to a Sales Consultant navigates to handoff', () => {
-      renderVehicleDetail();
-      
-      fireEvent.click(screen.getByText('Talk to a Sales Consultant'));
-      expect(mockNavigateTo).toHaveBeenCalledWith('handoff');
+      expect(mockNavigateTo).toHaveBeenCalledWith('modelBudget');
     });
   });
 
-  describe('Request Vehicle Flow', () => {
-    test('Request This Vehicle shows confirmation screen', () => {
+  describe('Let\'s See It Flow', () => {
+    test('clicking Let\'s See It shows confirmation screen', async () => {
       renderVehicleDetail();
       
-      fireEvent.click(screen.getByText('Request This Vehicle'));
+      fireEvent.click(screen.getByText("Let's See It!"));
       
-      expect(screen.getByText('Vehicle Requested!')).toBeInTheDocument();
-      expect(screen.getByText(/A team member will bring this vehicle/)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText("We're On It!")).toBeInTheDocument();
+      });
     });
 
-    test('confirmation screen shows vehicle details', () => {
+    test('confirmation screen shows success message', async () => {
       renderVehicleDetail();
       
-      fireEvent.click(screen.getByText('Request This Vehicle'));
+      fireEvent.click(screen.getByText("Let's See It!"));
       
-      expect(screen.getByText('2025 Silverado 1500')).toBeInTheDocument();
-      expect(screen.getByText('LT Crew Cab 4WD')).toBeInTheDocument();
-      expect(screen.getByText('Stock #24789')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/A team member has been notified/)).toBeInTheDocument();
+      });
     });
 
-    test('confirmation screen shows expected steps', () => {
+    test('confirmation screen shows vehicle details', async () => {
       renderVehicleDetail();
       
-      fireEvent.click(screen.getByText('Request This Vehicle'));
+      fireEvent.click(screen.getByText("Let's See It!"));
       
-      expect(screen.getByText('What to Expect')).toBeInTheDocument();
-      expect(screen.getByText('Vehicle will be brought up front')).toBeInTheDocument();
-      expect(screen.getByText('A team member will meet you')).toBeInTheDocument();
-      expect(screen.getByText('Take it for a test drive!')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('2025 Silverado 1500')).toBeInTheDocument();
+        expect(screen.getByText('LT Crew Cab 4WD')).toBeInTheDocument();
+        expect(screen.getByText('Stock# 24789')).toBeInTheDocument();
+      });
     });
 
-    test('confirmation screen shows estimated wait time', () => {
+    test('confirmation screen shows expected steps', async () => {
       renderVehicleDetail();
       
-      fireEvent.click(screen.getByText('Request This Vehicle'));
+      fireEvent.click(screen.getByText("Let's See It!"));
       
-      expect(screen.getByText(/Estimated wait: 2-3 minutes/)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('What to Expect:')).toBeInTheDocument();
+        expect(screen.getByText(/A sales consultant will locate the vehicle/)).toBeInTheDocument();
+        expect(screen.getByText(/bring it to the front entrance/)).toBeInTheDocument();
+        expect(screen.getByText(/see it up close and ask questions/)).toBeInTheDocument();
+      });
     });
 
-    test('updateCustomerData is called when vehicle is requested', () => {
+    test('confirmation screen shows estimated wait time', async () => {
       renderVehicleDetail();
       
-      fireEvent.click(screen.getByText('Request This Vehicle'));
+      fireEvent.click(screen.getByText("Let's See It!"));
       
-      expect(mockUpdateCustomerData).toHaveBeenCalledWith(
-        expect.objectContaining({
-          vehicleRequested: expect.objectContaining({
-            stockNumber: '24789',
-          }),
-        })
-      );
+      await waitFor(() => {
+        expect(screen.getByText(/Estimated wait: 3-5 minutes/)).toBeInTheDocument();
+      });
     });
 
-    test('Connect with Sales Consultant navigates to handoff from confirmation', () => {
+    test('updateCustomerData is called when vehicle is requested', async () => {
       renderVehicleDetail();
       
-      fireEvent.click(screen.getByText('Request This Vehicle'));
-      fireEvent.click(screen.getByText('Connect with Sales Consultant'));
+      fireEvent.click(screen.getByText("Let's See It!"));
       
-      expect(mockNavigateTo).toHaveBeenCalledWith('handoff');
+      await waitFor(() => {
+        expect(mockUpdateCustomerData).toHaveBeenCalledWith(
+          expect.objectContaining({
+            vehicleRequested: expect.objectContaining({
+              stockNumber: '24789',
+            }),
+          })
+        );
+      });
     });
 
-    test('Back to Vehicle Details returns to detail view', () => {
+    test('logTrafficSession is called when vehicle is requested', async () => {
       renderVehicleDetail();
       
-      fireEvent.click(screen.getByText('Request This Vehicle'));
-      expect(screen.getByText('Vehicle Requested!')).toBeInTheDocument();
+      fireEvent.click(screen.getByText("Let's See It!"));
       
-      fireEvent.click(screen.getByText('Back to Vehicle Details'));
-      
-      expect(screen.getByText('Request This Vehicle')).toBeInTheDocument();
-      expect(screen.queryByText('Vehicle Requested!')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(logTrafficSession).toHaveBeenCalledWith(
+          expect.objectContaining({
+            currentStep: 'vehicleRequest',
+            vehicleRequested: true,
+          })
+        );
+      });
     });
 
-    test('Continue Browsing navigates to inventory from confirmation', () => {
+    test('Browse More Vehicles navigates to inventory from confirmation', async () => {
       renderVehicleDetail();
       
-      fireEvent.click(screen.getByText('Request This Vehicle'));
-      fireEvent.click(screen.getByText('Continue Browsing'));
+      fireEvent.click(screen.getByText("Let's See It!"));
       
+      await waitFor(() => {
+        expect(screen.getByText('Browse More Vehicles')).toBeInTheDocument();
+      });
+      
+      fireEvent.click(screen.getByText('Browse More Vehicles'));
       expect(mockNavigateTo).toHaveBeenCalledWith('inventory');
     });
 
-    test('shows personalized confirmation when customer name is provided', () => {
-      render(
-        <VehicleDetail
-          navigateTo={mockNavigateTo}
-          updateCustomerData={mockUpdateCustomerData}
-          customerData={{ 
-            selectedVehicle: defaultVehicle,
-            customerName: 'John'
-          }}
-        />
-      );
-      
-      fireEvent.click(screen.getByText('Request This Vehicle'));
-      
-      expect(screen.getByText('Great choice, John!')).toBeInTheDocument();
-    });
-
-    test('shows generic confirmation when no customer name', () => {
+    test('Chat with AI Assistant navigates to aiAssistant from confirmation', async () => {
       renderVehicleDetail();
       
-      fireEvent.click(screen.getByText('Request This Vehicle'));
+      fireEvent.click(screen.getByText("Let's See It!"));
       
-      expect(screen.getByText('Vehicle Requested!')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Chat with AI Assistant')).toBeInTheDocument();
+      });
+      
+      fireEvent.click(screen.getByText('Chat with AI Assistant'));
+      expect(mockNavigateTo).toHaveBeenCalledWith('aiAssistant');
+    });
+  });
+
+  describe('Loading State', () => {
+    test('shows loading text while sending request', async () => {
+      // Make logTrafficSession take some time
+      logTrafficSession.mockImplementation(
+        () => new Promise(resolve => setTimeout(resolve, 100))
+      );
+      
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText("Let's See It!"));
+      
+      // Should show loading state
+      expect(screen.getByText('Notifying Team...')).toBeInTheDocument();
+      
+      // Wait for completion
+      await waitFor(() => {
+        expect(screen.getByText("We're On It!")).toBeInTheDocument();
+      });
     });
   });
 });
@@ -367,10 +402,10 @@ describe('VehicleDetail Edge Cases', () => {
     jest.clearAllMocks();
   });
 
-  test('handles vehicle with no rebates', () => {
+  test('handles vehicle with no rebates - uses default rebates', () => {
     const vehicleNoRebates = {
       ...defaultVehicle,
-      rebates: [],
+      rebates: undefined,
     };
 
     render(
@@ -381,8 +416,9 @@ describe('VehicleDetail Edge Cases', () => {
       />
     );
 
-    expect(screen.getByText('2025 Chevrolet Silverado 1500')).toBeInTheDocument();
-    expect(screen.queryByText('Customer Cash')).not.toBeInTheDocument();
+    // Should still show default rebates
+    expect(screen.getByText('Customer Cash')).toBeInTheDocument();
+    expect(screen.getByText('Bonus Cash')).toBeInTheDocument();
   });
 
   test('handles vehicle with no features', () => {
@@ -399,12 +435,12 @@ describe('VehicleDetail Edge Cases', () => {
       />
     );
 
-    expect(screen.getByText('Key Features')).toBeInTheDocument();
+    // Key Features section should not render when no features
     expect(screen.queryByText('Trailering Package')).not.toBeInTheDocument();
   });
 
   test('handles different vehicle model', () => {
-    const tahoVehicle = {
+    const tahoeVehicle = {
       ...defaultVehicle,
       model: 'Tahoe',
       trim: 'Z71 4WD',
@@ -414,12 +450,47 @@ describe('VehicleDetail Edge Cases', () => {
       <VehicleDetail
         navigateTo={mockNavigateTo}
         updateCustomerData={mockUpdateCustomerData}
-        customerData={{ selectedVehicle: tahoVehicle }}
+        customerData={{ selectedVehicle: tahoeVehicle }}
       />
     );
 
-    expect(screen.getByText('2025 Chevrolet Tahoe')).toBeInTheDocument();
-    expect(screen.getByText('Z71 4WD')).toBeInTheDocument();
+    expect(screen.getByText(/NEW 2025 Chevrolet Tahoe Z71 4WD/)).toBeInTheDocument();
+  });
+
+  test('handles In Transit status', () => {
+    const transitVehicle = {
+      ...defaultVehicle,
+      status: 'In Transit',
+    };
+
+    render(
+      <VehicleDetail
+        navigateTo={mockNavigateTo}
+        updateCustomerData={mockUpdateCustomerData}
+        customerData={{ selectedVehicle: transitVehicle }}
+      />
+    );
+
+    expect(screen.getByText('In Transit')).toBeInTheDocument();
+  });
+
+  test('handles missing exterior color', () => {
+    const vehicleNoColor = {
+      ...defaultVehicle,
+      exteriorColor: undefined,
+      exterior_color: undefined,
+    };
+
+    render(
+      <VehicleDetail
+        navigateTo={mockNavigateTo}
+        updateCustomerData={mockUpdateCustomerData}
+        customerData={{ selectedVehicle: vehicleNoColor }}
+      />
+    );
+
+    expect(screen.getByText('Exterior')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
   });
 });
 
@@ -431,29 +502,59 @@ describe('VehicleDetail Accessibility', () => {
   test('all action buttons are accessible', () => {
     renderVehicleDetail();
 
-    expect(screen.getByText('Request This Vehicle').tagName).toBe('BUTTON');
+    expect(screen.getByText("Let's See It!").tagName).toBe('BUTTON');
     expect(screen.getByText('Calculate Payment').tagName).toBe('BUTTON');
     expect(screen.getByText('Value My Trade').tagName).toBe('BUTTON');
-    expect(screen.getByText('Talk to a Sales Consultant').tagName).toBe('BUTTON');
-    expect(screen.getByText('Back to Results').tagName).toBe('BUTTON');
+    expect(screen.getByText('Back to Inventory').tagName).toBe('BUTTON');
   });
 
   test('spec sections have labels', () => {
     renderVehicleDetail();
 
+    expect(screen.getByText('Exterior')).toBeInTheDocument();
+    expect(screen.getByText('Interior')).toBeInTheDocument();
     expect(screen.getByText('Engine')).toBeInTheDocument();
-    expect(screen.getByText('Transmission')).toBeInTheDocument();
     expect(screen.getByText('Drivetrain')).toBeInTheDocument();
-    expect(screen.getByText('Fuel Economy')).toBeInTheDocument();
   });
 
-  test('confirmation screen buttons are accessible', () => {
+  test('confirmation screen buttons are accessible', async () => {
     renderVehicleDetail();
     
-    fireEvent.click(screen.getByText('Request This Vehicle'));
+    fireEvent.click(screen.getByText("Let's See It!"));
 
-    expect(screen.getByText('Connect with Sales Consultant').tagName).toBe('BUTTON');
-    expect(screen.getByText('Back to Vehicle Details').tagName).toBe('BUTTON');
-    expect(screen.getByText('Continue Browsing').tagName).toBe('BUTTON');
+    await waitFor(() => {
+      expect(screen.getByText('Browse More Vehicles').tagName).toBe('BUTTON');
+      expect(screen.getByText('Chat with AI Assistant').tagName).toBe('BUTTON');
+    });
+  });
+
+  test('conditional offers toggle is accessible', () => {
+    renderVehicleDetail();
+    
+    expect(screen.getByText('Conditional Offers').tagName).toBe('BUTTON');
+  });
+});
+
+describe('VehicleDetail API Error Handling', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('still shows confirmation even if API call fails', async () => {
+    // Suppress console.error for this test
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    
+    logTrafficSession.mockRejectedValue(new Error('Network error'));
+    
+    renderVehicleDetail();
+    
+    fireEvent.click(screen.getByText("Let's See It!"));
+    
+    // Should still show confirmation (graceful degradation)
+    await waitFor(() => {
+      expect(screen.getByText("We're On It!")).toBeInTheDocument();
+    });
+    
+    consoleSpy.mockRestore();
   });
 });
