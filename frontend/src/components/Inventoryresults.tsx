@@ -105,10 +105,23 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
     setFailedImages(prev => new Set(prev).add(vehicleId));
   };
 
-  // Handle vehicle card click - open dealership website
+  // Handle vehicle card click - navigate to VehicleDetail page
   const handleVehicleClick = (vehicle: Vehicle): void => {
-    const dealerUrl = generateDealerUrl(vehicle);
-    window.open(dealerUrl, '_blank', 'noopener,noreferrer');
+    // Add gradient and rebates to the vehicle data
+    const enrichedVehicle = {
+      ...vehicle,
+      gradient: getGradient(vehicle.exteriorColor || vehicle.exterior_color),
+      rebates: [
+        { name: 'Customer Cash', amount: 3000 },
+        { name: 'Bonus Cash', amount: 1000 },
+      ],
+    };
+    
+    // Update customer data with the selected vehicle
+    updateCustomerData({ selectedVehicle: enrichedVehicle });
+    
+    // Navigate to vehicle detail page
+    navigateTo('vehicleDetail');
   };
 
   useEffect(() => {
