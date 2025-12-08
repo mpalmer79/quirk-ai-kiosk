@@ -531,7 +531,9 @@ describe('VehicleDetail Accessibility', () => {
   test('conditional offers toggle is accessible', () => {
     renderVehicleDetail();
     
-    expect(screen.getByText('Conditional Offers').tagName).toBe('BUTTON');
+    // The text is in a span inside a button - check the parent button exists
+    const conditionalText = screen.getByText('Conditional Offers');
+    expect(conditionalText.closest('button')).toBeInTheDocument();
   });
 });
 
