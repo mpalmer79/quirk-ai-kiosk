@@ -180,7 +180,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
       }
       try {
         const result = await api.getModels(tradeData.make);
-        setModels(result.models || []);
+        setModels(result || []);
       } catch (err) {
         console.error('Failed to fetch models:', err);
         setModels([]);
