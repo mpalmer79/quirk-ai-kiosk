@@ -2,12 +2,18 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import ModelBudgetSelector from '../components/ModelBudgetSelector';
 
-// Mock the api module - only getInventory needed now
+// Mock the api module
 jest.mock('../components/api', () => ({
-  getInventory: jest.fn(),
+  __esModule: true,
+  default: {
+    getInventory: jest.fn(),
+    getModels: jest.fn(),
+  },
+  logTrafficSession: jest.fn().mockResolvedValue(undefined),
 }));
 
 import api from '../components/api';
+import { logTrafficSession } from '../components/api';
 
 const mockNavigateTo = jest.fn();
 const mockUpdateCustomerData = jest.fn();
@@ -26,6 +32,8 @@ const renderModelBudgetSelector = (props = {}) => {
 describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    api.getModels.mockResolvedValue([]);
+    logTrafficSession.mockResolvedValue(undefined);
   });
 
   describe('Models with Zero Inventory', () => {
@@ -269,6 +277,8 @@ describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
 describe('ModelBudgetSelector - Trade-In Model Dropdown (Local Database)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    api.getModels.mockResolvedValue([]);
+    logTrafficSession.mockResolvedValue(undefined);
     // Setup inventory so we can navigate to trade-in step
     api.getInventory.mockResolvedValue([
       { model: 'Equinox', price: 30000 },
@@ -357,7 +367,10 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown (Local Database)', () =>
     expect(modelSelect).toBeDisabled();
   });
 
-  test('model dropdown enables after make is selected', async () => {
+  test('model dropdown enables after year and make are selected', async () => {
+    // Mock getModels to return models
+    api.getModels.mockResolvedValue(['Camry', 'Corolla', 'RAV4']);
+    
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
@@ -370,21 +383,30 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown (Local Database)', () =>
     });
 
     const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
     const makeSelect = selects[1];
     const modelSelect = selects[2];
 
-    // Select Make - models should load instantly from local database
+    // Select Year first (required)
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2022' } });
+    });
+
+    // Select Make - models should load from local database
     await act(async () => {
       fireEvent.change(makeSelect, { target: { value: 'Toyota' } });
     });
 
-    // Model dropdown should now be enabled
+    // Model dropdown should now be enabled (requires both year AND make)
     await waitFor(() => {
       expect(modelSelect).not.toBeDisabled();
     });
   });
 
   test('populates model dropdown with models from local database', async () => {
+    // Mock getModels to return Toyota models
+    api.getModels.mockResolvedValue(['Camry', 'Corolla', 'RAV4', 'Highlander', 'Tacoma']);
+    
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
@@ -397,7 +419,13 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown (Local Database)', () =>
     });
 
     const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
     const makeSelect = selects[1];
+
+    // Select Year first (required)
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2022' } });
+    });
 
     // Select Toyota
     await act(async () => {
@@ -415,6 +443,11 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown (Local Database)', () =>
   });
 
   test('resets model selection when make changes', async () => {
+    // Mock getModels to return different models based on make
+    api.getModels
+      .mockResolvedValueOnce(['Camry', 'Corolla', 'RAV4'])
+      .mockResolvedValueOnce(['Civic', 'Accord', 'CR-V']);
+    
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
@@ -427,12 +460,23 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown (Local Database)', () =>
     });
 
     const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
     const makeSelect = selects[1];
     const modelSelect = selects[2];
+
+    // Select Year first (required)
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2022' } });
+    });
 
     // Select Toyota
     await act(async () => {
       fireEvent.change(makeSelect, { target: { value: 'Toyota' } });
+    });
+
+    // Wait for models to load
+    await waitFor(() => {
+      expect(modelSelect).not.toBeDisabled();
     });
 
     // Select a model
@@ -461,6 +505,11 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown (Local Database)', () =>
   });
 
   test('shows different models for different makes', async () => {
+    // Mock getModels to return different models based on make
+    api.getModels
+      .mockResolvedValueOnce(['F-150', 'Mustang', 'Explorer', 'Escape'])
+      .mockResolvedValueOnce(['Silverado 1500', 'Equinox', 'Tahoe', 'Malibu']);
+    
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
@@ -473,7 +522,13 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown (Local Database)', () =>
     });
 
     const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
     const makeSelect = selects[1];
+
+    // Select Year first (required)
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2022' } });
+    });
 
     // First: Select Ford
     await act(async () => {
