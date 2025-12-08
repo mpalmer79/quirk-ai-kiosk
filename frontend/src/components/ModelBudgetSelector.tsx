@@ -76,6 +76,9 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const [inventoryCount, setInventoryCount] = useState<number | null>(null);
   const [inventoryByModel, setInventoryByModel] = useState<InventoryByModel>({});
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
+  // Trade-in model dropdown state
+  const [tradeModels, setTradeModels] = useState<string[]>([]);
+  const [loadingTradeModels, setLoadingTradeModels] = useState<boolean>(false);
 
   // Fetch inventory counts on mount to filter available models
   useEffect(() => {
@@ -108,6 +111,30 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     
     loadInventoryCounts();
   }, []);
+
+  // Fetch trade-in models when year and make are selected
+  useEffect(() => {
+    const fetchTradeModels = async () => {
+      if (tradeVehicle.year && tradeVehicle.make) {
+        setLoadingTradeModels(true);
+        try {
+          const models = await api.getModels(tradeVehicle.make);
+          setTradeModels(models || []);
+        } catch (err) {
+          console.error('Error fetching trade models:', err);
+          setTradeModels([]);
+        } finally {
+          setLoadingTradeModels(false);
+        }
+      } else {
+        setTradeModels([]);
+      }
+    };
+    fetchTradeModels();
+    // Reset model when year or make changes
+    setTradeVehicle(prev => ({ ...prev, model: '' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tradeVehicle.year, tradeVehicle.make]);
 
   // Build dynamic categories based on actual inventory
   const VEHICLE_CATEGORIES: VehicleCategories = Object.entries(BASE_CATEGORIES).reduce(
@@ -165,13 +192,15 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     setColorChoices(prev => ({ ...prev, [choice]: value }));
   };
 
+  // Fixed: Allow decimals in currency input
   const handlePayoffAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+    const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
     setPayoffAmount(rawValue);
   };
 
+  // Fixed: Allow decimals in currency input
   const handleMonthlyPaymentChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+    const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
     setMonthlyPayment(rawValue);
   };
 
@@ -638,13 +667,17 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                 </div>
                 <div style={styles.payoffFieldGroup}>
                   <label style={styles.inputLabel}>Model</label>
-                  <input
-                    type="text"
-                    style={styles.textInputStandalone}
-                    placeholder="e.g., Camry, F-150"
+                  <select
+                    style={styles.selectInput}
                     value={tradeVehicle.model}
                     onChange={(e) => handleTradeVehicleChange('model', e.target.value)}
-                  />
+                    disabled={!tradeVehicle.year || !tradeVehicle.make || loadingTradeModels}
+                  >
+                    <option value="">{loadingTradeModels ? 'Loading...' : 'Select Model'}</option>
+                    {tradeModels.map((model) => (
+                      <option key={model} value={model}>{model}</option>
+                    ))}
+                  </select>
                 </div>
                 <div style={styles.payoffFieldGroup}>
                   <label style={styles.inputLabel}>Mileage</label>
