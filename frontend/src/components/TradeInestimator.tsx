@@ -110,12 +110,12 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({ navigateTo, updateC
   useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
 
   useEffect(() => {
-    api.getMakes().then(r => setMakes(r.makes || FALLBACK_MAKES)).catch(() => setMakes(FALLBACK_MAKES));
+    api.getMakes().then(r => setMakes(r || FALLBACK_MAKES)).catch(() => setMakes(FALLBACK_MAKES));
   }, []);
 
   useEffect(() => {
     if (!tradeData.make) { setModels([]); return; }
-    api.getModels(tradeData.make).then(r => setModels(r.models || [])).catch(() => setModels([]));
+    api.getModels(tradeData.make).then(r => setModels(r || [])).catch(() => setModels([]));
   }, [tradeData.make]);
 
   // Camera functions
