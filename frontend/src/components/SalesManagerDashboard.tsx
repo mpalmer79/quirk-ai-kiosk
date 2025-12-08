@@ -63,7 +63,8 @@ const SalesManagerDashboard: React.FC = () => {
       if (updated) setSelectedSession(updated);
       fetchSessionDetail(selectedSession.sessionId);
     }
-  }, [sessions, selectedSession?.sessionId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [sessions, selectedSession?.sessionId]);
 
   const handleSessionSelect = (session: CustomerSession) => {
     setSelectedSession(session);
