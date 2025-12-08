@@ -37,7 +37,8 @@ const TrafficLog: React.FC<TrafficLogProps> = ({ navigateTo }) => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { loadData(); }, [activeFilter]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+useEffect(() => { loadData(); }, [activeFilter]);
 
   const handleRefresh = async () => { setRefreshing(true); await loadData(); setRefreshing(false); };
   const handleStatCardClick = (filterType: string) => setActiveFilter(activeFilter === filterType ? null : filterType);
