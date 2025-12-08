@@ -1,5 +1,5 @@
 import React, { useState, CSSProperties } from 'react';
-import api, { logTrafficSession } from './api';
+import { logTrafficSession } from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
 
 interface DetailedVehicle extends Vehicle {
@@ -150,7 +150,6 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   const vin = vehicle.vin || '';
   const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
   const msrp = vehicle.msrp || 0;
-  const salePrice = vehicle.salePrice || vehicle.sale_price || vehicle.price || msrp;
   const rebates = vehicle.rebates || DEFAULT_REBATES;
   const totalRebates = rebates.reduce((sum, r) => sum + r.amount, 0);
   const quirkPrice = msrp - totalRebates;
