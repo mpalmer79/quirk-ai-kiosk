@@ -58,11 +58,13 @@ const SalesManagerDashboard: React.FC = () => {
   }, [autoRefresh]);
 
   useEffect(() => {
-    if (selectedSession) {
-      const updated = sessions.find(s => s.sessionId === selectedSession.sessionId);
+    const currentSessionId = selectedSession?.sessionId;
+    if (currentSessionId) {
+      const updated = sessions.find(s => s.sessionId === currentSessionId);
       if (updated) setSelectedSession(updated);
-      fetchSessionDetail(selectedSession.sessionId);
+      fetchSessionDetail(currentSessionId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, selectedSession?.sessionId]);
 
   const handleSessionSelect = (session: CustomerSession) => {
