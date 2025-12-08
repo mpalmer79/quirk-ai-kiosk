@@ -3,6 +3,7 @@ import api from './api';
 import GM_COLORS from '../types/gmColors';
 import { BASE_CATEGORIES, modelMatches } from '../types/vehicleCategories';
 import styles from './modelBudgetSelectorStyles';
+import { getModelsForMake, TRADE_IN_MAKES } from './tradeInVehicles';
 import type { 
   BudgetRange, 
   Vehicle, 
@@ -40,14 +41,6 @@ const formatCurrency = (value: string): string => {
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 21 }, (_, i) => (currentYear + 1 - i).toString());
 
-// Common makes for dropdown
-const COMMON_MAKES = [
-  'Acura', 'Audi', 'BMW', 'Buick', 'Cadillac', 'Chevrolet', 'Chrysler', 'Dodge',
-  'Ford', 'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Jeep', 'Kia', 'Lexus',
-  'Lincoln', 'Mazda', 'Mercedes-Benz', 'Nissan', 'Ram', 'Subaru', 'Tesla',
-  'Toyota', 'Volkswagen', 'Volvo', 'Other'
-];
-
 const ModelBudgetSelector: React.FC<KioskComponentProps> = ({ 
   navigateTo, 
   updateCustomerData, 
@@ -78,7 +71,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
   // Trade-in model dropdown state
   const [tradeModels, setTradeModels] = useState<string[]>([]);
-  const [loadingTradeModels, setLoadingTradeModels] = useState<boolean>(false);
 
   // Fetch inventory counts on mount to filter available models
   useEffect(() => {
@@ -112,29 +104,17 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     loadInventoryCounts();
   }, []);
 
-  // Fetch trade-in models when year and make are selected
+  // Get trade-in models from local database when make is selected
   useEffect(() => {
-    const fetchTradeModels = async () => {
-      if (tradeVehicle.year && tradeVehicle.make) {
-        setLoadingTradeModels(true);
-        try {
-          const models = await api.getModels(tradeVehicle.make);
-          setTradeModels(models || []);
-        } catch (err) {
-          console.error('Error fetching trade models:', err);
-          setTradeModels([]);
-        } finally {
-          setLoadingTradeModels(false);
-        }
-      } else {
-        setTradeModels([]);
-      }
-    };
-    fetchTradeModels();
-    // Reset model when year or make changes
+    if (tradeVehicle.make) {
+      setTradeModels(getModelsForMake(tradeVehicle.make));
+    } else {
+      setTradeModels([]);
+    }
+    // Reset model when make changes
     setTradeVehicle(prev => ({ ...prev, model: '' }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tradeVehicle.year, tradeVehicle.make]);
+  }, [tradeVehicle.make]);
 
   // Build dynamic categories based on actual inventory
   const VEHICLE_CATEGORIES: VehicleCategories = Object.entries(BASE_CATEGORIES).reduce(
@@ -660,7 +640,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                     onChange={(e) => handleTradeVehicleChange('make', e.target.value)}
                   >
                     <option value="">Select Make</option>
-                    {COMMON_MAKES.map((make) => (
+                    {TRADE_IN_MAKES.map((make) => (
                       <option key={make} value={make}>{make}</option>
                     ))}
                   </select>
@@ -671,9 +651,9 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                     style={styles.selectInput}
                     value={tradeVehicle.model}
                     onChange={(e) => handleTradeVehicleChange('model', e.target.value)}
-                    disabled={!tradeVehicle.year || !tradeVehicle.make || loadingTradeModels}
+                    disabled={!tradeVehicle.make}
                   >
-                    <option value="">{loadingTradeModels ? 'Loading...' : 'Select Model'}</option>
+                    <option value="">Select Model</option>
                     {tradeModels.map((model) => (
                       <option key={model} value={model}>{model}</option>
                     ))}
