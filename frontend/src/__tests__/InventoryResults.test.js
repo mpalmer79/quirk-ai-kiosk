@@ -9,7 +9,7 @@ jest.mock('../components/api', () => ({
 
 import api from '../components/api';
 
-// Mock window.open
+// Mock window.open (kept for any remaining external link tests)
 const mockWindowOpen = jest.fn();
 window.open = mockWindowOpen;
 
@@ -341,7 +341,7 @@ describe('InventoryResults Component', () => {
   });
 
   describe('Vehicle Card Interactions', () => {
-    test('View Details button opens dealer website', async () => {
+    test('View Details button navigates to vehicle detail page', async () => {
       renderInventoryResults();
 
       await waitFor(() => {
@@ -350,14 +350,31 @@ describe('InventoryResults Component', () => {
 
       fireEvent.click(screen.getAllByText('View Details')[0]);
 
-      expect(mockWindowOpen).toHaveBeenCalledWith(
-        expect.stringContaining('quirkchevynh.com'),
-        '_blank',
-        'noopener,noreferrer'
+      // Should navigate to vehicleDetail page
+      expect(mockNavigateTo).toHaveBeenCalledWith('vehicleDetail');
+    });
+
+    test('View Details button updates customer data with selected vehicle', async () => {
+      renderInventoryResults();
+
+      await waitFor(() => {
+        expect(screen.getAllByText('View Details')[0]).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('View Details')[0]);
+
+      // Should update customer data with the selected vehicle
+      expect(mockUpdateCustomerData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selectedVehicle: expect.objectContaining({
+            stockNumber: 'A1234',
+            model: 'Silverado 1500',
+          }),
+        })
       );
     });
 
-    test('clicking vehicle card opens dealer website', async () => {
+    test('clicking vehicle card navigates to vehicle detail page', async () => {
       renderInventoryResults();
 
       await waitFor(() => {
@@ -369,7 +386,29 @@ describe('InventoryResults Component', () => {
       const card = trim.closest('div[style*="cursor"]');
       fireEvent.click(card);
 
-      expect(mockWindowOpen).toHaveBeenCalled();
+      expect(mockNavigateTo).toHaveBeenCalledWith('vehicleDetail');
+    });
+
+    test('selected vehicle includes gradient and rebates', async () => {
+      renderInventoryResults();
+
+      await waitFor(() => {
+        expect(screen.getAllByText('View Details')[0]).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('View Details')[0]);
+
+      expect(mockUpdateCustomerData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selectedVehicle: expect.objectContaining({
+            gradient: expect.any(String),
+            rebates: expect.arrayContaining([
+              expect.objectContaining({ name: 'Customer Cash', amount: 3000 }),
+              expect.objectContaining({ name: 'Bonus Cash', amount: 1000 }),
+            ]),
+          }),
+        })
+      );
     });
   });
 
@@ -422,13 +461,13 @@ describe('InventoryResults Component', () => {
   });
 });
 
-describe('InventoryResults URL Generation', () => {
+describe('InventoryResults Vehicle Selection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     api.getInventory.mockResolvedValue(mockVehicles);
   });
 
-  test('generates dealer URL with correct format', async () => {
+  test('selecting vehicle stores all original vehicle properties', async () => {
     renderInventoryResults();
 
     await waitFor(() => {
@@ -437,38 +476,41 @@ describe('InventoryResults URL Generation', () => {
 
     fireEvent.click(screen.getAllByText('View Details')[0]);
 
-    expect(mockWindowOpen).toHaveBeenCalledWith(
-      expect.stringMatching(/https:\/\/www\.quirkchevynh\.com\/inventory\/.+\//),
-      '_blank',
-      'noopener,noreferrer'
+    expect(mockUpdateCustomerData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedVehicle: expect.objectContaining({
+          id: '1',
+          stockNumber: 'A1234',
+          year: 2025,
+          model: 'Silverado 1500',
+          trim: 'LT Crew Cab',
+          exteriorColor: 'Summit White',
+          price: 47495,
+          msrp: 48969,
+          vin: '1GCUDDED5RZ123456',
+        }),
+      })
     );
   });
 
-  test('URL includes make and model', async () => {
+  test('selecting different vehicles updates customer data', async () => {
     renderInventoryResults();
 
     await waitFor(() => {
-      expect(screen.getAllByText('View Details')[0]).toBeInTheDocument();
+      expect(screen.getAllByText('View Details').length).toBeGreaterThan(1);
     });
 
-    fireEvent.click(screen.getAllByText('View Details')[0]);
+    // Click second vehicle
+    fireEvent.click(screen.getAllByText('View Details')[1]);
 
-    const call = mockWindowOpen.mock.calls[0][0];
-    expect(call.toLowerCase()).toContain('chevrolet');
-    expect(call.toLowerCase()).toContain('silverado');
-  });
-
-  test('URL includes VIN', async () => {
-    renderInventoryResults();
-
-    await waitFor(() => {
-      expect(screen.getAllByText('View Details')[0]).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getAllByText('View Details')[0]);
-
-    const call = mockWindowOpen.mock.calls[0][0];
-    expect(call.toLowerCase()).toContain(mockVehicles[0].vin.toLowerCase());
+    expect(mockUpdateCustomerData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedVehicle: expect.objectContaining({
+          stockNumber: 'B5678',
+          trim: 'RST Crew Cab',
+        }),
+      })
+    );
   });
 });
 
