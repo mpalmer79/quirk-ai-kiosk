@@ -254,7 +254,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({ navigateTo, updateC
       const result = await api.getTradeInEstimate({
         year: parseInt(tradeData.year), make: tradeData.make, model: tradeData.model,
         trim: tradeData.trim, mileage: parseInt(tradeData.mileage.replace(/,/g, '')),
-        condition: tradeData.condition, vin: tradeData.vin,
+        condition: tradeData.condition as 'excellent' | 'good' | 'fair' | 'poor', vin: tradeData.vin,
       });
       setEstimate(result);
       setStep(5);
