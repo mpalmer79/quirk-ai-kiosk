@@ -295,3 +295,376 @@ describe('ModelBudgetSelector - Category Selection', () => {
     });
   });
 });
+
+describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    api.getModels.mockResolvedValue([]);
+    api.getInventory.mockResolvedValue([
+      { model: 'Corvette', price: 70000 },
+      { model: 'Corvette', price: 85000 },
+    ]);
+  });
+
+  // Helper to navigate to trade-in step (Step 6)
+  const navigateToTradeInStep = async () => {
+    renderModelBudgetSelector();
+
+    // Wait for loading to complete
+    await waitFor(() => {
+      expect(screen.getByText('Sports Cars')).toBeInTheDocument();
+    });
+
+    // Step 1: Select Sports Cars category
+    const sportsButton = screen.getByText('Sports Cars').closest('button');
+    sportsButton.click();
+
+    // Step 2: Select Corvette model
+    await waitFor(() => {
+      expect(screen.getByText('Corvette')).toBeInTheDocument();
+    });
+    const corvetteButton = screen.getByText('Corvette').closest('button');
+    corvetteButton.click();
+
+    // Step 4: Color selection - click Continue
+    await waitFor(() => {
+      expect(screen.getByText('Continue to Budget')).toBeInTheDocument();
+    });
+    screen.getByText('Continue to Budget').click();
+
+    // Step 5: Budget selection - click Continue
+    await waitFor(() => {
+      expect(screen.getByText('Continue')).toBeInTheDocument();
+    });
+    screen.getByText('Continue').click();
+
+    // Step 6: Trade-In step
+    await waitFor(() => {
+      expect(screen.getByText('Yes, I have a trade-in')).toBeInTheDocument();
+    });
+  };
+
+  test('shows trade-in vehicle form when "Yes, I have a trade-in" is clicked', async () => {
+    await navigateToTradeInStep();
+
+    // Click "Yes, I have a trade-in"
+    screen.getByText('Yes, I have a trade-in').click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
+    });
+
+    // Should show Year, Make, Model, Mileage fields
+    expect(screen.getByText('Year')).toBeInTheDocument();
+    expect(screen.getByText('Make')).toBeInTheDocument();
+    expect(screen.getByText('Model')).toBeInTheDocument();
+    expect(screen.getByText('Mileage')).toBeInTheDocument();
+  });
+
+  test('model dropdown is disabled until year and make are selected', async () => {
+    await navigateToTradeInStep();
+
+    // Click "Yes, I have a trade-in"
+    screen.getByText('Yes, I have a trade-in').click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
+    });
+
+    // Find the Model dropdown (third select element)
+    const selects = screen.getAllByRole('combobox');
+    const modelSelect = selects[2]; // Year=0, Make=1, Model=2
+
+    // Model dropdown should be disabled initially
+    expect(modelSelect).toBeDisabled();
+  });
+
+  test('model dropdown enables and shows "Select Model" after year and make are selected', async () => {
+    api.getModels.mockResolvedValue(['Malibu', 'Equinox', 'Silverado 1500', 'Tahoe']);
+
+    await navigateToTradeInStep();
+
+    // Click "Yes, I have a trade-in"
+    screen.getByText('Yes, I have a trade-in').click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
+    });
+
+    const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
+    const makeSelect = selects[1];
+    const modelSelect = selects[2];
+
+    // Select Year
+    yearSelect.click();
+    await waitFor(() => {
+      expect(screen.getByText('2024')).toBeInTheDocument();
+    });
+    screen.getByText('2024').click();
+
+    // Select Make
+    makeSelect.click();
+    await waitFor(() => {
+      expect(screen.getByText('Chevrolet')).toBeInTheDocument();
+    });
+    screen.getByText('Chevrolet').click();
+
+    // Model dropdown should now be enabled
+    await waitFor(() => {
+      expect(modelSelect).not.toBeDisabled();
+    });
+  });
+
+  test('calls api.getModels with selected make when year and make are set', async () => {
+    api.getModels.mockResolvedValue(['Malibu', 'Equinox', 'Silverado 1500']);
+
+    await navigateToTradeInStep();
+
+    // Click "Yes, I have a trade-in"
+    screen.getByText('Yes, I have a trade-in').click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
+    });
+
+    const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
+    const makeSelect = selects[1];
+
+    // Select Year first
+    yearSelect.click();
+    screen.getByText('2023').click();
+
+    // Select Make - this should trigger getModels call
+    makeSelect.click();
+    screen.getByText('Toyota').click();
+
+    await waitFor(() => {
+      expect(api.getModels).toHaveBeenCalledWith('Toyota');
+    });
+  });
+
+  test('populates model dropdown with models from API', async () => {
+    api.getModels.mockResolvedValue(['Camry', 'Corolla', 'RAV4', 'Highlander', 'Tacoma']);
+
+    await navigateToTradeInStep();
+
+    // Click "Yes, I have a trade-in"
+    screen.getByText('Yes, I have a trade-in').click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
+    });
+
+    const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
+    const makeSelect = selects[1];
+    const modelSelect = selects[2];
+
+    // Select Year
+    yearSelect.click();
+    screen.getByText('2022').click();
+
+    // Select Make
+    makeSelect.click();
+    screen.getByText('Toyota').click();
+
+    // Wait for models to load and check dropdown options
+    await waitFor(() => {
+      expect(modelSelect).not.toBeDisabled();
+    });
+
+    // Click model dropdown to see options
+    modelSelect.click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Camry')).toBeInTheDocument();
+      expect(screen.getByText('Corolla')).toBeInTheDocument();
+      expect(screen.getByText('RAV4')).toBeInTheDocument();
+      expect(screen.getByText('Highlander')).toBeInTheDocument();
+      expect(screen.getByText('Tacoma')).toBeInTheDocument();
+    });
+  });
+
+  test('resets model selection when make changes', async () => {
+    api.getModels
+      .mockResolvedValueOnce(['Camry', 'Corolla', 'RAV4'])
+      .mockResolvedValueOnce(['Civic', 'Accord', 'CR-V']);
+
+    await navigateToTradeInStep();
+
+    // Click "Yes, I have a trade-in"
+    screen.getByText('Yes, I have a trade-in').click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
+    });
+
+    const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
+    const makeSelect = selects[1];
+    const modelSelect = selects[2];
+
+    // Select Year and Make (Toyota)
+    yearSelect.click();
+    screen.getByText('2023').click();
+    makeSelect.click();
+    screen.getByText('Toyota').click();
+
+    await waitFor(() => {
+      expect(modelSelect).not.toBeDisabled();
+    });
+
+    // Select a model
+    modelSelect.click();
+    await waitFor(() => {
+      expect(screen.getByText('Camry')).toBeInTheDocument();
+    });
+    screen.getByText('Camry').click();
+
+    // Now change make to Honda
+    makeSelect.click();
+    screen.getByText('Honda').click();
+
+    // Model should reset and new models should load
+    await waitFor(() => {
+      expect(api.getModels).toHaveBeenCalledWith('Honda');
+    });
+
+    // Should show Honda models now
+    modelSelect.click();
+    await waitFor(() => {
+      expect(screen.getByText('Civic')).toBeInTheDocument();
+      expect(screen.getByText('Accord')).toBeInTheDocument();
+    });
+
+    // Toyota models should no longer be visible
+    expect(screen.queryByText('Camry')).not.toBeInTheDocument();
+  });
+
+  test('handles api.getModels error gracefully', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    api.getModels.mockRejectedValue(new Error('Network error'));
+
+    await navigateToTradeInStep();
+
+    // Click "Yes, I have a trade-in"
+    screen.getByText('Yes, I have a trade-in').click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
+    });
+
+    const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
+    const makeSelect = selects[1];
+    const modelSelect = selects[2];
+
+    // Select Year and Make
+    yearSelect.click();
+    screen.getByText('2023').click();
+    makeSelect.click();
+    screen.getByText('Ford').click();
+
+    // Should handle error gracefully
+    await waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching trade models:', expect.any(Error));
+    });
+
+    // Model dropdown should still be functional (just empty)
+    expect(modelSelect).not.toBeDisabled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  test('shows "Loading..." in model dropdown while fetching models', async () => {
+    // Create a promise that we control
+    let resolveModels;
+    api.getModels.mockImplementation(() => new Promise((resolve) => {
+      resolveModels = resolve;
+    }));
+
+    await navigateToTradeInStep();
+
+    // Click "Yes, I have a trade-in"
+    screen.getByText('Yes, I have a trade-in').click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
+    });
+
+    const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
+    const makeSelect = selects[1];
+
+    // Select Year and Make to trigger loading
+    yearSelect.click();
+    screen.getByText('2023').click();
+    makeSelect.click();
+    screen.getByText('Chevrolet').click();
+
+    // Should show Loading... while waiting
+    await waitFor(() => {
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
+    });
+
+    // Resolve the promise
+    resolveModels(['Malibu', 'Equinox']);
+
+    // Should now show Select Model
+    await waitFor(() => {
+      expect(screen.getByText('Select Model')).toBeInTheDocument();
+    });
+  });
+
+  test('fetches different models for different makes', async () => {
+    api.getModels
+      .mockResolvedValueOnce(['F-150', 'Mustang', 'Explorer', 'Escape'])
+      .mockResolvedValueOnce(['Silverado 1500', 'Equinox', 'Tahoe', 'Malibu']);
+
+    await navigateToTradeInStep();
+
+    // Click "Yes, I have a trade-in"
+    screen.getByText('Yes, I have a trade-in').click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
+    });
+
+    const selects = screen.getAllByRole('combobox');
+    const yearSelect = selects[0];
+    const makeSelect = selects[1];
+    const modelSelect = selects[2];
+
+    // First: Select Ford
+    yearSelect.click();
+    screen.getByText('2023').click();
+    makeSelect.click();
+    screen.getByText('Ford').click();
+
+    await waitFor(() => {
+      expect(api.getModels).toHaveBeenCalledWith('Ford');
+    });
+
+    modelSelect.click();
+    await waitFor(() => {
+      expect(screen.getByText('F-150')).toBeInTheDocument();
+      expect(screen.getByText('Mustang')).toBeInTheDocument();
+    });
+
+    // Second: Change to Chevrolet
+    makeSelect.click();
+    screen.getByText('Chevrolet').click();
+
+    await waitFor(() => {
+      expect(api.getModels).toHaveBeenCalledWith('Chevrolet');
+    });
+
+    modelSelect.click();
+    await waitFor(() => {
+      expect(screen.getByText('Silverado 1500')).toBeInTheDocument();
+      expect(screen.getByText('Equinox')).toBeInTheDocument();
+    });
+  });
+});
