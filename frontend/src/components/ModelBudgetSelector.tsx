@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
-import api, { logTrafficSession } from './api';
+import React, { useState, useEffect, ChangeEvent } from 'react';
+import api from './api';
 import GM_COLORS from '../types/gmColors';
 import { BASE_CATEGORIES, modelMatches } from '../types/vehicleCategories';
 import styles from './modelBudgetSelectorStyles';
-import { getModelsForMake, TRADE_IN_MAKES } from './tradeInVehicles';
 import type { 
   BudgetRange, 
   Vehicle, 
@@ -30,9 +29,8 @@ interface TradeVehicleInfo {
 // Inventory count by model name
 type InventoryByModel = Record<string, number>;
 
-// Currency formatter for payoff fields - formats on blur only
+// Currency formatter for payoff fields
 const formatCurrency = (value: string): string => {
-  if (!value) return '';
   const num = parseFloat(value.replace(/[^0-9.]/g, ''));
   if (isNaN(num)) return '';
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -41,6 +39,14 @@ const formatCurrency = (value: string): string => {
 // Generate year options (current year + 1 down to 20 years ago)
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 21 }, (_, i) => (currentYear + 1 - i).toString());
+
+// Common makes for dropdown
+const COMMON_MAKES = [
+  'Acura', 'Audi', 'BMW', 'Buick', 'Cadillac', 'Chevrolet', 'Chrysler', 'Dodge',
+  'Ford', 'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Jeep', 'Kia', 'Lexus',
+  'Lincoln', 'Mazda', 'Mercedes-Benz', 'Nissan', 'Ram', 'Subaru', 'Tesla',
+  'Toyota', 'Volkswagen', 'Volvo', 'Other'
+];
 
 const ModelBudgetSelector: React.FC<KioskComponentProps> = ({ 
   navigateTo, 
@@ -61,8 +67,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const [payoffAmount, setPayoffAmount] = useState<string>('');
   const [monthlyPayment, setMonthlyPayment] = useState<string>('');
   const [financedWith, setFinancedWith] = useState<string>('');
-  const [payoffFocused, setPayoffFocused] = useState<boolean>(false);
-  const [monthlyFocused, setMonthlyFocused] = useState<boolean>(false);
   const [tradeVehicle, setTradeVehicle] = useState<TradeVehicleInfo>({
     year: '',
     make: '',
@@ -74,90 +78,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
   // Trade-in model dropdown state
   const [tradeModels, setTradeModels] = useState<string[]>([]);
-
-  // Ref to track if we've already saved (prevent duplicate saves)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Build trade-in data object for API
-  const buildTradeInData = useCallback(() => {
-    if (hasTrade === null) return undefined;
-    
-    return {
-      hasTrade,
-      vehicle: hasTrade ? {
-        year: tradeVehicle.year ? parseInt(tradeVehicle.year) : null,
-        make: tradeVehicle.make || null,
-        model: tradeVehicle.model || null,
-        mileage: tradeVehicle.mileage ? parseInt(tradeVehicle.mileage) : null,
-      } : null,
-      hasPayoff: hasTrade ? hasPayoff : null,
-      payoffAmount: hasPayoff ? parseFloat(payoffAmount) || null : null,
-      monthlyPayment: hasPayoff ? parseFloat(monthlyPayment) || null : null,
-      financedWith: hasPayoff ? financedWith || null : null,
-    };
-  }, [hasTrade, hasPayoff, tradeVehicle, payoffAmount, monthlyPayment, financedWith]);
-
-  // Save trade-in data to backend (debounced)
-  const saveTradeInData = useCallback(async () => {
-    const tradeInData = buildTradeInData();
-    if (!tradeInData) return;
-
-    try {
-      await logTrafficSession({
-        currentStep: 'trade-in',
-        tradeIn: tradeInData,
-      });
-      console.log('Trade-in data saved:', tradeInData);
-    } catch (err) {
-      console.warn('Failed to save trade-in data:', err);
-    }
-  }, [buildTradeInData]);
-
-  // Debounced save - waits 500ms after last change before saving
-  const debouncedSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    saveTimeoutRef.current = setTimeout(() => {
-      saveTradeInData();
-    }, 500);
-  }, [saveTradeInData]);
-
-  // Auto-save trade-in data whenever it changes
-  useEffect(() => {
-    if (step === 6 && hasTrade !== null) {
-      debouncedSave();
-    }
-  }, [step, hasTrade, hasPayoff, tradeVehicle, payoffAmount, monthlyPayment, financedWith, debouncedSave]);
-
-  // Save immediately when leaving page (beforeunload)
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Clear debounce and save immediately
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      const tradeInData = buildTradeInData();
-      if (tradeInData && hasTrade !== null) {
-        // Use sendBeacon for reliable save on page close
-        const data = JSON.stringify({
-          currentStep: 'trade-in',
-          tradeIn: tradeInData,
-        });
-        navigator.sendBeacon?.('/api/v1/traffic/session', data);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Also save when component unmounts
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      saveTradeInData();
-    };
-  }, [buildTradeInData, hasTrade, saveTradeInData]);
+  const [loadingTradeModels, setLoadingTradeModels] = useState<boolean>(false);
 
   // Fetch inventory counts on mount to filter available models
   useEffect(() => {
@@ -191,17 +112,29 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     loadInventoryCounts();
   }, []);
 
-  // Get trade-in models from local database when make is selected
+  // Fetch trade-in models when year and make are selected
   useEffect(() => {
-    if (tradeVehicle.make) {
-      setTradeModels(getModelsForMake(tradeVehicle.make));
-    } else {
-      setTradeModels([]);
-    }
-    // Reset model when make changes
+    const fetchTradeModels = async () => {
+      if (tradeVehicle.year && tradeVehicle.make) {
+        setLoadingTradeModels(true);
+        try {
+          const models = await api.getModels(tradeVehicle.make);
+          setTradeModels(models || []);
+        } catch (err) {
+          console.error('Error fetching trade models:', err);
+          setTradeModels([]);
+        } finally {
+          setLoadingTradeModels(false);
+        }
+      } else {
+        setTradeModels([]);
+      }
+    };
+    fetchTradeModels();
+    // Reset model when year or make changes
     setTradeVehicle(prev => ({ ...prev, model: '' }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tradeVehicle.make]);
+  }, [tradeVehicle.year, tradeVehicle.make]);
 
   // Build dynamic categories based on actual inventory
   const VEHICLE_CATEGORIES: VehicleCategories = Object.entries(BASE_CATEGORIES).reduce(
@@ -259,36 +192,16 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     setColorChoices(prev => ({ ...prev, [choice]: value }));
   };
 
-  // Allow typing freely, only strip non-numeric except decimal
+  // Fixed: Allow decimals in currency input
   const handlePayoffAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
     setPayoffAmount(rawValue);
   };
 
-  const handlePayoffBlur = (): void => {
-    setPayoffFocused(false);
-    if (payoffAmount) {
-      const num = parseFloat(payoffAmount);
-      if (!isNaN(num)) {
-        setPayoffAmount(num.toFixed(2));
-      }
-    }
-  };
-
-  // Allow typing freely, only strip non-numeric except decimal
+  // Fixed: Allow decimals in currency input
   const handleMonthlyPaymentChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
     setMonthlyPayment(rawValue);
-  };
-
-  const handleMonthlyBlur = (): void => {
-    setMonthlyFocused(false);
-    if (monthlyPayment) {
-      const num = parseFloat(monthlyPayment);
-      if (!isNaN(num)) {
-        setMonthlyPayment(num.toFixed(2));
-      }
-    }
   };
 
   const handleFinancedWithChange = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -747,7 +660,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                     onChange={(e) => handleTradeVehicleChange('make', e.target.value)}
                   >
                     <option value="">Select Make</option>
-                    {TRADE_IN_MAKES.map((make) => (
+                    {COMMON_MAKES.map((make) => (
                       <option key={make} value={make}>{make}</option>
                     ))}
                   </select>
@@ -758,9 +671,9 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                     style={styles.selectInput}
                     value={tradeVehicle.model}
                     onChange={(e) => handleTradeVehicleChange('model', e.target.value)}
-                    disabled={!tradeVehicle.make}
+                    disabled={!tradeVehicle.year || !tradeVehicle.make || loadingTradeModels}
                   >
-                    <option value="">Select Model</option>
+                    <option value="">{loadingTradeModels ? 'Loading...' : 'Select Model'}</option>
                     {tradeModels.map((model) => (
                       <option key={model} value={model}>{model}</option>
                     ))}
@@ -805,10 +718,8 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                         type="text"
                         style={styles.textInput}
                         placeholder="18000"
-                        value={payoffFocused ? payoffAmount : (payoffAmount ? formatCurrency(payoffAmount) : '')}
+                        value={payoffAmount ? formatCurrency(payoffAmount) : ''}
                         onChange={handlePayoffAmountChange}
-                        onFocus={() => setPayoffFocused(true)}
-                        onBlur={handlePayoffBlur}
                       />
                     </div>
                   </div>
@@ -821,10 +732,8 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                         type="text"
                         style={styles.textInput}
                         placeholder="450"
-                        value={monthlyFocused ? monthlyPayment : (monthlyPayment ? formatCurrency(monthlyPayment) : '')}
+                        value={monthlyPayment ? formatCurrency(monthlyPayment) : ''}
                         onChange={handleMonthlyPaymentChange}
-                        onFocus={() => setMonthlyFocused(true)}
-                        onBlur={handleMonthlyBlur}
                       />
                     </div>
                   </div>
