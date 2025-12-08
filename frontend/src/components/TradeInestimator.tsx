@@ -162,7 +162,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
     const fetchMakes = async () => {
       try {
         const result = await api.getMakes();
-        setMakes(result.makes || FALLBACK_MAKES);
+        setMakes(result || FALLBACK_MAKES);
       } catch (err) {
         console.error('Failed to fetch makes:', err);
         setMakes(FALLBACK_MAKES);
