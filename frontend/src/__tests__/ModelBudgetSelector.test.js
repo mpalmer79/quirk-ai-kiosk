@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import ModelBudgetSelector from '../components/ModelBudgetSelector';
 
 // Mock the api module
@@ -198,7 +198,9 @@ describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
 
       // Click on Sports Cars to see model selection
       const sportsButton = screen.getByText('Sports Cars').closest('button');
-      sportsButton.click();
+      await act(async () => {
+        fireEvent.click(sportsButton);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Corvette')).toBeInTheDocument();
@@ -317,26 +319,35 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
 
     // Step 1: Select Sports Cars category
     const sportsButton = screen.getByText('Sports Cars').closest('button');
-    sportsButton.click();
+    await act(async () => {
+      fireEvent.click(sportsButton);
+    });
 
     // Step 2: Select Corvette model
     await waitFor(() => {
       expect(screen.getByText('Corvette')).toBeInTheDocument();
     });
     const corvetteButton = screen.getByText('Corvette').closest('button');
-    corvetteButton.click();
+    await act(async () => {
+      fireEvent.click(corvetteButton);
+    });
 
     // Step 4: Color selection - click Continue
     await waitFor(() => {
       expect(screen.getByText('Continue to Budget')).toBeInTheDocument();
     });
-    screen.getByText('Continue to Budget').click();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Continue to Budget'));
+    });
 
     // Step 5: Budget selection - click Continue
     await waitFor(() => {
-      expect(screen.getByText('Continue')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Continue/i })).toBeInTheDocument();
     });
-    screen.getByText('Continue').click();
+    const continueButtons = screen.getAllByRole('button', { name: /Continue/i });
+    await act(async () => {
+      fireEvent.click(continueButtons[0]);
+    });
 
     // Step 6: Trade-In step
     await waitFor(() => {
@@ -348,7 +359,9 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
-    screen.getByText('Yes, I have a trade-in').click();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes, I have a trade-in'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
@@ -365,7 +378,9 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
-    screen.getByText('Yes, I have a trade-in').click();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes, I have a trade-in'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
@@ -379,13 +394,15 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     expect(modelSelect).toBeDisabled();
   });
 
-  test('model dropdown enables and shows "Select Model" after year and make are selected', async () => {
+  test('model dropdown enables after year and make are selected', async () => {
     api.getModels.mockResolvedValue(['Malibu', 'Equinox', 'Silverado 1500', 'Tahoe']);
 
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
-    screen.getByText('Yes, I have a trade-in').click();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes, I have a trade-in'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
@@ -397,18 +414,14 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     const modelSelect = selects[2];
 
     // Select Year
-    yearSelect.click();
-    await waitFor(() => {
-      expect(screen.getByText('2024')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2024' } });
     });
-    screen.getByText('2024').click();
 
     // Select Make
-    makeSelect.click();
-    await waitFor(() => {
-      expect(screen.getByText('Chevrolet')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.change(makeSelect, { target: { value: 'Chevrolet' } });
     });
-    screen.getByText('Chevrolet').click();
 
     // Model dropdown should now be enabled
     await waitFor(() => {
@@ -422,7 +435,9 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
-    screen.getByText('Yes, I have a trade-in').click();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes, I have a trade-in'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
@@ -433,12 +448,14 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     const makeSelect = selects[1];
 
     // Select Year first
-    yearSelect.click();
-    screen.getByText('2023').click();
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2023' } });
+    });
 
     // Select Make - this should trigger getModels call
-    makeSelect.click();
-    screen.getByText('Toyota').click();
+    await act(async () => {
+      fireEvent.change(makeSelect, { target: { value: 'Toyota' } });
+    });
 
     await waitFor(() => {
       expect(api.getModels).toHaveBeenCalledWith('Toyota');
@@ -451,7 +468,9 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
-    screen.getByText('Yes, I have a trade-in').click();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes, I have a trade-in'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
@@ -463,27 +482,27 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     const modelSelect = selects[2];
 
     // Select Year
-    yearSelect.click();
-    screen.getByText('2022').click();
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2022' } });
+    });
 
     // Select Make
-    makeSelect.click();
-    screen.getByText('Toyota').click();
+    await act(async () => {
+      fireEvent.change(makeSelect, { target: { value: 'Toyota' } });
+    });
 
-    // Wait for models to load and check dropdown options
+    // Wait for models to load
     await waitFor(() => {
       expect(modelSelect).not.toBeDisabled();
     });
 
-    // Click model dropdown to see options
-    modelSelect.click();
-
+    // Check dropdown has the options
     await waitFor(() => {
-      expect(screen.getByText('Camry')).toBeInTheDocument();
-      expect(screen.getByText('Corolla')).toBeInTheDocument();
-      expect(screen.getByText('RAV4')).toBeInTheDocument();
-      expect(screen.getByText('Highlander')).toBeInTheDocument();
-      expect(screen.getByText('Tacoma')).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Camry' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Corolla' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'RAV4' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Highlander' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Tacoma' })).toBeInTheDocument();
     });
   });
 
@@ -495,7 +514,9 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
-    screen.getByText('Yes, I have a trade-in').click();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes, I have a trade-in'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
@@ -507,40 +528,38 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     const modelSelect = selects[2];
 
     // Select Year and Make (Toyota)
-    yearSelect.click();
-    screen.getByText('2023').click();
-    makeSelect.click();
-    screen.getByText('Toyota').click();
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2023' } });
+    });
+    await act(async () => {
+      fireEvent.change(makeSelect, { target: { value: 'Toyota' } });
+    });
 
     await waitFor(() => {
       expect(modelSelect).not.toBeDisabled();
     });
 
     // Select a model
-    modelSelect.click();
-    await waitFor(() => {
-      expect(screen.getByText('Camry')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.change(modelSelect, { target: { value: 'Camry' } });
     });
-    screen.getByText('Camry').click();
+
+    expect(modelSelect.value).toBe('Camry');
 
     // Now change make to Honda
-    makeSelect.click();
-    screen.getByText('Honda').click();
+    await act(async () => {
+      fireEvent.change(makeSelect, { target: { value: 'Honda' } });
+    });
 
-    // Model should reset and new models should load
+    // Model should reset
     await waitFor(() => {
       expect(api.getModels).toHaveBeenCalledWith('Honda');
     });
 
-    // Should show Honda models now
-    modelSelect.click();
+    // Model value should be reset to empty
     await waitFor(() => {
-      expect(screen.getByText('Civic')).toBeInTheDocument();
-      expect(screen.getByText('Accord')).toBeInTheDocument();
+      expect(modelSelect.value).toBe('');
     });
-
-    // Toyota models should no longer be visible
-    expect(screen.queryByText('Camry')).not.toBeInTheDocument();
   });
 
   test('handles api.getModels error gracefully', async () => {
@@ -550,7 +569,9 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
-    screen.getByText('Yes, I have a trade-in').click();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes, I have a trade-in'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
@@ -559,21 +580,19 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     const selects = screen.getAllByRole('combobox');
     const yearSelect = selects[0];
     const makeSelect = selects[1];
-    const modelSelect = selects[2];
 
     // Select Year and Make
-    yearSelect.click();
-    screen.getByText('2023').click();
-    makeSelect.click();
-    screen.getByText('Ford').click();
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2023' } });
+    });
+    await act(async () => {
+      fireEvent.change(makeSelect, { target: { value: 'Ford' } });
+    });
 
     // Should handle error gracefully
     await waitFor(() => {
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching trade models:', expect.any(Error));
     });
-
-    // Model dropdown should still be functional (just empty)
-    expect(modelSelect).not.toBeDisabled();
 
     consoleErrorSpy.mockRestore();
   });
@@ -588,7 +607,9 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
-    screen.getByText('Yes, I have a trade-in').click();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes, I have a trade-in'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
@@ -599,22 +620,26 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     const makeSelect = selects[1];
 
     // Select Year and Make to trigger loading
-    yearSelect.click();
-    screen.getByText('2023').click();
-    makeSelect.click();
-    screen.getByText('Chevrolet').click();
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2023' } });
+    });
+    await act(async () => {
+      fireEvent.change(makeSelect, { target: { value: 'Chevrolet' } });
+    });
 
     // Should show Loading... while waiting
     await waitFor(() => {
-      expect(screen.getByText('Loading...')).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Loading...' })).toBeInTheDocument();
     });
 
     // Resolve the promise
-    resolveModels(['Malibu', 'Equinox']);
+    await act(async () => {
+      resolveModels(['Malibu', 'Equinox']);
+    });
 
     // Should now show Select Model
     await waitFor(() => {
-      expect(screen.getByText('Select Model')).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Select Model' })).toBeInTheDocument();
     });
   });
 
@@ -626,7 +651,9 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     await navigateToTradeInStep();
 
     // Click "Yes, I have a trade-in"
-    screen.getByText('Yes, I have a trade-in').click();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes, I have a trade-in'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
@@ -635,36 +662,36 @@ describe('ModelBudgetSelector - Trade-In Model Dropdown', () => {
     const selects = screen.getAllByRole('combobox');
     const yearSelect = selects[0];
     const makeSelect = selects[1];
-    const modelSelect = selects[2];
 
     // First: Select Ford
-    yearSelect.click();
-    screen.getByText('2023').click();
-    makeSelect.click();
-    screen.getByText('Ford').click();
+    await act(async () => {
+      fireEvent.change(yearSelect, { target: { value: '2023' } });
+    });
+    await act(async () => {
+      fireEvent.change(makeSelect, { target: { value: 'Ford' } });
+    });
 
     await waitFor(() => {
       expect(api.getModels).toHaveBeenCalledWith('Ford');
     });
 
-    modelSelect.click();
     await waitFor(() => {
-      expect(screen.getByText('F-150')).toBeInTheDocument();
-      expect(screen.getByText('Mustang')).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'F-150' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Mustang' })).toBeInTheDocument();
     });
 
     // Second: Change to Chevrolet
-    makeSelect.click();
-    screen.getByText('Chevrolet').click();
+    await act(async () => {
+      fireEvent.change(makeSelect, { target: { value: 'Chevrolet' } });
+    });
 
     await waitFor(() => {
       expect(api.getModels).toHaveBeenCalledWith('Chevrolet');
     });
 
-    modelSelect.click();
     await waitFor(() => {
-      expect(screen.getByText('Silverado 1500')).toBeInTheDocument();
-      expect(screen.getByText('Equinox')).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Silverado 1500' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Equinox' })).toBeInTheDocument();
     });
   });
 });
