@@ -1,5 +1,5 @@
-import React, { useState, useEffect, ChangeEvent } from 'react';
-import api from './api';
+import React, { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
+import api, { logTrafficSession } from './api';
 import GM_COLORS from '../types/gmColors';
 import { BASE_CATEGORIES, modelMatches } from '../types/vehicleCategories';
 import styles from './modelBudgetSelectorStyles';
@@ -74,6 +74,90 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
   // Trade-in model dropdown state
   const [tradeModels, setTradeModels] = useState<string[]>([]);
+
+  // Ref to track if we've already saved (prevent duplicate saves)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Build trade-in data object for API
+  const buildTradeInData = useCallback(() => {
+    if (hasTrade === null) return undefined;
+    
+    return {
+      hasTrade,
+      vehicle: hasTrade ? {
+        year: tradeVehicle.year ? parseInt(tradeVehicle.year) : null,
+        make: tradeVehicle.make || null,
+        model: tradeVehicle.model || null,
+        mileage: tradeVehicle.mileage ? parseInt(tradeVehicle.mileage) : null,
+      } : null,
+      hasPayoff: hasTrade ? hasPayoff : null,
+      payoffAmount: hasPayoff ? parseFloat(payoffAmount) || null : null,
+      monthlyPayment: hasPayoff ? parseFloat(monthlyPayment) || null : null,
+      financedWith: hasPayoff ? financedWith || null : null,
+    };
+  }, [hasTrade, hasPayoff, tradeVehicle, payoffAmount, monthlyPayment, financedWith]);
+
+  // Save trade-in data to backend (debounced)
+  const saveTradeInData = useCallback(async () => {
+    const tradeInData = buildTradeInData();
+    if (!tradeInData) return;
+
+    try {
+      await logTrafficSession({
+        currentStep: 'trade-in',
+        tradeIn: tradeInData,
+      });
+      console.log('Trade-in data saved:', tradeInData);
+    } catch (err) {
+      console.warn('Failed to save trade-in data:', err);
+    }
+  }, [buildTradeInData]);
+
+  // Debounced save - waits 500ms after last change before saving
+  const debouncedSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTradeInData();
+    }, 500);
+  }, [saveTradeInData]);
+
+  // Auto-save trade-in data whenever it changes
+  useEffect(() => {
+    if (step === 6 && hasTrade !== null) {
+      debouncedSave();
+    }
+  }, [step, hasTrade, hasPayoff, tradeVehicle, payoffAmount, monthlyPayment, financedWith, debouncedSave]);
+
+  // Save immediately when leaving page (beforeunload)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Clear debounce and save immediately
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      const tradeInData = buildTradeInData();
+      if (tradeInData && hasTrade !== null) {
+        // Use sendBeacon for reliable save on page close
+        const data = JSON.stringify({
+          currentStep: 'trade-in',
+          tradeIn: tradeInData,
+        });
+        navigator.sendBeacon?.('/api/v1/traffic/session', data);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Also save when component unmounts
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveTradeInData();
+    };
+  }, [buildTradeInData, hasTrade, saveTradeInData]);
 
   // Fetch inventory counts on mount to filter available models
   useEffect(() => {
