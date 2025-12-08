@@ -2,14 +2,6 @@ import React, { useState, useEffect, CSSProperties } from 'react';
 import api from './api';
 
 interface ChatMessage { role: 'user' | 'assistant'; content: string; timestamp?: string; }
-interface TradeInData { year?: string; make?: string; model?: string; mileage?: number; condition?: string; estimatedValue?: number; }
-interface VehicleData { year?: number; make?: string; model?: string; trim?: string; stockNumber?: string; salePrice?: number; }
-interface PaymentData { type?: string; monthly?: number; term?: number; downPayment?: number; }
-interface Session {
-  sessionId: string; customerName?: string; phone?: string; path?: string; createdAt: string; updatedAt: string;
-  vehicle?: VehicleData; tradeIn?: TradeInData; payment?: PaymentData; chatHistory?: ChatMessage[];
-  vehicleRequested?: boolean;
-}
 interface Stats {
   today?: number; total_sessions?: number; with_vehicle_selected?: number;
   vehicle_requests?: number; completed_handoffs?: number; conversion_rate?: number;
@@ -20,11 +12,11 @@ const PATH_LABELS: Record<string, string> = { stockLookup: 'Stock Lookup', model
 const PATH_COLORS: Record<string, string> = { stockLookup: '#1B7340', modelBudget: '#2563eb', guidedQuiz: '#dc2626', browse: '#6b7280', aiChat: '#8b5cf6' };
 
 const TrafficLog: React.FC<TrafficLogProps> = ({ navigateTo }) => {
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
@@ -34,10 +26,10 @@ const TrafficLog: React.FC<TrafficLogProps> = ({ navigateTo }) => {
       const params = { limit: 100, filter_today: activeFilter === 'today' };
       const [logData, statsData] = await Promise.all([api.getTrafficLog(params.limit, 0, params.filter_today), api.getTrafficStats()]);
       let sessionList = logData.sessions || [];
-      if (activeFilter === 'vehicle') sessionList = sessionList.filter((s: Session) => s.vehicle);
-      else if (activeFilter === 'requested') sessionList = sessionList.filter((s: Session) => s.vehicleRequested);
-      else if (activeFilter === 'completed') sessionList = sessionList.filter((s: Session) => s.phone);
-      else if (activeFilter === 'chat') sessionList = sessionList.filter((s: Session) => s.chatHistory && s.chatHistory.length > 0);
+      if (activeFilter === 'vehicle') sessionList = sessionList.filter(s => s.vehicle);
+      else if (activeFilter === 'requested') sessionList = sessionList.filter(s => s.vehicleRequested);
+      else if (activeFilter === 'completed') sessionList = sessionList.filter(s => s.phone);
+      else if (activeFilter === 'chat') sessionList = sessionList.filter(s => s.chatHistory && s.chatHistory.length > 0);
       setSessions(sessionList);
       setStats(statsData);
       setError(null);
@@ -224,7 +216,7 @@ const TrafficLog: React.FC<TrafficLogProps> = ({ navigateTo }) => {
                 <div style={s.detailSection}>
                   <h3 style={s.sectionTitle}>AI Chat History ({selectedSession.chatHistory.length} messages)</h3>
                   <div style={s.chatHistoryContainer}>
-                    {selectedSession.chatHistory.map((msg, idx) => (
+                    {selectedSession.chatHistory.map((msg: ChatMessage, idx: number) => (
                       <div key={idx} style={{ ...s.chatMessage, ...(msg.role === 'user' ? s.chatMessageUser : s.chatMessageAssistant) }}>
                         <div style={s.chatMessageHeader}><span style={s.chatRole}>{msg.role === 'user' ? '👤 Customer' : '🤖 AI Assistant'}</span>{msg.timestamp && <span style={s.chatTimestamp}>{formatChatTime(msg.timestamp)}</span>}</div>
                         <div style={s.chatContent}>{msg.content}</div>
