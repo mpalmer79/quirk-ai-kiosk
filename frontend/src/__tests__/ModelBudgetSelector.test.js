@@ -5,6 +5,7 @@ import ModelBudgetSelector from '../components/ModelBudgetSelector';
 // Mock the api module
 jest.mock('../components/api', () => ({
   getInventory: jest.fn(),
+  getModels: jest.fn(),
 }));
 
 import api from '../components/api';
@@ -26,6 +27,7 @@ const renderModelBudgetSelector = (props = {}) => {
 describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    api.getModels.mockResolvedValue([]);
   });
 
   describe('Models with Zero Inventory', () => {
@@ -269,6 +271,7 @@ describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
 describe('ModelBudgetSelector - Category Selection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    api.getModels.mockResolvedValue([]);
     api.getInventory.mockResolvedValue([
       { model: 'Silverado 1500', price: 45000 },
       { model: 'Tahoe', price: 55000 },
