@@ -4,38 +4,6 @@ import type { Vehicle, KioskComponentProps } from '../types';
 
 type SortOption = 'recommended' | 'priceLow' | 'priceHigh' | 'newest';
 
-// Generate Quirk Chevy NH website URL for a vehicle
-const generateDealerUrl = (vehicle: Vehicle): string => {
-  const baseUrl = 'https://www.quirkchevynh.com/inventory/';
-  
-  // Helper to slugify text (lowercase, replace spaces with hyphens)
-  const slugify = (text?: string): string => {
-    if (!text) return '';
-    return text.toString().toLowerCase()
-      .replace(/\s+/g, '-')           // Replace spaces with hyphens
-      .replace(/[^\w-]/g, '')         // Remove special characters except hyphens
-      .replace(/--+/g, '-')           // Replace multiple hyphens with single
-      .replace(/^-+/, '')             // Trim hyphens from start
-      .replace(/-+$/, '');            // Trim hyphens from end
-  };
-  
-  // Build URL components
-  const condition = 'new'; // All inventory appears to be new
-  const year = String(vehicle.year || '2026');
-  const make = 'chevrolet';
-  const model = slugify(vehicle.model || '');
-  const trim = slugify(vehicle.trim || '');
-  const drivetrain = slugify(vehicle.drivetrain || '4wd');
-  const bodyType = slugify(vehicle.cabType || vehicle.bodyStyle || vehicle.body_style || '');
-  const vin = (vehicle.vin || '').toLowerCase();
-  
-  // Construct URL: new-year-chevrolet-model-trim-drivetrain-bodytype-vin
-  const urlParts = [condition, year, make, model, trim, drivetrain, bodyType, vin]
-    .filter(part => part && part.length > 0); // Remove empty parts
-  
-  return baseUrl + urlParts.join('-') + '/';
-};
-
 // Generate gradient based on color
 const getGradient = (color?: string): string => {
   const colorMap: Record<string, string> = {
