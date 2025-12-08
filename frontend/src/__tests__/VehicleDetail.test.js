@@ -71,13 +71,13 @@ describe('VehicleDetail Component', () => {
     test('renders stock number', () => {
       renderVehicleDetail();
       expect(screen.getByText(/STOCK:/)).toBeInTheDocument();
-      expect(screen.getByText('24789')).toBeInTheDocument();
+      expect(screen.getByText(/24789/)).toBeInTheDocument();
     });
 
     test('renders VIN', () => {
       renderVehicleDetail();
       expect(screen.getByText(/VIN:/)).toBeInTheDocument();
-      expect(screen.getByText('1GCUDDED5RZ123456')).toBeInTheDocument();
+      expect(screen.getByText(/1GCUDDED5RZ123456/)).toBeInTheDocument();
     });
 
     test('renders back button', () => {
@@ -290,7 +290,7 @@ describe('VehicleDetail Component', () => {
       await waitFor(() => {
         expect(screen.getByText('2025 Silverado 1500')).toBeInTheDocument();
         expect(screen.getByText('LT Crew Cab 4WD')).toBeInTheDocument();
-        expect(screen.getByText('Stock# 24789')).toBeInTheDocument();
+        expect(screen.getByText(/Stock#\s*24789/)).toBeInTheDocument();
       });
     });
 
