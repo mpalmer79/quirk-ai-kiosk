@@ -36,7 +36,7 @@ const SalesManagerDashboard: React.FC = () => {
 
   const fetchSessions = async () => {
     try {
-      const data = await api.getActiveSessions(60); // Increased timeout to 60 minutes
+      const data = await api.getActiveSessions(60);
       setSessions(data.sessions || []);
       setLastUpdate(new Date().toLocaleTimeString());
     } catch (err) { console.error('Error fetching sessions:', err); }
@@ -63,7 +63,6 @@ const SalesManagerDashboard: React.FC = () => {
       if (updated) setSelectedSession(updated);
       fetchSessionDetail(selectedSession.sessionId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, selectedSession?.sessionId]);
 
   const handleSessionSelect = (session: CustomerSession) => {
@@ -133,32 +132,38 @@ const SalesManagerDashboard: React.FC = () => {
         <span style={s.sessionTime}>Started {getTimeSince(session.startTime)}</span>
       </div>
       <div style={s.customerInfoBar}>
-        <div style={s.infoItem}><span style={s.infoLabel}>Name</span><span style={s.infoValue}>{session.customerName || '—'}</span></div>
-        <div style={s.infoItem}><span style={s.infoLabel}>Phone</span><span style={s.infoValue}>{session.phone || '—'}</span></div>
-        <div style={s.infoItem}><span style={s.infoLabel}>Status</span><span style={{ ...s.infoValue, color: '#4ade80' }}>{getStepLabel(session.currentStep)}</span></div>
+        {[{ label: 'NAME', value: session.customerName }, { label: 'PHONE', value: session.phone }, { label: 'STATUS', value: getStepLabel(session.currentStep), color: '#4ade80' }].map((item, i) => (
+          <div key={i} style={s.infoItem}>
+            <span style={s.infoLabel}>{item.label}</span>
+            <span style={{ ...s.infoValue, ...(item.color ? { color: item.color } : {}) }}>{item.value || '—'}</span>
+          </div>
+        ))}
       </div>
+      {isAIChatSession(session.currentStep) && (
+        <button style={s.viewChatBtn} onClick={() => setShowChatTranscript(!showChatTranscript)}>
+          <span>💬</span>
+          <span>{showChatTranscript ? 'Hide Chat Transcript' : 'View Customer Chat with Quirk AI'}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: showChatTranscript ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+      )}
+      {showChatTranscript && (loadingDetail ? <div style={s.loadingChat}>Loading conversation...</div> : renderChatTranscript())}
       <div style={s.vehicleSection}>
         <h3 style={s.sectionTitle}>🚗 Vehicle Interest</h3>
         <div style={s.vehicleGrid}>
-          <div style={s.vehicleField}><span style={s.fieldLabel}>Model</span><span style={s.fieldValue}>{session.vehicleInterest?.model || '—'}</span></div>
-          <div style={s.vehicleField}><span style={s.fieldLabel}>Cab/Config</span><span style={s.fieldValue}>{session.vehicleInterest?.cab || '—'}</span></div>
-          <div style={s.vehicleField}><span style={s.fieldLabel}>Color Pref</span><span style={s.fieldValue}>{session.vehicleInterest?.colors?.join(', ') || '—'}</span></div>
+          {[{ label: 'MODEL', value: session.vehicleInterest?.model }, { label: 'CAB/CONFIG', value: session.vehicleInterest?.cab }, { label: 'COLOR PREF', value: session.vehicleInterest?.colors?.length > 0 ? session.vehicleInterest.colors.join(', ') : null }].map((f, i) => (
+            <div key={i} style={s.vehicleField}><span style={s.fieldLabel}>{f.label}</span><span style={s.fieldValue}>{f.value || '—'}</span></div>
+          ))}
         </div>
         {session.selectedVehicle && (
           <div style={s.selectedVehicleCard}>
-            <span style={s.selectedLabel}>✓ Selected Vehicle</span>
-            <span style={s.selectedVehicle}>{session.selectedVehicle.year} {session.selectedVehicle.make} {session.selectedVehicle.model} {session.selectedVehicle.trim}</span>
+            <span style={s.selectedLabel}>SELECTED VEHICLE</span>
+            <span style={s.selectedVehicle}>Stock #{session.selectedVehicle.stockNumber} — {session.selectedVehicle.year} {session.selectedVehicle.make} {session.selectedVehicle.model} {session.selectedVehicle.trim}</span>
             <span style={s.selectedPrice}>{formatCurrency(session.selectedVehicle.price)}</span>
           </div>
         )}
       </div>
-      {isAIChatSession(session.currentStep) && (
-        <button style={s.viewChatBtn} onClick={() => setShowChatTranscript(!showChatTranscript)}>
-          💬 {showChatTranscript ? 'Hide' : 'View'} AI Chat Transcript
-          {sessionDetail?.chatHistory?.length ? ` (${sessionDetail.chatHistory.length} messages)` : ''}
-        </button>
-      )}
-      {showChatTranscript && (loadingDetail ? <div style={s.loadingChat}>Loading chat history...</div> : renderChatTranscript())}
       <div style={s.fourSquareGrid}>
         {/* Trade-In */}
         <div style={s.quadrant}>
@@ -201,7 +206,9 @@ const SalesManagerDashboard: React.FC = () => {
         <div style={s.quadrant}>
           <h4 style={s.quadrantTitle}>MONTHLY PAYMENTS</h4>
           <div style={s.quadrantContent}>
-            {session.budget?.min || session.budget?.max ? (<><span style={s.bigValue}>{formatCurrency(session.budget.min)} - {formatCurrency(session.budget.max)}</span><span style={s.subValue}>Target Range</span></>) : <span style={s.pending}>Pending...</span>}
+            {session.budget?.min != null && session.budget?.max != null ? (<><span style={s.bigValue}>{formatCurrency(session.budget.min)} - {formatCurrency(session.budget.max)}</span><span style={s.subValue}>Target Range /mo</span></>)
+              : session.tradeIn?.monthlyPayment ? (<><span style={s.bigValue}>{formatCurrency(session.tradeIn.monthlyPayment)}</span><span style={s.subValue}>Current Payment (Trade)</span></>)
+              : <span style={s.pending}>Pending...</span>}
           </div>
         </div>
       </div>
@@ -231,19 +238,10 @@ const SalesManagerDashboard: React.FC = () => {
       </div>
       <div style={s.content}>
         <div style={s.sessionsList}>
-          {/* HOME Button */}
-          <button style={s.homeButton} onClick={handleGoHome}>
-            HOME
-          </button>
+          <button style={s.homeButton} onClick={handleGoHome}>HOME</button>
           <h3 style={s.sectionHeader}>ACTIVE KIOSK SESSIONS ({sessions.length})</h3>
           {sessions.length === 0 ? (
-            <div style={s.emptyState}>
-              <p>No active sessions</p>
-              <p style={{ fontSize: '13px', marginTop: '8px' }}>Sessions will appear when customers use the kiosk</p>
-              <p style={{ fontSize: '12px', marginTop: '12px', color: 'rgba(255,255,255,0.3)' }}>
-                Note: Each kiosk device creates its own session. Open the kiosk in a different browser or device to test multiple sessions.
-              </p>
-            </div>
+            <div style={s.emptyState}><p>No active sessions</p><p style={{ fontSize: '13px', marginTop: '8px' }}>Sessions will appear when customers use the kiosk</p></div>
           ) : sessions.map((session) => (
             <button key={session.sessionId} style={{ ...s.sessionCard, ...(selectedSession?.sessionId === session.sessionId ? s.sessionCardActive : {}) }} onClick={() => handleSessionSelect(session)}>
               <div style={s.sessionCardHeader}>
@@ -277,21 +275,8 @@ const s: Record<string, React.CSSProperties> = {
   refreshBtn: { padding: '10px 16px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: '#fff', fontSize: '14px', cursor: 'pointer' },
   content: { display: 'grid', gridTemplateColumns: '300px 1fr', gap: '24px', alignItems: 'start' },
   sessionsList: { background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '20px', maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' },
-  homeButton: { 
-    width: '100%', 
-    padding: '12px 16px', 
-    background: 'transparent', 
-    border: 'none', 
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-    color: '#fff', 
-    fontSize: '24px', 
-    fontWeight: 700, 
-    cursor: 'pointer', 
-    textAlign: 'left',
-    marginBottom: '16px',
-    letterSpacing: '0.5px',
-  },
   sectionHeader: { fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: '16px', textTransform: 'uppercase' },
+  homeButton: { width: '100%', padding: '12px 16px', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '24px', fontWeight: 700, cursor: 'pointer', textAlign: 'left', marginBottom: '16px', letterSpacing: '0.5px' },
   emptyState: { padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.4)' },
   sessionCard: { width: '100%', textAlign: 'left', padding: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', transition: 'all 0.2s ease' },
   sessionCardActive: { borderColor: '#1B7340', background: 'rgba(27,115,64,0.15)' },
