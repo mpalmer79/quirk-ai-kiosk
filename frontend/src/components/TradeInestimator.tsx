@@ -8,8 +8,10 @@
  * - Mobile-first responsive design
  * - VIN decode with auto-fill
  * - Equity calculation preview
+ * - 📷 Camera VIN scanning from registration
+ * - 📷 Registration photo capture and storage
  * 
- * @version 2.0.0
+ * @version 2.1.0
  */
 
 import React, { useState, useEffect, useRef, CSSProperties } from 'react';
@@ -36,6 +38,8 @@ interface TradeData {
   // Step 4: Condition
   condition: string;
   photos: PhotoData[];
+  // Registration photo
+  registrationPhoto: PhotoData | null;
 }
 
 interface PhotoData {
@@ -114,6 +118,81 @@ const FALLBACK_MAKES = [
   'Tesla', 'Toyota', 'Volkswagen', 'Volvo'
 ];
 
+// VIN validation regex - 17 characters, no I, O, Q
+const VIN_REGEX = /[A-HJ-NPR-Z0-9]{17}/gi;
+
+// ============================================================================
+// Tesseract.js Loader (for OCR)
+// ============================================================================
+
+let tesseractLoaded = false;
+let tesseractWorker: any = null;
+
+const loadTesseract = async (): Promise<boolean> => {
+  if (tesseractLoaded && tesseractWorker) return true;
+  
+  try {
+    // Check if Tesseract is already loaded
+    if ((window as any).Tesseract) {
+      const { createWorker } = (window as any).Tesseract;
+      tesseractWorker = await createWorker('eng');
+      tesseractLoaded = true;
+      return true;
+    }
+
+    // Load Tesseract.js from CDN
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      script.async = true;
+      script.onload = async () => {
+        try {
+          const { createWorker } = (window as any).Tesseract;
+          tesseractWorker = await createWorker('eng');
+          tesseractLoaded = true;
+          resolve(true);
+        } catch (err) {
+          console.error('Failed to initialize Tesseract worker:', err);
+          resolve(false);
+        }
+      };
+      script.onerror = () => {
+        console.error('Failed to load Tesseract.js');
+        resolve(false);
+      };
+      document.head.appendChild(script);
+    });
+  } catch (err) {
+    console.error('Error loading Tesseract:', err);
+    return false;
+  }
+};
+
+const extractVinFromImage = async (imageData: string): Promise<string | null> => {
+  try {
+    const loaded = await loadTesseract();
+    if (!loaded || !tesseractWorker) {
+      console.warn('Tesseract not available, skipping OCR');
+      return null;
+    }
+
+    const result = await tesseractWorker.recognize(imageData);
+    const text = result.data.text.toUpperCase().replace(/\s/g, '');
+    
+    // Find VIN pattern in recognized text
+    const matches = text.match(VIN_REGEX);
+    if (matches && matches.length > 0) {
+      // Return the first valid VIN found
+      return matches[0];
+    }
+    
+    return null;
+  } catch (err) {
+    console.error('OCR error:', err);
+    return null;
+  }
+};
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -138,6 +217,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
     financedWith: '',
     condition: '',
     photos: PHOTO_SPOTS.map(spot => ({ id: spot.id, file: null, preview: null })),
+    registrationPhoto: null,
   });
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -146,8 +226,19 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isDecodingVin, setIsDecodingVin] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-
+  
+  // Scanner state
+  const [showScanner, setShowScanner] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState<string>('');
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  
+  // Refs
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const registrationInputRef = useRef<HTMLInputElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Detect mobile
   useEffect(() => {
@@ -155,6 +246,15 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
   }, []);
 
   // Fetch makes on mount
@@ -190,6 +290,170 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
   }, [tradeData.make]);
 
   // ============================================================================
+  // Camera & Scanner Functions
+  // ============================================================================
+
+  const startCamera = async () => {
+    setCameraError(null);
+    setShowScanner(true);
+    setScanStatus('Starting camera...');
+
+    try {
+      const constraints = {
+        video: {
+          facingMode: 'environment', // Use back camera
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setScanStatus('Position registration document in frame');
+      }
+    } catch (err: any) {
+      console.error('Camera error:', err);
+      setCameraError(
+        err.name === 'NotAllowedError' 
+          ? 'Camera access denied. Please allow camera access and try again.'
+          : err.name === 'NotFoundError'
+          ? 'No camera found on this device.'
+          : 'Unable to access camera. Please try uploading a photo instead.'
+      );
+      setScanStatus('');
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setShowScanner(false);
+    setScanStatus('');
+    setCameraError(null);
+  };
+
+  const captureAndScan = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    setIsScanning(true);
+    setScanStatus('Capturing image...');
+
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) throw new Error('Canvas context not available');
+
+      // Set canvas size to video size
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      // Draw video frame to canvas
+      ctx.drawImage(video, 0, 0);
+
+      // Get image data
+      const imageData = canvas.toDataURL('image/jpeg', 0.9);
+
+      // Save registration photo
+      const blob = await (await fetch(imageData)).blob();
+      const file = new File([blob], 'registration.jpg', { type: 'image/jpeg' });
+      
+      setTradeData(prev => ({
+        ...prev,
+        registrationPhoto: {
+          id: 'registration',
+          file,
+          preview: imageData,
+        }
+      }));
+
+      setScanStatus('Scanning for VIN...');
+
+      // Run OCR to extract VIN
+      const extractedVin = await extractVinFromImage(imageData);
+
+      if (extractedVin) {
+        setScanStatus(`Found VIN: ${extractedVin}`);
+        setTradeData(prev => ({ ...prev, vin: extractedVin }));
+        
+        // Also decode the VIN
+        setTimeout(() => {
+          handleVinDecode(extractedVin);
+        }, 500);
+
+        // Close scanner after short delay
+        setTimeout(() => {
+          stopCamera();
+        }, 1500);
+      } else {
+        setScanStatus('VIN not detected. Photo saved - enter VIN manually.');
+        setTimeout(() => {
+          stopCamera();
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Capture error:', err);
+      setScanStatus('Error capturing image. Please try again.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleRegistrationUpload = async (file: File) => {
+    setIsScanning(true);
+    setScanStatus('Processing image...');
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const imageData = e.target?.result as string;
+
+        // Save registration photo
+        setTradeData(prev => ({
+          ...prev,
+          registrationPhoto: {
+            id: 'registration',
+            file,
+            preview: imageData,
+          }
+        }));
+
+        setScanStatus('Scanning for VIN...');
+
+        // Run OCR to extract VIN
+        const extractedVin = await extractVinFromImage(imageData);
+
+        if (extractedVin) {
+          setScanStatus(`Found VIN: ${extractedVin}`);
+          setTradeData(prev => ({ ...prev, vin: extractedVin }));
+          
+          // Also decode the VIN
+          setTimeout(() => {
+            handleVinDecode(extractedVin);
+          }, 500);
+        } else {
+          setScanStatus('VIN not detected. Enter VIN manually.');
+        }
+
+        setIsScanning(false);
+        setTimeout(() => setScanStatus(''), 3000);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Upload error:', err);
+      setScanStatus('Error processing image.');
+      setIsScanning(false);
+    }
+  };
+
+  // ============================================================================
   // Handlers
   // ============================================================================
 
@@ -203,15 +467,17 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
     }
   };
 
-  const handleVinDecode = async () => {
-    if (tradeData.vin.length !== 17) return;
+  const handleVinDecode = async (vinToUse?: string) => {
+    const vin = vinToUse || tradeData.vin;
+    if (vin.length !== 17) return;
 
     setIsDecodingVin(true);
     try {
-      const decoded = await api.decodeTradeInVin(tradeData.vin);
+      const decoded = await api.decodeTradeInVin(vin);
       if (decoded) {
         setTradeData(prev => ({
           ...prev,
+          vin: vin,
           year: decoded.year?.toString() || prev.year,
           make: decoded.make || prev.make,
           model: decoded.model || prev.model,
@@ -248,6 +514,13 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
           ? { ...p, file: null, preview: null }
           : p
       ),
+    }));
+  };
+
+  const handleRemoveRegistration = () => {
+    setTradeData(prev => ({
+      ...prev,
+      registrationPhoto: null,
     }));
   };
 
@@ -295,6 +568,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
       estimateRange: estimate,
       equity: estimate?.mid ? estimate.mid - (tradeData.hasPayoff ? parseFloat(tradeData.payoffAmount.replace(/,/g, '')) : 0) : null,
       photosUploaded: tradeData.photos.filter(p => p.file !== null).length,
+      registrationPhoto: tradeData.registrationPhoto?.preview || null,
     };
 
     updateCustomerData({ tradeIn: tradeInData });
@@ -334,6 +608,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
         estimatedValue: estimate?.mid || 0,
         estimateRange: estimate,
         requestedAppraisal: true,
+        registrationPhoto: tradeData.registrationPhoto?.preview || null,
       };
 
       updateCustomerData({ tradeIn: tradeInData });
@@ -372,6 +647,82 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
   const canProceedStep4 = tradeData.condition;
 
   // ============================================================================
+  // Scanner Modal
+  // ============================================================================
+
+  const renderScannerModal = () => {
+    if (!showScanner) return null;
+
+    return (
+      <div style={styles.scannerOverlay}>
+        <div style={styles.scannerModal}>
+          <div style={styles.scannerHeader}>
+            <h3 style={styles.scannerTitle}>Scan Registration</h3>
+            <button style={styles.scannerClose} onClick={stopCamera}>✕</button>
+          </div>
+
+          {cameraError ? (
+            <div style={styles.scannerError}>
+              <span style={{ fontSize: '48px', marginBottom: '16px' }}>📷</span>
+              <p>{cameraError}</p>
+              <button 
+                style={styles.uploadFallbackButton}
+                onClick={() => {
+                  stopCamera();
+                  registrationInputRef.current?.click();
+                }}
+              >
+                Upload Photo Instead
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={styles.scannerVideoContainer}>
+                <video
+                  ref={videoRef}
+                  style={styles.scannerVideo}
+                  autoPlay
+                  playsInline
+                  muted
+                />
+                <div style={styles.scannerFrame}>
+                  <div style={styles.scannerCorner} />
+                  <div style={{ ...styles.scannerCorner, right: 0, left: 'auto' }} />
+                  <div style={{ ...styles.scannerCorner, bottom: 0, top: 'auto' }} />
+                  <div style={{ ...styles.scannerCorner, bottom: 0, right: 0, top: 'auto', left: 'auto' }} />
+                </div>
+                <canvas ref={canvasRef} style={{ display: 'none' }} />
+              </div>
+
+              <div style={styles.scannerStatus}>
+                {isScanning ? (
+                  <div style={styles.scanningIndicator}>
+                    <div style={styles.spinner} />
+                    <span>{scanStatus}</span>
+                  </div>
+                ) : (
+                  <span>{scanStatus}</span>
+                )}
+              </div>
+
+              <div style={styles.scannerActions}>
+                <button
+                  style={styles.captureButton}
+                  onClick={captureAndScan}
+                  disabled={isScanning}
+                >
+                  <span style={{ fontSize: '24px' }}>📸</span>
+                  Capture & Scan
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================================
   // Render Steps
   // ============================================================================
 
@@ -384,13 +735,46 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
       <div style={styles.vinSection}>
         <div style={styles.vinHeader}>
           <div style={styles.vinIconLabel}>
-            <span style={{ fontSize: '24px' }}>📷</span>
+            <button 
+              style={styles.cameraButton}
+              onClick={startCamera}
+              title="Scan Registration"
+            >
+              📷
+            </button>
             <div>
-              <span style={styles.vinLabel}>Quick VIN Lookup</span>
-              <span style={styles.vinHint}>Auto-fills vehicle info</span>
+              <span style={styles.vinLabel}>Quick VIN Scan</span>
+              <span style={styles.vinHint}>Tap camera to scan registration</span>
             </div>
           </div>
+          {!tradeData.registrationPhoto && (
+            <button 
+              style={styles.uploadButton}
+              onClick={() => registrationInputRef.current?.click()}
+            >
+              Upload
+            </button>
+          )}
         </div>
+
+        {/* Registration Photo Preview */}
+        {tradeData.registrationPhoto?.preview && (
+          <div style={styles.registrationPreview}>
+            <img 
+              src={tradeData.registrationPhoto.preview} 
+              alt="Registration" 
+              style={styles.registrationImage}
+            />
+            <button 
+              style={styles.registrationRemove}
+              onClick={handleRemoveRegistration}
+            >
+              ✕
+            </button>
+            <span style={styles.registrationLabel}>✓ Registration saved</span>
+          </div>
+        )}
+
         <div style={styles.vinInputWrapper}>
           <input
             type="text"
@@ -398,7 +782,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
             placeholder="Enter 17-character VIN"
             value={tradeData.vin}
             onChange={(e) => handleInputChange('vin', e.target.value.toUpperCase())}
-            onBlur={handleVinDecode}
+            onBlur={() => handleVinDecode()}
             maxLength={17}
           />
           {isDecodingVin && (
@@ -407,6 +791,27 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
             </div>
           )}
         </div>
+
+        {/* Scan status message */}
+        {scanStatus && !showScanner && (
+          <div style={styles.scanStatusMessage}>
+            {isScanning && <div style={styles.spinnerSmall} />}
+            {scanStatus}
+          </div>
+        )}
+
+        {/* Hidden file input for registration upload */}
+        <input
+          ref={registrationInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleRegistrationUpload(file);
+          }}
+        />
       </div>
 
       <div style={styles.divider}>
@@ -492,6 +897,9 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
           <path d="M5 12h14M12 5l7 7-7 7"/>
         </svg>
       </button>
+
+      {/* Scanner Modal */}
+      {renderScannerModal()}
     </div>
   );
 
@@ -781,7 +1189,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
               </div>
               <div style={styles.equityDivider} />
               <div style={styles.equityRow}>
-                <span style={{ fontWeight: '700' }}>Your Equity</span>
+                <span style={{ fontWeight: 700 }}>Your Equity</span>
                 <span style={{ 
                   ...styles.equityValue, 
                   fontSize: '24px',
@@ -790,6 +1198,14 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
                   {equity >= 0 ? '+' : ''}{formatCurrency(equity)}
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* Registration Photo Indicator */}
+          {tradeData.registrationPhoto?.preview && (
+            <div style={styles.registrationSaved}>
+              <span>📄</span>
+              <span>Registration photo saved to customer file</span>
             </div>
           )}
 
@@ -1071,12 +1487,38 @@ const styles: { [key: string]: CSSProperties } = {
     marginBottom: '16px',
   },
   vinHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: '12px',
   },
   vinIconLabel: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
+  },
+  cameraButton: {
+    width: '48px',
+    height: '48px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    fontSize: '24px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'transform 0.2s ease',
+  },
+  uploadButton: {
+    padding: '8px 16px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '8px',
+    color: '#ffffff',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
   },
   vinLabel: {
     display: 'block',
@@ -1111,6 +1553,67 @@ const styles: { [key: string]: CSSProperties } = {
     right: '16px',
     top: '50%',
     transform: 'translateY(-50%)',
+  },
+  scanStatusMessage: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginTop: '12px',
+    padding: '8px 12px',
+    background: 'rgba(255,255,255,0.05)',
+    borderRadius: '8px',
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  registrationPreview: {
+    position: 'relative',
+    marginBottom: '12px',
+    borderRadius: '8px',
+    overflow: 'hidden',
+  },
+  registrationImage: {
+    width: '100%',
+    height: '120px',
+    objectFit: 'cover',
+    borderRadius: '8px',
+  },
+  registrationRemove: {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    background: 'rgba(0,0,0,0.7)',
+    border: 'none',
+    color: '#ffffff',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+  },
+  registrationLabel: {
+    position: 'absolute',
+    bottom: '8px',
+    left: '8px',
+    padding: '4px 8px',
+    background: 'rgba(27, 115, 64, 0.9)',
+    borderRadius: '4px',
+    fontSize: '11px',
+    color: '#ffffff',
+    fontWeight: 600,
+  },
+  registrationSaved: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '12px',
+    background: 'rgba(27, 115, 64, 0.15)',
+    borderRadius: '8px',
+    fontSize: '13px',
+    color: '#4ade80',
+    marginBottom: '16px',
   },
   divider: {
     display: 'flex',
@@ -1317,6 +1820,14 @@ const styles: { [key: string]: CSSProperties } = {
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
   },
+  spinnerSmall: {
+    width: '14px',
+    height: '14px',
+    border: '2px solid rgba(255,255,255,0.3)',
+    borderTopColor: '#ffffff',
+    borderRadius: '50%',
+    animation: 'spin 0.8s linear infinite',
+  },
   errorMessage: {
     padding: '12px 16px',
     background: 'rgba(220, 38, 38, 0.2)',
@@ -1325,6 +1836,134 @@ const styles: { [key: string]: CSSProperties } = {
     fontSize: '14px',
     marginBottom: '16px',
     textAlign: 'center',
+  },
+  // Scanner Modal Styles
+  scannerOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.95)',
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+  },
+  scannerModal: {
+    width: '100%',
+    maxWidth: '500px',
+    background: '#1a1a1a',
+    borderRadius: '16px',
+    overflow: 'hidden',
+  },
+  scannerHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px 20px',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+  },
+  scannerTitle: {
+    margin: 0,
+    fontSize: '18px',
+    fontWeight: 700,
+    color: '#ffffff',
+  },
+  scannerClose: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    background: 'rgba(255,255,255,0.1)',
+    border: 'none',
+    color: '#ffffff',
+    fontSize: '18px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scannerVideoContainer: {
+    position: 'relative',
+    background: '#000',
+    aspectRatio: '4/3',
+  },
+  scannerVideo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  scannerFrame: {
+    position: 'absolute',
+    top: '15%',
+    left: '10%',
+    right: '10%',
+    bottom: '15%',
+    border: '2px solid rgba(27, 115, 64, 0.5)',
+    borderRadius: '8px',
+  },
+  scannerCorner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '24px',
+    height: '24px',
+    borderTop: '3px solid #1B7340',
+    borderLeft: '3px solid #1B7340',
+    borderTopLeftRadius: '8px',
+  },
+  scannerStatus: {
+    padding: '12px 20px',
+    textAlign: 'center',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)',
+    minHeight: '44px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanningIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  scannerActions: {
+    padding: '16px 20px 20px',
+  },
+  captureButton: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    padding: '16px 24px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    borderRadius: '12px',
+    color: '#ffffff',
+    fontSize: '16px',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  scannerError: {
+    padding: '40px 20px',
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.7)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  uploadFallbackButton: {
+    marginTop: '16px',
+    padding: '12px 24px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '10px',
+    color: '#ffffff',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
   },
   estimateCard: {
     padding: '24px',
