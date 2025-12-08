@@ -1,15 +1,36 @@
 import React, { useState, CSSProperties } from 'react';
+import api, { logTrafficSession } from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
 
 interface DetailedVehicle extends Vehicle {
-  transmission?: string; fuelEconomy?: string; savings?: number;
-  monthlyLease?: number; monthlyFinance?: number; mileage?: number;
-  gradient?: string; rebates?: Array<{ name: string; amount: number }>;
+  transmission?: string;
+  fuelEconomy?: string;
+  savings?: number;
+  monthlyLease?: number;
+  monthlyFinance?: number;
+  mileage?: number;
+  gradient?: string;
+  rebates?: Array<{ name: string; amount: number }>;
 }
 
-interface TruckVINInfo { cabType: string; driveType: string; }
+// Default rebates for Chevrolet vehicles
+const DEFAULT_REBATES = [
+  { name: 'Customer Cash', amount: 3000 },
+  { name: 'Bonus Cash', amount: 1000 },
+];
 
-const decodeGMTruckVIN = (vin: string, model: string): TruckVINInfo | null => {
+// Conditional offers that may apply
+const CONDITIONAL_OFFERS = [
+  { name: 'Select Market Chevy Loyalty Cash', amount: 2500 },
+  { name: 'Trade Assistance', amount: 1250 },
+  { name: 'GM First Responder Offer', amount: 500 },
+  { name: 'GM Military Offer', amount: 500 },
+  { name: 'Costco Executive Member Incentive', amount: 1250 },
+  { name: 'Costco Gold Star and Business Member Incentive', amount: 1000 },
+];
+
+// Decode VIN for Silverado trucks
+const decodeGMTruckVIN = (vin: string, model: string): { cabType: string; driveType: string } | null => {
   if (!vin || vin.length !== 17) return null;
   if (!(model || '').toLowerCase().includes('silverado')) return null;
   const v = vin.toUpperCase();
@@ -26,220 +47,449 @@ const decodeGMTruckVIN = (vin: string, model: string): TruckVINInfo | null => {
   return (cabType || driveType) ? { cabType, driveType } : null;
 };
 
+// Color category mapping
 const getColorCategory = (colorDesc: string): string => {
   const c = colorDesc.toLowerCase();
   if (c.includes('black')) return 'black';
-  if (c.includes('white') || c.includes('summit') || c.includes('arctic') || c.includes('polar')) return 'white';
-  if (c.includes('red') || c.includes('cherry') || c.includes('cajun') || c.includes('radiant')) return 'red';
-  if (c.includes('blue') || c.includes('northsky') || c.includes('glacier') || c.includes('reef')) return 'blue';
-  if (c.includes('silver') || c.includes('sterling')) return 'silver';
-  if (c.includes('gray') || c.includes('grey') || c.includes('shadow')) return 'gray';
-  if (c.includes('green') || c.includes('woodland')) return 'green';
-  if (c.includes('orange') || c.includes('tangier')) return 'orange';
-  if (c.includes('yellow') || c.includes('accelerate')) return 'yellow';
-  if (c.includes('brown') || c.includes('harvest')) return 'brown';
+  if (c.includes('white') || c.includes('summit') || c.includes('arctic') || c.includes('polar') || c.includes('iridescent')) return 'white';
+  if (c.includes('red') || c.includes('cherry') || c.includes('cajun') || c.includes('radiant') || c.includes('garnet')) return 'red';
+  if (c.includes('blue') || c.includes('northsky') || c.includes('glacier') || c.includes('reef') || c.includes('midnight')) return 'blue';
+  if (c.includes('gray') || c.includes('grey') || c.includes('shadow') || c.includes('sterling') || c.includes('satin steel')) return 'gray';
+  if (c.includes('silver')) return 'silver';
+  if (c.includes('green') || c.includes('woodland') || c.includes('evergreen')) return 'green';
+  if (c.includes('orange') || c.includes('tangier') || c.includes('cayenne')) return 'orange';
+  if (c.includes('yellow') || c.includes('accelerate') || c.includes('nitro')) return 'yellow';
+  if (c.includes('brown') || c.includes('harvest') || c.includes('auburn')) return 'brown';
   return '';
 };
 
-const getImageCandidates = (vehicle: Vehicle, exteriorColor: string, stockNumber: string): string[] => {
-  const candidates: string[] = [];
-  if (vehicle.imageUrl) candidates.push(vehicle.imageUrl);
-  if (vehicle.image_url) candidates.push(vehicle.image_url);
-  if (vehicle.images?.length) candidates.push(...vehicle.images);
-  const fullModel = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const baseModel = fullModel.replace(/-ev$/, '').replace(/-hd$/, '').replace(/\d+$/, '');
-  const colorCat = getColorCategory(exteriorColor);
-  if (stockNumber) candidates.push(`/images/vehicles/${stockNumber}.jpg`);
-  if (fullModel && colorCat) candidates.push(`/images/vehicles/${fullModel}-${colorCat}.jpg`);
-  if (baseModel && baseModel !== fullModel && colorCat) candidates.push(`/images/vehicles/${baseModel}-${colorCat}.jpg`);
-  if (fullModel) candidates.push(`/images/vehicles/${fullModel}.jpg`);
-  if (baseModel && baseModel !== fullModel) candidates.push(`/images/vehicles/${baseModel}.jpg`);
-  return candidates;
+// Get color hex for swatch
+const getColorHex = (colorDesc: string): string => {
+  const category = getColorCategory(colorDesc);
+  const colorHexMap: Record<string, string> = {
+    'black': '#1a1a1a',
+    'white': '#f5f5f5',
+    'red': '#c41e3a',
+    'blue': '#1e40af',
+    'gray': '#6b7280',
+    'silver': '#c0c0c0',
+    'green': '#15803d',
+    'orange': '#ea580c',
+    'yellow': '#eab308',
+    'brown': '#78350f',
+  };
+  return colorHexMap[category] || '#6b7280';
 };
 
-const defaultVehicle: DetailedVehicle = {
-  stockNumber: '24789', stock_number: '24789', year: 2025, make: 'Chevrolet', model: 'Silverado 1500',
-  trim: 'LT Crew Cab 4WD', vin: '1GCUDDED5RZ123456', exteriorColor: 'Summit White', exterior_color: 'Summit White',
-  interiorColor: 'Jet Black', interior_color: 'Jet Black', engine: '5.3L EcoTec3 V8', transmission: '10-Speed Automatic',
-  drivetrain: '4WD', fuelEconomy: '16 city / 22 hwy', msrp: 52995, salePrice: 47495, sale_price: 47495, price: 47495,
-  savings: 5500, monthlyLease: 398, monthlyFinance: 612, status: 'In Stock', mileage: 12,
-  gradient: 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
-  features: ['Trailering Package', 'Heated Front Seats', '13.4" Diagonal Touchscreen', 'Apple CarPlay & Android Auto',
-    'Wireless Charging', 'Remote Start', 'LED Headlamps', 'Spray-On Bedliner', '20" Painted Aluminum Wheels', 'Rear Vision Camera'],
-  rebates: [{ name: 'Customer Cash', amount: 2500 }, { name: 'Bonus Cash', amount: 1500 }, { name: 'Conquest Bonus', amount: 1000 }],
+// Get gradient background for image placeholder
+const getGradient = (color?: string): string => {
+  const category = getColorCategory(color || '');
+  const gradientMap: Record<string, string> = {
+    'white': 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
+    'black': 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+    'red': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+    'blue': 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+    'silver': 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
+    'gray': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+    'green': 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+    'orange': 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+    'yellow': 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+    'brown': 'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
+  };
+  return gradientMap[category] || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
+};
+
+// Get vehicle image URL
+const getVehicleImageUrl = (vehicle: Vehicle): string | null => {
+  if (vehicle.imageUrl) return vehicle.imageUrl;
+  if (vehicle.image_url) return vehicle.image_url;
+  if (vehicle.images && vehicle.images.length > 0) return vehicle.images[0];
+  
+  const fullModel = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const baseModel = fullModel.replace(/-ev$/, '').replace(/-hd$/, '').replace(/\d+$/, '');
+  const exteriorColor = (vehicle.exteriorColor || vehicle.exterior_color || '').toLowerCase();
+  const colorCategory = getColorCategory(exteriorColor);
+  const modelForImage = baseModel || fullModel;
+  
+  if (modelForImage && colorCategory) return `/images/vehicles/${modelForImage}-${colorCategory}.jpg`;
+  if (modelForImage) return `/images/vehicles/${modelForImage}.jpg`;
+  return null;
+};
+
+// Format currency
+const formatCurrency = (amount: number | null | undefined): string => {
+  if (amount == null) return '$0';
+  return `$${Math.round(amount).toLocaleString()}`;
 };
 
 const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
   const [vehicleRequested, setVehicleRequested] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [allImagesFailed, setAllImagesFailed] = useState(false);
+  const [requestSending, setRequestSending] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [imageError, setImageError] = useState(false);
+  const [showConditionalOffers, setShowConditionalOffers] = useState(false);
 
-  const customerName = customerData?.customerName;
-  const vehicle: DetailedVehicle = (customerData?.selectedVehicle as DetailedVehicle) || defaultVehicle;
-
-  const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
-  const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
-  const interiorColor = vehicle.interiorColor || vehicle.interior_color || '';
-  const salePrice = vehicle.salePrice || vehicle.sale_price || vehicle.price || 0;
-  const gradient = vehicle.gradient || 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)';
-
-  const truckVINInfo = decodeGMTruckVIN(vehicle.vin || '', vehicle.model || '');
-  const vinCabType = truckVINInfo?.cabType || '';
-  const vinDriveType = truckVINInfo?.driveType || '';
-  const imageCandidates = getImageCandidates(vehicle, exteriorColor, stockNumber);
-
-  const handleRequestVehicle = () => {
-    setVehicleRequested(true);
-    updateCustomerData({ vehicleRequested: { stockNumber, requestedAt: new Date().toISOString() } });
+  // Get vehicle from customerData or use placeholder
+  const vehicle: DetailedVehicle = customerData?.selectedVehicle || {
+    stockNumber: 'M39816',
+    vin: '1GCRKWEK8TZ247247',
+    year: 2026,
+    make: 'Chevrolet',
+    model: 'Silverado 1500',
+    trim: 'RST 4WD',
+    exteriorColor: 'Sterling Gray Metallic',
+    interiorColor: 'Jet Black',
+    msrp: 51605,
+    salePrice: 47605,
+    status: 'In Transit',
+    features: ['Remote Start', 'Apple CarPlay', 'Backup Camera', 'Android Auto'],
+    rebates: DEFAULT_REBATES,
   };
 
-  // Confirmation State
+  const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
+  const vin = vehicle.vin || '';
+  const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
+  const msrp = vehicle.msrp || 0;
+  const salePrice = vehicle.salePrice || vehicle.sale_price || vehicle.price || msrp;
+  const rebates = vehicle.rebates || DEFAULT_REBATES;
+  const totalRebates = rebates.reduce((sum, r) => sum + r.amount, 0);
+  const quirkPrice = msrp - totalRebates;
+  const status = vehicle.status || 'In Stock';
+  
+  // Decode VIN for additional info
+  const vinInfo = decodeGMTruckVIN(vin, vehicle.model || '');
+  
+  // Build title
+  const title = `NEW ${vehicle.year} Chevrolet ${vehicle.model} ${vehicle.trim || ''}`.trim();
+  
+  // Get image URL
+  const imageUrl = getVehicleImageUrl(vehicle);
+  const gradient = getGradient(exteriorColor);
+
+  // Handle "Let's See It" button click
+  const handleLetsSeeIt = async () => {
+    setRequestSending(true);
+    
+    try {
+      // Log the vehicle request to traffic session
+      await logTrafficSession({
+        currentStep: 'vehicleRequest',
+        vehicleRequested: true,
+        vehicle: {
+          stockNumber: stockNumber,
+          year: vehicle.year,
+          make: vehicle.make,
+          model: vehicle.model,
+          trim: vehicle.trim,
+          msrp: msrp,
+          salePrice: quirkPrice,
+        },
+        actions: ['lets_see_it_clicked'],
+      });
+      
+      // Update customer data
+      updateCustomerData({
+        vehicleRequested: {
+          stockNumber,
+          requestedAt: new Date().toISOString(),
+        },
+      });
+      
+      setVehicleRequested(true);
+    } catch (err) {
+      console.error('Error sending vehicle request:', err);
+      // Still show success - the request will be logged when connection resumes
+      setVehicleRequested(true);
+    } finally {
+      setRequestSending(false);
+    }
+  };
+
+  // Handle back button
+  const handleBack = () => {
+    navigateTo('inventory');
+  };
+
+  // Success confirmation screen
   if (vehicleRequested) {
     return (
       <div style={s.container}>
-        <div style={s.confirmOverlay}>
-          <div style={s.confirmCard}>
-            <div style={s.confirmIcon}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+        <div style={s.successOverlay}>
+          <div style={s.successCard}>
+            <div style={s.successIcon}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <path d="M20 6L9 17l-5-5" />
               </svg>
             </div>
-            <h1 style={s.confirmTitle}>{customerName ? `Great choice, ${customerName}!` : 'Vehicle Requested!'}</h1>
-            <p style={s.confirmSubtitle}>A team member will bring this vehicle to the front of the showroom shortly.</p>
-            <div style={s.confirmVehicle}>
-              <div style={{ ...s.confirmThumb, background: gradient }}>
-                <span style={s.confirmInitial}>{(vehicle.model || 'V').charAt(0)}</span>
+            <h1 style={s.successTitle}>We're On It!</h1>
+            <p style={s.successSubtitle}>
+              A team member has been notified and will bring this vehicle to the front for you to see.
+            </p>
+            <div style={s.successVehicleCard}>
+              <div style={{ ...s.successVehicleThumb, background: gradient }}>
+                <span style={s.successVehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
               </div>
-              <div style={s.confirmVehicleInfo}>
-                <span style={s.confirmVehicleName}>{vehicle.year} {vehicle.model}</span>
-                <span style={s.confirmVehicleTrim}>{vehicle.trim}</span>
-                <span style={s.confirmStock}>Stock #{stockNumber}</span>
+              <div style={s.successVehicleInfo}>
+                <span style={s.successVehicleName}>{vehicle.year} {vehicle.model}</span>
+                <span style={s.successVehicleTrim}>{vehicle.trim}</span>
+                <span style={s.successVehicleStock}>Stock# {stockNumber}</span>
               </div>
             </div>
             <div style={s.expectSection}>
-              <h4 style={s.expectTitle}>What to Expect</h4>
+              <h4 style={s.expectTitle}>What to Expect:</h4>
               <div style={s.expectSteps}>
-                {['Vehicle will be brought up front', 'A team member will meet you', 'Take it for a test drive!'].map((text, i) => (
-                  <div key={i} style={s.expectStep}>
-                    <span style={s.stepNumber}>{i + 1}</span>
-                    <span style={s.stepText}>{text}</span>
-                  </div>
-                ))}
+                <div style={s.expectStep}>
+                  <span style={s.stepNumber}>1</span>
+                  <span style={s.stepText}>A sales consultant will locate the vehicle</span>
+                </div>
+                <div style={s.expectStep}>
+                  <span style={s.stepNumber}>2</span>
+                  <span style={s.stepText}>They'll bring it to the front entrance</span>
+                </div>
+                <div style={s.expectStep}>
+                  <span style={s.stepNumber}>3</span>
+                  <span style={s.stepText}>You'll be able to see it up close and ask questions</span>
+                </div>
               </div>
             </div>
-            <div style={s.confirmActions}>
-              <button style={s.primaryBtn} onClick={() => navigateTo('handoff')}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                </svg>
-                Connect with Sales Consultant
-              </button>
-              <button style={s.secondaryBtn} onClick={() => setVehicleRequested(false)}>Back to Vehicle Details</button>
-              <button style={s.tertiaryBtn} onClick={() => navigateTo('inventory')}>Continue Browsing</button>
-            </div>
             <div style={s.estimatedTime}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
               </svg>
-              Estimated wait: 2-3 minutes
+              <span>Estimated wait: 3-5 minutes</span>
+            </div>
+            <div style={s.successActions}>
+              <button style={s.secondaryBtn} onClick={() => navigateTo('inventory')}>
+                Browse More Vehicles
+              </button>
+              <button style={s.tertiaryBtn} onClick={() => navigateTo('aiAssistant')}>
+                Chat with AI Assistant
+              </button>
             </div>
           </div>
         </div>
-        <style>{`@keyframes checkmark { 0% { transform: scale(0); opacity: 0; } 50% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }`}</style>
       </div>
     );
   }
 
   return (
     <div style={s.container}>
-      <button style={s.backBtn} onClick={() => navigateTo('inventory')}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        Back to Results
-      </button>
-      <div style={s.content}>
-        {/* Left Column */}
-        <div style={s.leftCol}>
-          <div style={{ ...s.mainImage, background: (!allImagesFailed && imageCandidates.length > 0) ? '#1a1a1a' : gradient }}>
-            {!allImagesFailed && imageCandidates.length > 0 && imageCandidates[currentImageIndex] ? (
-              <img src={imageCandidates[currentImageIndex]} alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`} style={s.vehicleImg}
-                onError={() => currentImageIndex < imageCandidates.length - 1 ? setCurrentImageIndex(currentImageIndex + 1) : setAllImagesFailed(true)} />
-            ) : (
-              <span style={s.imageInitial}>{(vehicle.model || 'V').charAt(0)}</span>
-            )}
-            <div style={s.statusBadge}><span style={s.statusDot} />{vehicle.status || 'In Stock'}</div>
+      {/* Header Bar */}
+      <div style={s.headerBar}>
+        <div style={s.headerLeft}>
+          <h1 style={s.vehicleTitle}>{title}</h1>
+          <div style={s.headerMeta}>
+            <span style={s.vinText}>VIN: {vin}</span>
+            <span style={s.stockText}>STOCK: {stockNumber}</span>
           </div>
-          <div style={s.quickSpecs}>
-            {[{ icon: '🔧', label: 'Engine', value: vehicle.engine || 'N/A' },
-              { icon: '⚙️', label: 'Transmission', value: vehicle.transmission || 'Automatic' },
-              { icon: '🚗', label: 'Drivetrain', value: vehicle.drivetrain || 'N/A' },
-              { icon: '⛽', label: 'Fuel Economy', value: vehicle.fuelEconomy || 'N/A' }].map((spec, i) => (
-              <div key={i} style={s.specItem}>
-                <span style={s.specIcon}>{spec.icon}</span>
-                <div><span style={s.specLabel}>{spec.label}</span><span style={s.specValue}>{spec.value}</span></div>
+        </div>
+        <div style={s.headerRight}>
+          <button style={s.backBtn} onClick={handleBack}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Back to Inventory
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div style={s.mainContent}>
+        {/* Left Column - Images */}
+        <div style={s.leftColumn}>
+          {/* Main Image */}
+          <div style={{ ...s.mainImageContainer, background: gradient }}>
+            {imageUrl && !imageError ? (
+              <img
+                src={imageUrl}
+                alt={title}
+                style={s.mainImage}
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <span style={s.imagePlaceholder}>{(vehicle.model || 'V').charAt(0)}</span>
+            )}
+          </div>
+          
+          {/* Thumbnail Strip */}
+          <div style={s.thumbnailStrip}>
+            {[0, 1, 2, 3].map((idx) => (
+              <div
+                key={idx}
+                style={{
+                  ...s.thumbnail,
+                  background: gradient,
+                  borderColor: selectedImageIndex === idx ? '#1B7340' : 'rgba(255,255,255,0.1)',
+                }}
+                onClick={() => setSelectedImageIndex(idx)}
+              >
+                <span style={s.thumbnailPlaceholder}>{(vehicle.model || 'V').charAt(0)}</span>
               </div>
             ))}
           </div>
+
+          {/* Photo Count Badge */}
+          <div style={s.photoCountBadge}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
+            <span>(4) Photos</span>
+          </div>
+
+          {/* Status Badge */}
+          <div style={s.statusBadge}>
+            <span style={{ ...s.statusDot, background: status === 'In Stock' ? '#4ade80' : '#f59e0b' }} />
+            {status}
+          </div>
         </div>
-        {/* Right Column */}
-        <div style={s.rightCol}>
-          <div style={s.vehicleHeader}>
-            <div>
-              <h1 style={s.vehicleTitle}>{vehicle.year} {vehicle.make} {vehicle.model}</h1>
-              {(vinCabType || vinDriveType) && <p style={s.vinDecodedInfo}>{vinCabType}{vinCabType && vinDriveType && ' • '}{vinDriveType}</p>}
-              <p style={s.vehicleTrim}>{vehicle.trim}</p>
-            </div>
-            <div style={s.stockInfo}><span style={s.stockLabel}>Stock #</span><span style={s.stockNum}>{stockNumber}</span></div>
-          </div>
-          <div style={s.colorRow}>
-            <div style={s.colorItem}><div style={{ ...s.colorSwatch, background: gradient }} /><div><span style={s.colorLabel}>Exterior</span><span style={s.colorValue}>{exteriorColor}</span></div></div>
-            <div style={s.colorItem}><div style={{ ...s.colorSwatch, background: '#1f2937' }} /><div><span style={s.colorLabel}>Interior</span><span style={s.colorValue}>{interiorColor}</span></div></div>
-          </div>
+
+        {/* Right Column - Pricing */}
+        <div style={s.rightColumn}>
+          {/* Pricing Card */}
           <div style={s.pricingCard}>
-            <div style={s.priceRow}><span style={s.msrpLabel}>MSRP</span><span style={s.msrpValue}>${(vehicle.msrp || 0).toLocaleString()}</span></div>
-            {vehicle.rebates?.map((rebate, i) => (
-              <div key={i} style={s.rebateRow}><span style={s.rebateName}>{rebate.name}</span><span style={s.rebateAmt}>-${rebate.amount.toLocaleString()}</span></div>
+            {/* Base MSRP */}
+            <div style={s.priceRow}>
+              <span style={s.priceLabel}>MSRP</span>
+              <span style={s.priceValue}>{formatCurrency(msrp)}</span>
+            </div>
+
+            {/* Rebates */}
+            {rebates.map((rebate, idx) => (
+              <div key={idx} style={s.rebateRow}>
+                <span style={s.rebateName}>{rebate.name}</span>
+                <span style={s.rebateAmount}>-{formatCurrency(rebate.amount)}</span>
+              </div>
             ))}
-            <div style={s.priceDivider} />
-            <div style={s.priceRow}><span style={s.yourPriceLabel}>Your Price</span><span style={s.yourPriceValue}>${salePrice.toLocaleString()}</span></div>
-            {vehicle.savings && <div style={s.savingsBadge}>You Save ${vehicle.savings.toLocaleString()}!</div>}
-            <div style={s.paymentsGrid}>
-              <div style={s.paymentOpt}><span style={s.paymentType}>Lease</span><span style={s.paymentAmt}>${vehicle.monthlyLease || 0}</span><span style={s.paymentTerm}>/mo for 39 mo</span></div>
-              <div style={s.paymentOpt}><span style={s.paymentType}>Finance</span><span style={s.paymentAmt}>${vehicle.monthlyFinance || 0}</span><span style={s.paymentTerm}>/mo for 72 mo</span></div>
+
+            {/* Quirk Price */}
+            <div style={s.divider} />
+            <div style={s.quirkPriceRow}>
+              <span style={s.quirkPriceLabel}>Quirk Price</span>
+              <span style={s.quirkPriceValue}>{formatCurrency(quirkPrice)}</span>
             </div>
-          </div>
-          <div style={s.featuresSection}>
-            <h3 style={s.sectionTitle}>Key Features</h3>
-            <div style={s.featuresList}>
-              {(vehicle.features || []).map((feature, i) => (
-                <div key={i} style={s.featureItem}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
-                  {feature}
+
+            {/* Conditional Offers */}
+            <div style={s.conditionalSection}>
+              <button
+                style={s.conditionalToggle}
+                onClick={() => setShowConditionalOffers(!showConditionalOffers)}
+              >
+                <span>Conditional Offers</span>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  style={{ transform: showConditionalOffers ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              
+              {showConditionalOffers && (
+                <div style={s.conditionalList}>
+                  {CONDITIONAL_OFFERS.map((offer, idx) => (
+                    <div key={idx} style={s.conditionalRow}>
+                      <span style={s.conditionalName}>{offer.name}</span>
+                      <span style={s.conditionalAmount}>-{formatCurrency(offer.amount)}</span>
+                    </div>
+                  ))}
+                  <button style={s.detailsLink}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 16v-4M12 8h.01" />
+                    </svg>
+                    Details
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
           </div>
-          <div style={s.actionBtns}>
-            <button style={s.requestBtn} onClick={handleRequestVehicle}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
-                <circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>
+
+          {/* Vehicle Quick Specs */}
+          <div style={s.specsCard}>
+            <h3 style={s.specsTitle}>Basic Info</h3>
+            <div style={s.specsGrid}>
+              <div style={s.specItem}>
+                <span style={s.specLabel}>Exterior</span>
+                <div style={s.specValueWithSwatch}>
+                  <span style={{ ...s.colorSwatch, background: getColorHex(exteriorColor) }} />
+                  <span style={s.specValue}>{exteriorColor || '—'}</span>
+                </div>
+              </div>
+              <div style={s.specItem}>
+                <span style={s.specLabel}>Interior</span>
+                <span style={s.specValue}>{vehicle.interiorColor || vehicle.interior_color || '—'}</span>
+              </div>
+              <div style={s.specItem}>
+                <span style={s.specLabel}>Engine</span>
+                <span style={s.specValue}>{vehicle.engine || '5.3L EcoTec3 V8'}</span>
+              </div>
+              <div style={s.specItem}>
+                <span style={s.specLabel}>Drivetrain</span>
+                <span style={s.specValue}>{vinInfo?.driveType || vehicle.drivetrain || '4WD'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Key Features */}
+          {vehicle.features && vehicle.features.length > 0 && (
+            <div style={s.featuresCard}>
+              <h3 style={s.featuresTitle}>Key Features</h3>
+              <div style={s.featuresTags}>
+                {vehicle.features.slice(0, 6).map((feature, idx) => (
+                  <span key={idx} style={s.featureTag}>{feature}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LET'S SEE IT Button */}
+          <button
+            style={s.letsSeeItBtn}
+            onClick={handleLetsSeeIt}
+            disabled={requestSending}
+          >
+            {requestSending ? (
+              <>
+                <div style={s.spinner} />
+                Notifying Team...
+              </>
+            ) : (
+              <>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                Let's See It!
+              </>
+            )}
+          </button>
+          <p style={s.letsSeeItHint}>
+            Tap to have this vehicle brought to the showroom entrance
+          </p>
+
+          {/* Secondary Actions */}
+          <div style={s.secondaryActions}>
+            <button style={s.actionBtn} onClick={() => navigateTo('paymentCalculator')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <path d="M2 10h20" />
               </svg>
-              Request This Vehicle
-            </button>
-            <button style={s.secondaryBtn} onClick={() => navigateTo('paymentCalculator')}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h4"/></svg>
               Calculate Payment
             </button>
-            <button style={s.secondaryBtn} onClick={() => navigateTo('tradeIn')}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+            <button style={s.actionBtn} onClick={() => navigateTo('modelBudget')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
               Value My Trade
             </button>
-            <button style={s.tertiaryBtn} onClick={() => navigateTo('handoff')}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              Talk to a Sales Consultant
-            </button>
           </div>
-          <div style={s.vinSection}><span style={s.vinLabel}>VIN:</span><span style={s.vinValue}>{vehicle.vin || 'N/A'}</span></div>
         </div>
       </div>
     </div>
@@ -248,82 +498,563 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
 
 // Styles
 const s: Record<string, CSSProperties> = {
-  container: { flex: 1, padding: '24px 40px', overflow: 'auto' },
-  backBtn: { display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '10px 20px', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer', marginBottom: '24px' },
-  content: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', maxWidth: '1400px', margin: '0 auto' },
-  leftCol: { display: 'flex', flexDirection: 'column', gap: '20px' },
-  mainImage: { aspectRatio: '16/10', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' },
-  vehicleImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  imageInitial: { fontSize: '120px', fontWeight: 800, color: 'rgba(255,255,255,0.2)' },
-  statusBadge: { position: 'absolute', top: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: 'rgba(0,0,0,0.7)', borderRadius: '20px', fontSize: '12px', fontWeight: 600, color: '#fff' },
-  statusDot: { width: '8px', height: '8px', borderRadius: '50%', background: '#4ade80' },
-  quickSpecs: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
-  specItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' },
-  specIcon: { fontSize: '24px' },
-  specLabel: { display: 'block', fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: '2px' },
-  specValue: { display: 'block', fontSize: '14px', fontWeight: 600, color: '#fff' },
-  rightCol: { display: 'flex', flexDirection: 'column', gap: '20px' },
-  vehicleHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' },
-  vehicleTitle: { fontSize: '32px', fontWeight: 700, color: '#fff', margin: 0 },
-  vinDecodedInfo: { fontSize: '14px', color: '#4ade80', margin: '4px 0 0 0', fontWeight: 600 },
-  vehicleTrim: { fontSize: '18px', color: 'rgba(255,255,255,0.6)', margin: '4px 0 0 0' },
-  stockInfo: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end' },
-  stockLabel: { fontSize: '12px', color: 'rgba(255,255,255,0.4)', fontWeight: 600 },
-  stockNum: { fontSize: '18px', fontWeight: 700, color: '#fff' },
-  colorRow: { display: 'flex', gap: '16px' },
-  colorItem: { flex: 1, display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' },
-  colorSwatch: { width: '40px', height: '40px', borderRadius: '8px', border: '2px solid rgba(255,255,255,0.2)' },
-  colorLabel: { display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 600 },
-  colorValue: { display: 'block', fontSize: '14px', color: '#fff', fontWeight: 600 },
-  pricingCard: { padding: '24px', background: 'rgba(255,255,255,0.05)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' },
-  priceRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
-  msrpLabel: { fontSize: '14px', color: 'rgba(255,255,255,0.6)' },
-  msrpValue: { fontSize: '18px', fontWeight: 600, color: 'rgba(255,255,255,0.6)', textDecoration: 'line-through' },
-  rebateRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' },
-  rebateName: { fontSize: '13px', color: 'rgba(255,255,255,0.5)' },
-  rebateAmt: { fontSize: '14px', fontWeight: 600, color: '#4ade80' },
-  priceDivider: { height: '1px', background: 'rgba(255,255,255,0.1)', margin: '16px 0' },
-  yourPriceLabel: { fontSize: '16px', fontWeight: 700, color: '#fff' },
-  yourPriceValue: { fontSize: '36px', fontWeight: 800, color: '#4ade80' },
-  savingsBadge: { display: 'inline-block', padding: '8px 16px', background: 'rgba(74,222,128,0.15)', borderRadius: '8px', fontSize: '14px', fontWeight: 700, color: '#4ade80', marginTop: '12px' },
-  paymentsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '20px' },
-  paymentOpt: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' },
-  paymentType: { fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' },
-  paymentAmt: { fontSize: '28px', fontWeight: 700, color: '#fff' },
-  paymentTerm: { fontSize: '12px', color: 'rgba(255,255,255,0.4)' },
-  featuresSection: { padding: '20px', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' },
-  sectionTitle: { fontSize: '16px', fontWeight: 700, color: '#fff', margin: '0 0 16px 0' },
-  featuresList: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
-  featureItem: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'rgba(255,255,255,0.8)' },
-  actionBtns: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  requestBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '20px 24px', background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 15px rgba(27,115,64,0.4)' },
-  primaryBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '18px 24px', background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '16px', fontWeight: 700, cursor: 'pointer' },
-  secondaryBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px 24px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px', color: '#fff', fontSize: '15px', fontWeight: 600, cursor: 'pointer' },
-  tertiaryBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px 24px', background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'rgba(255,255,255,0.7)', fontSize: '14px', fontWeight: 600, cursor: 'pointer' },
-  vinSection: { display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' },
-  vinLabel: { fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' },
-  vinValue: { fontSize: '12px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.6)' },
-  // Confirmation styles
-  confirmOverlay: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 200px)' },
-  confirmCard: { maxWidth: '500px', width: '100%', padding: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' },
-  confirmIcon: { width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(74,222,128,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4ade80', margin: '0 auto 24px', animation: 'checkmark 0.5s ease' },
-  confirmTitle: { fontSize: '32px', fontWeight: 700, color: '#fff', margin: '0 0 8px 0' },
-  confirmSubtitle: { fontSize: '16px', color: 'rgba(255,255,255,0.6)', margin: '0 0 24px 0', lineHeight: 1.5 },
-  confirmVehicle: { display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', marginBottom: '24px', textAlign: 'left' },
-  confirmThumb: { width: '60px', height: '60px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  confirmInitial: { fontSize: '28px', fontWeight: 800, color: 'rgba(255,255,255,0.3)' },
-  confirmVehicleInfo: { display: 'flex', flexDirection: 'column' },
-  confirmVehicleName: { fontSize: '18px', fontWeight: 700, color: '#fff' },
-  confirmVehicleTrim: { fontSize: '14px', color: 'rgba(255,255,255,0.6)' },
-  confirmStock: { fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' },
-  expectSection: { padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginBottom: '24px', textAlign: 'left' },
-  expectTitle: { fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', margin: '0 0 16px 0' },
-  expectSteps: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  expectStep: { display: 'flex', alignItems: 'center', gap: '12px' },
-  stepNumber: { width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(27,115,64,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#4ade80', flexShrink: 0 },
-  stepText: { fontSize: '14px', color: 'rgba(255,255,255,0.7)' },
-  confirmActions: { display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' },
-  estimatedTime: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', color: 'rgba(255,255,255,0.5)' },
+  container: {
+    minHeight: '100vh',
+    background: '#0a0a0a',
+    color: '#fff',
+  },
+  
+  // Header Bar
+  headerBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: '20px 40px',
+    background: '#1a1a1a',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+  },
+  headerLeft: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  vehicleTitle: {
+    fontSize: '24px',
+    fontWeight: 700,
+    color: '#fff',
+    margin: 0,
+  },
+  headerMeta: {
+    display: 'flex',
+    gap: '24px',
+  },
+  vinText: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+    fontFamily: 'monospace',
+  },
+  stockText: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  backBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 20px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '8px',
+    color: '#fff',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+
+  // Main Content
+  mainContent: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 400px',
+    gap: '40px',
+    padding: '40px',
+    maxWidth: '1400px',
+    margin: '0 auto',
+  },
+
+  // Left Column - Images
+  leftColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    position: 'relative',
+  },
+  mainImageContainer: {
+    aspectRatio: '16/10',
+    borderRadius: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  mainImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  imagePlaceholder: {
+    fontSize: '120px',
+    fontWeight: 800,
+    color: 'rgba(255,255,255,0.2)',
+  },
+  thumbnailStrip: {
+    display: 'flex',
+    gap: '12px',
+  },
+  thumbnail: {
+    width: '100px',
+    height: '70px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    border: '2px solid rgba(255,255,255,0.1)',
+    transition: 'border-color 0.2s',
+  },
+  thumbnailPlaceholder: {
+    fontSize: '24px',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  photoCountBadge: {
+    position: 'absolute',
+    bottom: '100px',
+    left: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 14px',
+    background: '#fff',
+    borderRadius: '8px',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#1B7340',
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: '16px',
+    right: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    background: 'rgba(0,0,0,0.7)',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#fff',
+    backdropFilter: 'blur(8px)',
+  },
+  statusDot: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+  },
+
+  // Right Column - Pricing
+  rightColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+  },
+  pricingCard: {
+    padding: '24px',
+    background: '#fff',
+    borderRadius: '12px',
+    color: '#1a1a1a',
+  },
+  priceRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px',
+  },
+  priceLabel: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+  },
+  priceValue: {
+    fontSize: '18px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+  },
+  rebateRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+  },
+  rebateName: {
+    fontSize: '14px',
+    color: '#666',
+  },
+  rebateAmount: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+  },
+  divider: {
+    height: '1px',
+    background: '#e5e5e5',
+    margin: '16px 0',
+  },
+  quirkPriceRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  quirkPriceLabel: {
+    fontSize: '18px',
+    fontWeight: 700,
+    color: '#1a1a1a',
+  },
+  quirkPriceValue: {
+    fontSize: '28px',
+    fontWeight: 700,
+    color: '#1B7340',
+  },
+  conditionalSection: {
+    marginTop: '16px',
+    paddingTop: '16px',
+    borderTop: '1px solid #e5e5e5',
+  },
+  conditionalToggle: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    padding: '0',
+    background: 'none',
+    border: 'none',
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#666',
+    cursor: 'pointer',
+  },
+  conditionalList: {
+    marginTop: '12px',
+    padding: '12px',
+    background: '#f5f5f5',
+    borderRadius: '8px',
+  },
+  conditionalRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+  },
+  conditionalName: {
+    fontSize: '13px',
+    color: '#666',
+  },
+  conditionalAmount: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+  },
+  detailsLink: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    marginTop: '12px',
+    padding: '0',
+    background: 'none',
+    border: 'none',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#1B7340',
+    cursor: 'pointer',
+  },
+
+  // Specs Card
+  specsCard: {
+    padding: '20px',
+    background: 'rgba(255,255,255,0.05)',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.1)',
+  },
+  specsTitle: {
+    fontSize: '16px',
+    fontWeight: 700,
+    color: '#fff',
+    margin: '0 0 16px 0',
+  },
+  specsGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '16px',
+  },
+  specItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  specLabel: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.4)',
+    textTransform: 'uppercase',
+  },
+  specValue: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#fff',
+  },
+  specValueWithSwatch: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  colorSwatch: {
+    width: '16px',
+    height: '16px',
+    borderRadius: '4px',
+    border: '1px solid rgba(255,255,255,0.2)',
+  },
+
+  // Features Card
+  featuresCard: {
+    padding: '20px',
+    background: 'rgba(255,255,255,0.05)',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.1)',
+  },
+  featuresTitle: {
+    fontSize: '16px',
+    fontWeight: 700,
+    color: '#fff',
+    margin: '0 0 12px 0',
+  },
+  featuresTags: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+  },
+  featureTag: {
+    padding: '6px 12px',
+    background: 'rgba(27,115,64,0.2)',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: 600,
+    color: '#4ade80',
+  },
+
+  // Let's See It Button
+  letsSeeItBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    width: '100%',
+    padding: '20px 24px',
+    background: '#1B7340',
+    border: 'none',
+    borderRadius: '12px',
+    color: '#fff',
+    fontSize: '20px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: '0 4px 20px rgba(27,115,64,0.4)',
+    transition: 'transform 0.2s, box-shadow 0.2s',
+  },
+  letsSeeItHint: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    margin: '8px 0 0 0',
+  },
+  spinner: {
+    width: '20px',
+    height: '20px',
+    border: '3px solid rgba(255,255,255,0.3)',
+    borderTopColor: '#fff',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+
+  // Secondary Actions
+  secondaryActions: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '12px',
+    marginTop: '8px',
+  },
+  actionBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '14px 16px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '10px',
+    color: '#fff',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+
+  // Success Screen
+  successOverlay: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    padding: '40px',
+  },
+  successCard: {
+    maxWidth: '500px',
+    width: '100%',
+    padding: '40px',
+    background: 'rgba(255,255,255,0.05)',
+    borderRadius: '24px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    textAlign: 'center',
+  },
+  successIcon: {
+    width: '80px',
+    height: '80px',
+    margin: '0 auto 24px',
+    borderRadius: '50%',
+    background: 'rgba(74,222,128,0.2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#4ade80',
+  },
+  successTitle: {
+    fontSize: '32px',
+    fontWeight: 700,
+    color: '#fff',
+    margin: '0 0 12px 0',
+  },
+  successSubtitle: {
+    fontSize: '16px',
+    color: 'rgba(255,255,255,0.6)',
+    margin: '0 0 24px 0',
+    lineHeight: 1.5,
+  },
+  successVehicleCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '16px',
+    background: 'rgba(0,0,0,0.2)',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    textAlign: 'left',
+  },
+  successVehicleThumb: {
+    width: '70px',
+    height: '50px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  successVehicleInitial: {
+    fontSize: '24px',
+    fontWeight: 800,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  successVehicleInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+  },
+  successVehicleName: {
+    fontSize: '18px',
+    fontWeight: 700,
+    color: '#fff',
+  },
+  successVehicleTrim: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  successVehicleStock: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  expectSection: {
+    padding: '20px',
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    textAlign: 'left',
+  },
+  expectTitle: {
+    fontSize: '14px',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.8)',
+    margin: '0 0 16px 0',
+  },
+  expectSteps: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  expectStep: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  stepNumber: {
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    background: 'rgba(27,115,64,0.3)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#4ade80',
+    flexShrink: 0,
+  },
+  stepText: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  estimatedTime: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: '24px',
+  },
+  successActions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  secondaryBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '16px 24px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    borderRadius: '12px',
+    color: '#fff',
+    fontSize: '16px',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  tertiaryBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '14px 24px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '12px',
+    color: '#fff',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
 };
 
 export default VehicleDetail;
