@@ -30,8 +30,9 @@ interface TradeVehicleInfo {
 // Inventory count by model name
 type InventoryByModel = Record<string, number>;
 
-// Currency formatter for payoff fields
+// Currency formatter for payoff fields - formats on blur only
 const formatCurrency = (value: string): string => {
+  if (!value) return '';
   const num = parseFloat(value.replace(/[^0-9.]/g, ''));
   if (isNaN(num)) return '';
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -60,6 +61,8 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const [payoffAmount, setPayoffAmount] = useState<string>('');
   const [monthlyPayment, setMonthlyPayment] = useState<string>('');
   const [financedWith, setFinancedWith] = useState<string>('');
+  const [payoffFocused, setPayoffFocused] = useState<boolean>(false);
+  const [monthlyFocused, setMonthlyFocused] = useState<boolean>(false);
   const [tradeVehicle, setTradeVehicle] = useState<TradeVehicleInfo>({
     year: '',
     make: '',
@@ -172,16 +175,36 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     setColorChoices(prev => ({ ...prev, [choice]: value }));
   };
 
-  // Fixed: Allow decimals in currency input
+  // Allow typing freely, only strip non-numeric except decimal
   const handlePayoffAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
     setPayoffAmount(rawValue);
   };
 
-  // Fixed: Allow decimals in currency input
+  const handlePayoffBlur = (): void => {
+    setPayoffFocused(false);
+    if (payoffAmount) {
+      const num = parseFloat(payoffAmount);
+      if (!isNaN(num)) {
+        setPayoffAmount(num.toFixed(2));
+      }
+    }
+  };
+
+  // Allow typing freely, only strip non-numeric except decimal
   const handleMonthlyPaymentChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
     setMonthlyPayment(rawValue);
+  };
+
+  const handleMonthlyBlur = (): void => {
+    setMonthlyFocused(false);
+    if (monthlyPayment) {
+      const num = parseFloat(monthlyPayment);
+      if (!isNaN(num)) {
+        setMonthlyPayment(num.toFixed(2));
+      }
+    }
   };
 
   const handleFinancedWithChange = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -698,8 +721,10 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                         type="text"
                         style={styles.textInput}
                         placeholder="18000"
-                        value={payoffAmount ? formatCurrency(payoffAmount) : ''}
+                        value={payoffFocused ? payoffAmount : (payoffAmount ? formatCurrency(payoffAmount) : '')}
                         onChange={handlePayoffAmountChange}
+                        onFocus={() => setPayoffFocused(true)}
+                        onBlur={handlePayoffBlur}
                       />
                     </div>
                   </div>
@@ -712,8 +737,10 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                         type="text"
                         style={styles.textInput}
                         placeholder="450"
-                        value={monthlyPayment ? formatCurrency(monthlyPayment) : ''}
+                        value={monthlyFocused ? monthlyPayment : (monthlyPayment ? formatCurrency(monthlyPayment) : '')}
                         onChange={handleMonthlyPaymentChange}
+                        onFocus={() => setMonthlyFocused(true)}
+                        onBlur={handleMonthlyBlur}
                       />
                     </div>
                   </div>
