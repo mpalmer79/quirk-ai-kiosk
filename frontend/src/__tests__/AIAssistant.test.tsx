@@ -1,3 +1,85 @@
+// Mock SpeechSynthesis BEFORE any imports - must be at the very top
+// Create a proper mock that behaves like an EventTarget
+
+class MockSpeechSynthesis {
+  private listeners: { [key: string]: Function[] } = {};
+  
+  speak = jest.fn();
+  cancel = jest.fn();
+  pause = jest.fn();
+  resume = jest.fn();
+  getVoices = jest.fn(() => []);
+  paused = false;
+  pending = false;
+  speaking = false;
+  onvoiceschanged: ((this: SpeechSynthesis, ev: Event) => any) | null = null;
+
+  addEventListener(type: string, listener: EventListener) {
+    if (!this.listeners[type]) {
+      this.listeners[type] = [];
+    }
+    this.listeners[type].push(listener);
+  }
+
+  removeEventListener(type: string, listener: EventListener) {
+    if (this.listeners[type]) {
+      this.listeners[type] = this.listeners[type].filter(l => l !== listener);
+    }
+  }
+
+  dispatchEvent(event: Event): boolean {
+    return true;
+  }
+}
+
+const mockSpeechSynthesis = new MockSpeechSynthesis();
+
+// Delete any existing speechSynthesis to avoid jsdom conflicts
+if (typeof window !== 'undefined') {
+  delete (window as any).speechSynthesis;
+}
+
+Object.defineProperty(window, 'speechSynthesis', {
+  value: mockSpeechSynthesis,
+  writable: true,
+  configurable: true,
+});
+
+// Mock SpeechSynthesisUtterance
+global.SpeechSynthesisUtterance = jest.fn().mockImplementation(() => ({
+  text: '',
+  voice: null,
+  lang: '',
+  rate: 1,
+  pitch: 1,
+  volume: 1,
+  onstart: null,
+  onend: null,
+  onerror: null,
+  onpause: null,
+  onresume: null,
+  onmark: null,
+  onboundary: null,
+}));
+
+// Mock SpeechRecognition
+const mockSpeechRecognition = {
+  start: jest.fn(),
+  stop: jest.fn(),
+  abort: jest.fn(),
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
+  onresult: null,
+  onend: null,
+  onerror: null,
+  continuous: false,
+  interimResults: false,
+  lang: '',
+};
+
+global.webkitSpeechRecognition = jest.fn(() => mockSpeechRecognition);
+global.SpeechRecognition = jest.fn(() => mockSpeechRecognition);
+
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AIAssistant from '../components/AIAssistant';
@@ -10,49 +92,6 @@ jest.mock('../components/api', () => ({
 }));
 
 import api from '../components/api';
-
-// Mock SpeechRecognition
-const mockSpeechRecognition = {
-  start: jest.fn(),
-  stop: jest.fn(),
-  abort: jest.fn(),
-  addEventListener: jest.fn(),
-  removeEventListener: jest.fn(),
-  onresult: null,
-  onend: null,
-  onerror: null,
-};
-
-global.webkitSpeechRecognition = jest.fn(() => mockSpeechRecognition);
-
-// Mock SpeechSynthesis - MUST include addEventListener/removeEventListener
-const mockSpeechSynthesis = {
-  speak: jest.fn(),
-  cancel: jest.fn(),
-  getVoices: jest.fn(() => []),
-  addEventListener: jest.fn(),
-  removeEventListener: jest.fn(),
-  onvoiceschanged: null,
-  paused: false,
-  pending: false,
-  speaking: false,
-};
-Object.defineProperty(window, 'speechSynthesis', {
-  value: mockSpeechSynthesis,
-  writable: true,
-  configurable: true,
-});
-
-// Mock SpeechSynthesisUtterance
-global.SpeechSynthesisUtterance = jest.fn().mockImplementation(() => ({
-  text: '',
-  voice: null,
-  rate: 1,
-  pitch: 1,
-  volume: 1,
-  onend: null,
-  onerror: null,
-}));
 
 // Mock props
 const mockNavigateTo = jest.fn();
