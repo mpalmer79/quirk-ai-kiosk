@@ -32,14 +32,14 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
 
   useEffect(() => {
     setIsVisible(true);
-    api.getInventoryStats().then(data => setStats(data as InventoryStats)).catch(console.error);
+    api.getInventoryStats().then(data => setStats(data as InventoryStats)).catch(() => {});
     if (!nameSubmitted) setTimeout(() => nameInputRef.current?.focus(), 800);
   }, [nameSubmitted]);
 
   const logSession = async (name: string | null, phone: string | null, path?: string) => {
     try {
       await api.logTrafficSession({ customerName: name || undefined, phone: phone || undefined, path: path || 'welcome', currentStep: 'name_entered', actions: name ? ['entered_name'] : ['skipped_name'] });
-    } catch (err) { console.error('Failed to log session:', err); }
+    } catch {}
   };
 
   const handleNameSubmit = async () => {
@@ -72,7 +72,27 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     navigateTo('inventory');
   };
 
-  const handleStatClick = () => { updateCustomerData({ path: 'browse' }); navigateTo('inventory'); };
+  // Updated: Navigate to filtered inventory based on which stat was clicked
+  const handleStatClick = (statKey: StatType) => {
+    updateCustomerData({ path: 'browse' });
+    
+    // Navigate with filter based on stat type
+    switch (statKey) {
+      case 'suv':
+        updateCustomerData({ bodyStyleFilter: 'SUV' });
+        navigateTo('inventory', { bodyStyle: 'SUV' });
+        break;
+      case 'truck':
+        updateCustomerData({ bodyStyleFilter: 'Truck' });
+        navigateTo('inventory', { bodyStyle: 'Truck' });
+        break;
+      case 'total':
+      case 'price':
+      default:
+        navigateTo('inventory');
+        break;
+    }
+  };
 
   const AvatarIcon = () => (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
@@ -148,15 +168,15 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
 
       {stats && (
         <div style={s.statsBar}>
-          {[{ key: 'total', value: stats.total || 0, label: 'Vehicles In Stock' },
-            { key: 'suv', value: stats.byBodyStyle?.SUV || 0, label: 'SUVs' },
-            { key: 'truck', value: stats.byBodyStyle?.Truck || 0, label: 'Trucks' },
-            { key: 'price', value: `$${stats.priceRange?.min ? Math.round(stats.priceRange.min / 1000) : 0}k+`, label: 'Starting At' }
+          {[{ key: 'total' as StatType, value: stats.total || 0, label: 'Vehicles In Stock' },
+            { key: 'suv' as StatType, value: stats.byBodyStyle?.SUV || 0, label: 'SUVs' },
+            { key: 'truck' as StatType, value: stats.byBodyStyle?.Truck || 0, label: 'Trucks' },
+            { key: 'price' as StatType, value: `$${stats.priceRange?.min ? Math.round(stats.priceRange.min / 1000) : 0}k+`, label: 'Starting At' }
           ].map((stat, i) => (
             <React.Fragment key={stat.key}>
               {i > 0 && <div style={s.statDivider} />}
               <button style={{ ...s.statBtn, ...(hoveredStat === stat.key ? s.statBtnHover : {}) }}
-                onMouseEnter={() => setHoveredStat(stat.key as StatType)} onMouseLeave={() => setHoveredStat(null)} onClick={handleStatClick}>
+                onMouseEnter={() => setHoveredStat(stat.key)} onMouseLeave={() => setHoveredStat(null)} onClick={() => handleStatClick(stat.key)}>
                 <div style={s.statItem}><span style={s.statNumber}>{stat.value}</span><span style={s.statLabel}>{stat.label}</span></div>
               </button>
             </React.Fragment>
