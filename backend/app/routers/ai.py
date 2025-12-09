@@ -6,19 +6,24 @@ Handles AI-powered conversational vehicle discovery using Anthropic Claude API
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-import os
 import httpx
+import logging
+
+# Use secure key manager instead of raw os.getenv
+from app.core.security import get_key_manager
 
 router = APIRouter()
+logger = logging.getLogger("quirk_kiosk.ai")
 
 # Anthropic API configuration
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+
 
 # Request/Response models
 class ConversationMessage(BaseModel):
     role: str
     content: str
+
 
 class AIChatRequest(BaseModel):
     message: str
@@ -26,9 +31,11 @@ class AIChatRequest(BaseModel):
     conversationHistory: List[ConversationMessage] = []
     customerName: Optional[str] = None
 
+
 class AIChatResponse(BaseModel):
     message: str
     suggestedVehicles: Optional[List[str]] = None
+
 
 # System prompt for the AI assistant
 SYSTEM_PROMPT = """You are a friendly, knowledgeable AI sales assistant on an interactive kiosk INSIDE the Quirk Chevrolet showroom. The customer you're speaking with is physically present in the dealership RIGHT NOW, standing in front of this kiosk. Your goal is to help customers find their perfect vehicle and build a relationship with them.
@@ -95,15 +102,20 @@ INVENTORY CONTEXT:
 
 Remember: You're here to help customers find the right vehicle and build trust. Focus on understanding their complete situation - including their trade, budget, and financing - so you can provide the best guidance."""
 
+
 @router.post("/chat", response_model=AIChatResponse)
 async def chat_with_ai(request: AIChatRequest):
     """
     Process a chat message and return AI response with vehicle recommendations
     """
     
+    # Get API key from secure key manager
+    key_manager = get_key_manager()
+    api_key = key_manager.anthropic_key
+    
     # Check for API key
-    if not ANTHROPIC_API_KEY:
-        # Fallback response when no API key is configured
+    if not api_key:
+        logger.warning("Anthropic API key not configured - using fallback response")
         return AIChatResponse(
             message=generate_fallback_response(request.message, request.customerName),
             suggestedVehicles=None
@@ -139,7 +151,7 @@ async def chat_with_ai(request: AIChatRequest):
                 ANTHROPIC_API_URL,
                 headers={
                     "Content-Type": "application/json",
-                    "x-api-key": ANTHROPIC_API_KEY,
+                    "x-api-key": api_key,
                     "anthropic-version": "2023-06-01"
                 },
                 json={
@@ -152,7 +164,8 @@ async def chat_with_ai(request: AIChatRequest):
             )
             
             if response.status_code != 200:
-                print(f"Anthropic API error: {response.status_code} - {response.text}")
+                # Log error without exposing API key
+                logger.error(f"Anthropic API error: {response.status_code}")
                 return AIChatResponse(
                     message=generate_fallback_response(request.message, request.customerName),
                     suggestedVehicles=None
@@ -169,12 +182,20 @@ async def chat_with_ai(request: AIChatRequest):
                 suggestedVehicles=suggested_vehicles if suggested_vehicles else None
             )
             
-    except Exception as e:
-        print(f"AI Chat error: {str(e)}")
+    except httpx.TimeoutException:
+        logger.error("Anthropic API timeout")
         return AIChatResponse(
             message=generate_fallback_response(request.message, request.customerName),
             suggestedVehicles=None
         )
+    except Exception as e:
+        # Log error without exposing sensitive details
+        logger.exception("AI Chat error occurred")
+        return AIChatResponse(
+            message=generate_fallback_response(request.message, request.customerName),
+            suggestedVehicles=None
+        )
+
 
 def generate_fallback_response(message: str, customer_name: Optional[str] = None) -> str:
     """Generate a helpful fallback response when AI is unavailable"""
@@ -200,6 +221,7 @@ def generate_fallback_response(message: str, customer_name: Optional[str] = None
     
     else:
         return f"{greeting}I'd love to help you find the perfect vehicle! To give you the best recommendations, could you tell me a bit more about what you're looking for? For example:\n\n• What will you primarily use it for? (commuting, family, work, fun)\n• How many passengers do you typically carry?\n• Any must-have features?\n• Do you have a budget in mind?"
+
 
 def extract_stock_numbers(text: str) -> List[str]:
     """Extract stock numbers from AI response text"""
