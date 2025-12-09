@@ -5,6 +5,53 @@
 
 import type { Vehicle } from '../types';
 
+/**
+ * Registry of available stock vehicle images in /public/images/vehicles/
+ * Format: {model}-{color}.jpg
+ * 
+ * To add new images:
+ * 1. Add the image file to frontend/public/images/vehicles/ with naming: {model}-{color}.jpg
+ * 2. Add the model and color to this registry
+ */
+export const AVAILABLE_VEHICLE_IMAGES: Record<string, string[]> = {
+  'corvette': ['black'],
+  'equinox': ['blue', 'gray', 'green', 'red', 'white'],
+  'trailblazer': ['white'],
+};
+
+/**
+ * Check if we have a local image for this model/color combination
+ */
+export const hasLocalImage = (model: string, color: string): boolean => {
+  const modelKey = model.toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/-ev$/, '')
+    .replace(/-hd$/, '')
+    .replace(/\d+$/, '');
+  
+  const colorCategory = getColorCategory(color);
+  return AVAILABLE_VEHICLE_IMAGES[modelKey]?.includes(colorCategory) || false;
+};
+
+/**
+ * Get the local image path for a vehicle if available
+ */
+export const getLocalImagePath = (model: string, color: string): string | null => {
+  const modelKey = model.toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/-ev$/, '')
+    .replace(/-hd$/, '')
+    .replace(/\d+$/, '');
+  
+  const colorCategory = getColorCategory(color);
+  
+  if (AVAILABLE_VEHICLE_IMAGES[modelKey]?.includes(colorCategory)) {
+    return `/images/vehicles/${modelKey}-${colorCategory}.jpg`;
+  }
+  
+  return null;
+};
+
 // GM Truck VIN Decoder - extracts cab type and drive type for Silverado models
 export interface TruckVINInfo {
   cabType: string;
@@ -165,6 +212,7 @@ export const getVehicleImageCandidates = (vehicle: Vehicle, exteriorColor: strin
 
 /**
  * Get single vehicle image URL (for inventory listings)
+ * Priority: API URL > Local stock photo > null (will use gradient fallback)
  */
 export const getVehicleImageUrl = (vehicle: Vehicle): string | null => {
   // Check for API-provided URLs first
@@ -172,21 +220,12 @@ export const getVehicleImageUrl = (vehicle: Vehicle): string | null => {
   if (vehicle.image_url) return vehicle.image_url;
   if (vehicle.images && vehicle.images.length > 0) return vehicle.images[0];
   
-  // Normalize model for file matching
-  const fullModel = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const baseModel = fullModel.replace(/-ev$/, '').replace(/-hd$/, '').replace(/\d+$/, '');
-  const exteriorColor = (vehicle.exteriorColor || vehicle.exterior_color || '').toLowerCase();
-  const colorCategory = getColorCategory(exteriorColor);
+  // Try local stock photo matching
+  const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
+  const model = vehicle.model || '';
   
-  // Use base model name for images (equinox-ev uses equinox-gray.jpg)
-  const modelForImage = baseModel || fullModel;
-  
-  if (modelForImage && colorCategory) {
-    return `/images/vehicles/${modelForImage}-${colorCategory}.jpg`;
-  }
-  if (modelForImage) {
-    return `/images/vehicles/${modelForImage}.jpg`;
-  }
+  const localPath = getLocalImagePath(model, exteriorColor);
+  if (localPath) return localPath;
   
   return null;
 };
