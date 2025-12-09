@@ -28,19 +28,37 @@ const formatPrice = (price?: number): string => {
 };
 
 // Map color descriptions to base color categories
+// Handles truncated color names (e.g., "Blu" → "blue", "Whi" → "white")
 const getColorCategory = (colorDesc: string): string => {
-  const c = colorDesc.toLowerCase();
-  // Check black first, including "mosaic" for Mosaic Black Metallic
-  if (c.includes('black') || c.includes('mosaic')) return 'black';
-  if (c.includes('white') || c.includes('summit') || c.includes('arctic') || c.includes('polar') || c.includes('iridescent')) return 'white';
-  if (c.includes('red') || c.includes('cherry') || c.includes('cajun') || c.includes('radiant') || c.includes('garnet')) return 'red';
-  if (c.includes('blue') || c.includes('northsky') || c.includes('glacier') || c.includes('reef') || c.includes('midnight')) return 'blue';
-  if (c.includes('gray') || c.includes('grey') || c.includes('shadow') || c.includes('sterling') || c.includes('satin steel')) return 'gray';
-  if (c.includes('silver')) return 'silver';
-  if (c.includes('green') || c.includes('woodland') || c.includes('evergreen')) return 'green';
-  if (c.includes('orange') || c.includes('tangier') || c.includes('cayenne')) return 'orange';
-  if (c.includes('yellow') || c.includes('accelerate') || c.includes('nitro')) return 'yellow';
-  if (c.includes('brown') || c.includes('harvest') || c.includes('auburn')) return 'brown';
+  const c = colorDesc.toLowerCase().trim();
+  
+  // If empty or too short, return empty
+  if (c.length < 2) return '';
+  
+  // Define color mappings with keywords and partial matches
+  const colorMappings: Array<{ category: string; keywords: string[] }> = [
+    { category: 'black', keywords: ['black', 'blac', 'bla', 'mosaic', 'onyx', 'ebony'] },
+    { category: 'white', keywords: ['white', 'whit', 'whi', 'summit', 'arctic', 'polar', 'iridescent', 'pearl'] },
+    { category: 'red', keywords: ['red', 'cherry', 'cajun', 'radiant', 'garnet', 'crimson'] },
+    { category: 'blue', keywords: ['blue', 'blu', 'northsky', 'glacier', 'reef', 'midnight', 'navy'] },
+    { category: 'gray', keywords: ['gray', 'grey', 'gra', 'shadow', 'sterling', 'satin steel', 'graphite'] },
+    { category: 'silver', keywords: ['silver', 'silve', 'silv', 'sil'] },
+    { category: 'green', keywords: ['green', 'gree', 'gre', 'woodland', 'evergreen', 'forest'] },
+    { category: 'orange', keywords: ['orange', 'orang', 'oran', 'ora', 'tangier', 'cayenne'] },
+    { category: 'yellow', keywords: ['yellow', 'yello', 'yell', 'yel', 'accelerate', 'nitro'] },
+    { category: 'brown', keywords: ['brown', 'brow', 'bro', 'harvest', 'auburn', 'bronze'] },
+  ];
+  
+  // Check each color mapping
+  for (const mapping of colorMappings) {
+    for (const keyword of mapping.keywords) {
+      // Check if color contains keyword OR keyword starts with color (for truncated names)
+      if (c.includes(keyword) || (keyword.startsWith(c) && c.length >= 2)) {
+        return mapping.category;
+      }
+    }
+  }
+  
   return '';
 };
 
