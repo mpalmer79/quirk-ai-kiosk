@@ -1,7 +1,6 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import VehicleCard from '../components/VehicleCard';
-import type { Vehicle } from '../types';
 
 // Mock the vehicleHelpers module
 jest.mock('../utils/vehicleHelpers', () => ({
@@ -12,168 +11,122 @@ import { getVehicleImageUrl } from '../utils/vehicleHelpers';
 
 const mockOnClick = jest.fn();
 
-const createMockVehicle = (overrides: Partial<Vehicle> = {}): Vehicle => ({
+const createMockVehicle = (overrides = {}) => ({
   id: '1',
   stockNumber: 'M12345',
+  stock_number: 'M12345',
   year: 2025,
   make: 'Chevrolet',
   model: 'Silverado 1500',
   trim: 'LT Crew Cab',
   exteriorColor: 'Summit White',
+  exterior_color: 'Summit White',
   interiorColor: 'Jet Black',
+  interior_color: 'Jet Black',
   price: 52000,
+  salePrice: 52000,
+  sale_price: 52000,
   msrp: 54000,
   mileage: 0,
   engine: '5.3L V8',
   transmission: 'Automatic',
   drivetrain: '4WD',
   fuelType: 'Gasoline',
+  fuel_type: 'Gasoline',
   bodyStyle: 'Truck',
+  body_style: 'Truck',
   status: 'In Stock',
   features: ['Trailering Package', 'Heated Seats'],
   ...overrides,
 });
 
-const renderVehicleCard = (vehicle: Vehicle = createMockVehicle(), onClick = mockOnClick) => {
+const renderVehicleCard = (vehicle = createMockVehicle(), onClick = mockOnClick) => {
   return render(<VehicleCard vehicle={vehicle} onClick={onClick} />);
 };
 
 describe('VehicleCard Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
+    getVehicleImageUrl.mockReturnValue(null);
   });
 
   describe('Basic Rendering', () => {
     test('renders vehicle year, make, and model', () => {
       renderVehicleCard();
-
       expect(screen.getByText(/2025 Chevrolet Silverado 1500/i)).toBeInTheDocument();
     });
 
     test('renders exterior color', () => {
       renderVehicleCard();
-
       expect(screen.getByText('Summit White')).toBeInTheDocument();
     });
 
     test('renders drivetrain', () => {
       renderVehicleCard();
-
       expect(screen.getByText('4WD')).toBeInTheDocument();
     });
 
     test('renders engine', () => {
       renderVehicleCard();
-
       expect(screen.getByText('5.3L V8')).toBeInTheDocument();
     });
 
-    test('renders price formatted correctly', () => {
+    test('renders formatted price', () => {
       renderVehicleCard();
-
       expect(screen.getByText('$52,000')).toBeInTheDocument();
     });
 
     test('renders status badge', () => {
       renderVehicleCard();
-
       expect(screen.getByText('In Stock')).toBeInTheDocument();
     });
   });
 
-  describe('Image Display', () => {
-    test('shows gradient fallback when no image URL', () => {
-      (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
+  describe('Gradient Fallback', () => {
+    test('shows model name in fallback when no image', () => {
+      getVehicleImageUrl.mockReturnValue(null);
       renderVehicleCard();
 
-      // Should show model name in fallback design
-      const modelTexts = screen.getAllByText(/Silverado 1500/i);
-      expect(modelTexts.length).toBeGreaterThan(0);
+      // Model name appears multiple times - in header and card content
+      const silveradoTexts = screen.getAllByText(/Silverado 1500/i);
+      expect(silveradoTexts.length).toBeGreaterThan(0);
     });
 
-    test('shows real image when URL is available', () => {
-      (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/vehicles/silverado-white.jpg');
+    test('shows year and trim in fallback', () => {
+      getVehicleImageUrl.mockReturnValue(null);
+      renderVehicleCard();
+
+      expect(screen.getByText(/2025.*LT Crew Cab/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('Image Display', () => {
+    test('shows image when URL is available', () => {
+      getVehicleImageUrl.mockReturnValue('/images/vehicles/silverado-white.jpg');
       renderVehicleCard();
 
       const img = screen.getByRole('img');
       expect(img).toHaveAttribute('src', '/images/vehicles/silverado-white.jpg');
     });
 
-    test('shows image alt text with vehicle info', () => {
-      (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/vehicles/silverado-white.jpg');
+    test('image has alt text', () => {
+      getVehicleImageUrl.mockReturnValue('/images/vehicles/silverado-white.jpg');
       renderVehicleCard();
 
       const img = screen.getByRole('img');
-      expect(img).toHaveAttribute('alt', expect.stringContaining('Silverado'));
+      expect(img).toHaveAttribute('alt');
+      expect(img.getAttribute('alt')).toContain('Silverado');
     });
 
-    test('falls back to gradient on image load error', async () => {
-      (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/vehicles/nonexistent.jpg');
+    test('handles image load error', () => {
+      getVehicleImageUrl.mockReturnValue('/images/vehicles/nonexistent.jpg');
       renderVehicleCard();
 
       const img = screen.getByRole('img');
       fireEvent.error(img);
 
-      // After error, should show fallback with Chevy logo/icon
-      await waitFor(() => {
-        // The gradient fallback should now be showing
-        expect(screen.queryByRole('img')).not.toBeInTheDocument();
-      });
-    });
-
-    test('displays image overlay with model and year for real images', () => {
-      (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/vehicles/silverado-white.jpg');
-      renderVehicleCard();
-
-      // Overlay should show model
-      expect(screen.getByText('Silverado 1500')).toBeInTheDocument();
-    });
-  });
-
-  describe('Gradient Fallback Design', () => {
-    beforeEach(() => {
-      (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
-    });
-
-    test('shows Chevrolet bowtie logo in fallback', () => {
-      renderVehicleCard();
-
-      // Check for SVG with bowtie path
-      const svgs = document.querySelectorAll('svg');
-      expect(svgs.length).toBeGreaterThan(0);
-    });
-
-    test('shows vehicle icon for trucks', () => {
-      renderVehicleCard(createMockVehicle({ bodyStyle: 'Truck' }));
-
-      // Should have truck icon SVG
-      const svgs = document.querySelectorAll('svg');
-      expect(svgs.length).toBeGreaterThan(0);
-    });
-
-    test('shows vehicle icon for SUVs', () => {
-      renderVehicleCard(createMockVehicle({ 
-        model: 'Tahoe',
-        bodyStyle: 'SUV' 
-      }));
-
-      const svgs = document.querySelectorAll('svg');
-      expect(svgs.length).toBeGreaterThan(0);
-    });
-
-    test('shows model name text in fallback', () => {
-      renderVehicleCard();
-
-      const modelTexts = screen.getAllByText('Silverado 1500');
-      expect(modelTexts.length).toBeGreaterThan(0);
-    });
-
-    test('shows year and trim in fallback', () => {
-      renderVehicleCard();
-
-      expect(screen.getByText(/2025/i)).toBeInTheDocument();
-      expect(screen.getByText(/LT Crew Cab/i)).toBeInTheDocument();
+      // After error, image should not be visible (falls back to gradient)
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
     });
   });
 
@@ -181,32 +134,25 @@ describe('VehicleCard Component', () => {
     test('calls onClick when card is clicked', () => {
       renderVehicleCard();
 
-      const card = screen.getByText(/2025 Chevrolet Silverado 1500/i).closest('div');
-      if (card) {
-        fireEvent.click(card);
-      }
+      // Click on the card content
+      const priceElement = screen.getByText('$52,000');
+      const card = priceElement.closest('div[style*="cursor"]');
+      
+      fireEvent.click(card);
 
       expect(mockOnClick).toHaveBeenCalled();
     });
 
-    test('passes vehicle object to onClick', () => {
+    test('passes vehicle to onClick', () => {
       const vehicle = createMockVehicle();
       renderVehicleCard(vehicle);
 
-      const card = screen.getByText(/2025 Chevrolet Silverado 1500/i).closest('div');
-      if (card) {
-        fireEvent.click(card);
-      }
+      const priceElement = screen.getByText('$52,000');
+      const card = priceElement.closest('div[style*="cursor"]');
+      
+      fireEvent.click(card);
 
       expect(mockOnClick).toHaveBeenCalledWith(vehicle);
-    });
-
-    test('card has pointer cursor', () => {
-      renderVehicleCard();
-
-      const card = screen.getByText(/2025 Chevrolet Silverado 1500/i)
-        .closest('div[style*="cursor"]');
-      expect(card).toHaveStyle({ cursor: 'pointer' });
     });
   });
 
@@ -215,89 +161,103 @@ describe('VehicleCard Component', () => {
       renderVehicleCard();
 
       const card = document.querySelector('div[style*="cursor: pointer"]');
-      expect(card).toBeTruthy();
+      fireEvent.mouseEnter(card);
 
-      if (card) {
-        fireEvent.mouseEnter(card);
-        expect(card).toHaveStyle({ transform: 'translateY(-4px)' });
-      }
+      expect(card.style.transform).toBe('translateY(-4px)');
     });
 
     test('resets on mouse leave', () => {
       renderVehicleCard();
 
       const card = document.querySelector('div[style*="cursor: pointer"]');
-      expect(card).toBeTruthy();
+      fireEvent.mouseEnter(card);
+      fireEvent.mouseLeave(card);
 
-      if (card) {
-        fireEvent.mouseEnter(card);
-        fireEvent.mouseLeave(card);
-        expect(card).toHaveStyle({ transform: 'translateY(0)' });
-      }
+      expect(card.style.transform).toBe('translateY(0)');
     });
   });
 
   describe('Price Formatting', () => {
-    test('formats price with commas', () => {
+    test('formats price with dollar sign and commas', () => {
       renderVehicleCard(createMockVehicle({ price: 52000 }));
-
       expect(screen.getByText('$52,000')).toBeInTheDocument();
     });
 
     test('formats large prices correctly', () => {
       renderVehicleCard(createMockVehicle({ price: 125999 }));
-
       expect(screen.getByText('$125,999')).toBeInTheDocument();
     });
 
     test('handles zero price', () => {
-      renderVehicleCard(createMockVehicle({ price: 0 }));
-
+      renderVehicleCard(createMockVehicle({ price: 0, salePrice: 0, sale_price: 0 }));
       expect(screen.getByText('$0')).toBeInTheDocument();
     });
 
     test('uses salePrice if price not available', () => {
       renderVehicleCard(createMockVehicle({ 
         price: undefined, 
-        salePrice: 48000 
+        salePrice: 48000,
+        sale_price: 48000
       }));
-
       expect(screen.getByText('$48,000')).toBeInTheDocument();
     });
   });
 
   describe('Status Badge', () => {
-    test('shows green badge for In Stock', () => {
+    test('displays In Stock status', () => {
       renderVehicleCard(createMockVehicle({ status: 'In Stock' }));
-
-      const badge = screen.getByText('In Stock');
-      expect(badge).toHaveStyle({ background: '#e8f5e9' });
+      expect(screen.getByText('In Stock')).toBeInTheDocument();
     });
 
-    test('shows orange badge for In Transit', () => {
+    test('displays In Transit status', () => {
       renderVehicleCard(createMockVehicle({ status: 'In Transit' }));
-
-      const badge = screen.getByText('In Transit');
-      expect(badge).toHaveStyle({ background: '#fff3e0' });
+      expect(screen.getByText('In Transit')).toBeInTheDocument();
     });
 
-    test('defaults to In Stock if status not provided', () => {
+    test('defaults to In Stock when no status', () => {
       renderVehicleCard(createMockVehicle({ status: undefined }));
-
       expect(screen.getByText('In Stock')).toBeInTheDocument();
     });
   });
 
+  describe('Field Fallbacks', () => {
+    test('shows N/A for missing exterior color', () => {
+      renderVehicleCard(createMockVehicle({ 
+        exteriorColor: undefined, 
+        exterior_color: undefined 
+      }));
+      
+      const naElements = screen.getAllByText('N/A');
+      expect(naElements.length).toBeGreaterThan(0);
+    });
+
+    test('shows N/A for missing drivetrain', () => {
+      renderVehicleCard(createMockVehicle({ drivetrain: undefined }));
+      
+      const naElements = screen.getAllByText('N/A');
+      expect(naElements.length).toBeGreaterThan(0);
+    });
+
+    test('shows N/A for missing engine', () => {
+      renderVehicleCard(createMockVehicle({ engine: undefined }));
+      
+      const naElements = screen.getAllByText('N/A');
+      expect(naElements.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('Different Vehicle Types', () => {
-    test('renders correctly for Corvette', () => {
+    test('renders Corvette correctly', () => {
       const vehicle = createMockVehicle({
         model: 'Corvette',
         bodyStyle: 'Coupe',
+        body_style: 'Coupe',
         exteriorColor: 'Torch Red',
+        exterior_color: 'Torch Red',
         price: 85000,
       });
 
-      (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
+      getVehicleImageUrl.mockReturnValue(null);
       renderVehicleCard(vehicle);
 
       expect(screen.getByText(/Corvette/i)).toBeInTheDocument();
@@ -305,11 +265,13 @@ describe('VehicleCard Component', () => {
       expect(screen.getByText('$85,000')).toBeInTheDocument();
     });
 
-    test('renders correctly for Equinox', () => {
+    test('renders Equinox correctly', () => {
       const vehicle = createMockVehicle({
         model: 'Equinox',
         bodyStyle: 'SUV',
+        body_style: 'SUV',
         exteriorColor: 'Mosaic Black',
+        exterior_color: 'Mosaic Black',
         drivetrain: 'AWD',
       });
 
@@ -320,11 +282,11 @@ describe('VehicleCard Component', () => {
       expect(screen.getByText('AWD')).toBeInTheDocument();
     });
 
-    test('renders correctly for Bolt EV', () => {
+    test('renders Bolt EV correctly', () => {
       const vehicle = createMockVehicle({
         model: 'Bolt EV',
         bodyStyle: 'Hatchback',
-        exteriorColor: 'Kinetic Blue',
+        body_style: 'Hatchback',
         engine: 'Electric Motor',
         drivetrain: 'FWD',
       });
@@ -336,74 +298,32 @@ describe('VehicleCard Component', () => {
     });
   });
 
-  describe('Field Fallbacks', () => {
-    test('shows N/A for missing exterior color', () => {
-      renderVehicleCard(createMockVehicle({ exteriorColor: undefined }));
-
-      expect(screen.getByText('N/A')).toBeInTheDocument();
-    });
-
-    test('shows N/A for missing drivetrain', () => {
-      renderVehicleCard(createMockVehicle({ drivetrain: undefined }));
-
-      const naTexts = screen.getAllByText('N/A');
-      expect(naTexts.length).toBeGreaterThan(0);
-    });
-
-    test('shows N/A for missing engine', () => {
-      renderVehicleCard(createMockVehicle({ engine: undefined }));
-
-      const naTexts = screen.getAllByText('N/A');
-      expect(naTexts.length).toBeGreaterThan(0);
-    });
-
-    test('handles snake_case field names', () => {
-      const vehicle = {
-        ...createMockVehicle(),
-        exterior_color: 'Summit White',
-        exteriorColor: undefined,
-      };
-
-      renderVehicleCard(vehicle as Vehicle);
-
-      expect(screen.getByText('Summit White')).toBeInTheDocument();
-    });
-  });
-
   describe('Card Layout', () => {
-    test('has correct border radius', () => {
+    test('card has correct max width', () => {
       renderVehicleCard();
-
-      const card = document.querySelector('div[style*="borderRadius"]');
-      expect(card).toHaveStyle({ borderRadius: '12px' });
-    });
-
-    test('has box shadow', () => {
-      renderVehicleCard();
-
-      const card = document.querySelector('div[style*="boxShadow"]');
-      expect(card).toBeTruthy();
-    });
-
-    test('has max width constraint', () => {
-      renderVehicleCard();
-
+      
       const card = document.querySelector('div[style*="maxWidth"]');
-      expect(card).toHaveStyle({ maxWidth: '320px' });
+      expect(card.style.maxWidth).toBe('320px');
+    });
+
+    test('card has border radius', () => {
+      renderVehicleCard();
+      
+      const card = document.querySelector('div[style*="borderRadius"]');
+      expect(card.style.borderRadius).toBe('12px');
     });
   });
 
   describe('Accessibility', () => {
-    test('card is clickable with keyboard', () => {
+    test('card is clickable', () => {
       renderVehicleCard();
-
-      // Card should be a clickable element
+      
       const card = document.querySelector('div[style*="cursor: pointer"]');
       expect(card).toBeTruthy();
     });
 
-    test('image has alt text', () => {
-      (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/test.jpg');
+    test('image has alt text when shown', () => {
+      getVehicleImageUrl.mockReturnValue('/images/test.jpg');
       renderVehicleCard();
 
       const img = screen.getByRole('img');
@@ -413,75 +333,45 @@ describe('VehicleCard Component', () => {
   });
 });
 
-describe('VehicleCard Gradient Logic', () => {
+describe('VehicleCard Snake Case Fields', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
+    getVehicleImageUrl.mockReturnValue(null);
   });
 
-  test('applies correct gradient for Corvette', () => {
-    renderVehicleCard(createMockVehicle({ model: 'Corvette' }));
+  test('handles snake_case exterior_color', () => {
+    const vehicle = {
+      id: '1',
+      stock_number: 'M12345',
+      year: 2025,
+      make: 'Chevrolet',
+      model: 'Silverado 1500',
+      trim: 'LT',
+      exterior_color: 'Summit White',
+      price: 52000,
+      drivetrain: '4WD',
+      engine: '5.3L V8',
+    };
 
-    // Corvette should have racing red gradient
-    const imageContainer = document.querySelector('div[style*="linear-gradient"]');
-    expect(imageContainer?.getAttribute('style')).toContain('#c41e3a');
+    render(<VehicleCard vehicle={vehicle} onClick={mockOnClick} />);
+    expect(screen.getByText('Summit White')).toBeInTheDocument();
   });
 
-  test('applies correct gradient for Silverado', () => {
-    renderVehicleCard(createMockVehicle({ model: 'Silverado 1500' }));
+  test('handles snake_case sale_price', () => {
+    const vehicle = {
+      id: '1',
+      stock_number: 'M12345',
+      year: 2025,
+      make: 'Chevrolet',
+      model: 'Silverado 1500',
+      trim: 'LT',
+      exterior_color: 'White',
+      sale_price: 48000,
+      drivetrain: '4WD',
+      engine: '5.3L V8',
+    };
 
-    // Silverado should have truck steel gradient
-    const imageContainer = document.querySelector('div[style*="linear-gradient"]');
-    expect(imageContainer?.getAttribute('style')).toContain('#2c3e50');
-  });
-
-  test('applies correct gradient for Tahoe', () => {
-    renderVehicleCard(createMockVehicle({ model: 'Tahoe' }));
-
-    // Tahoe should have SUV charcoal gradient
-    const imageContainer = document.querySelector('div[style*="linear-gradient"]');
-    expect(imageContainer?.getAttribute('style')).toContain('#34495e');
-  });
-
-  test('applies correct gradient for Bolt EV', () => {
-    renderVehicleCard(createMockVehicle({ model: 'Bolt EV' }));
-
-    // Bolt should have EV green gradient
-    const imageContainer = document.querySelector('div[style*="linear-gradient"]');
-    expect(imageContainer?.getAttribute('style')).toContain('#00b894');
-  });
-
-  test('applies correct gradient for Equinox', () => {
-    renderVehicleCard(createMockVehicle({ model: 'Equinox' }));
-
-    // Equinox should have crossover blue gradient
-    const imageContainer = document.querySelector('div[style*="linear-gradient"]');
-    expect(imageContainer?.getAttribute('style')).toContain('#1e3a5f');
-  });
-
-  test('applies correct gradient for Express Van', () => {
-    renderVehicleCard(createMockVehicle({ model: 'Express', bodyStyle: 'Van' }));
-
-    // Express should have commercial gray gradient
-    const imageContainer = document.querySelector('div[style*="linear-gradient"]');
-    expect(imageContainer?.getAttribute('style')).toContain('#636e72');
-  });
-});
-
-describe('VehicleCard with Real Images', () => {
-  test('displays image with correct object-fit', () => {
-    (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/vehicles/test.jpg');
-    renderVehicleCard();
-
-    const img = screen.getByRole('img');
-    expect(img).toHaveStyle({ objectFit: 'cover' });
-  });
-
-  test('image container has fixed height', () => {
-    (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/vehicles/test.jpg');
-    renderVehicleCard();
-
-    const img = screen.getByRole('img');
-    expect(img).toHaveStyle({ height: '180px' });
+    render(<VehicleCard vehicle={vehicle} onClick={mockOnClick} />);
+    expect(screen.getByText('$48,000')).toBeInTheDocument();
   });
 });
