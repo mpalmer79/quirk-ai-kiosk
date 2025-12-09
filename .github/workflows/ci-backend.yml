@@ -1,69 +1,175 @@
-name: CI/CD - Backend API Gateway
+name: CI/CD - Backend API
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+      - development
     paths:
       - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - development
     paths:
       - 'backend/**'
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/backend
+  PYTHON_VERSION: '3.11'
 
 jobs:
-  build_and_push_backend:
+  lint:
+    name: 🔍 Lint
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
+    
     steps:
-      - name: Checkout Repository
+      - name: ⬇️ Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install Dependencies & Run Tests
+      - name: 📦 Install Linting Tools
+        run: |
+          pip install ruff
+
+      - name: 🔍 Run Ruff Linter
+        run: |
+          cd backend
+          ruff check app/ --output-format=github || true
+
+  test:
+    name: 🧪 Test Suite
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: 📦 Install Dependencies
         run: |
           cd backend
           pip install -r requirements.txt
-          python -m pytest tests/ -v --tb=short
+          pip install pytest-cov
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 🧪 Run Tests with Coverage
+        run: |
+          cd backend
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing
+        env:
+          ENVIRONMENT: test
+          ANTHROPIC_API_KEY: test-key
 
-      - name: Extract Metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: 📊 Upload Coverage
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=sha
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 7
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
         with:
-          context: ./backend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📦 Install Security Tools
+        run: |
+          pip install bandit safety
+
+      - name: 🔒 Run Bandit Security Scan
+        run: |
+          cd backend
+          bandit -r app/ -ll -ii || true
+
+      - name: 🔒 Check Dependencies for Vulnerabilities
+        run: |
+          cd backend
+          safety check -r requirements.txt || true
+
+  build:
+    name: 🐳 Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [test]
+    
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐳 Build Docker Image
+        run: |
+          cd backend
+          docker build -t quirk-kiosk-backend:${{ github.sha }} .
+
+      - name: 🧪 Test Docker Image
+        run: |
+          docker run --rm -d --name test-backend -p 8000:8000 \
+            -e ENVIRONMENT=test \
+            quirk-kiosk-backend:${{ github.sha }}
+          sleep 5
+          curl -f http://localhost:8000/api/health || exit 1
+          docker stop test-backend
+```
+
+---
+
+## 15. `backend/requirements.txt` (complete updated)
+```
+# FastAPI Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic[email]==2.5.2
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# HTTP Client
+httpx==0.25.2
+
+# Data Processing
+openpyxl==3.1.2
+pandas==2.1.3
+
+# Configuration
+python-dotenv==1.0.0
+
+# Validation
+email-validator==2.1.0
+
+# PostgreSQL
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.23
+psycopg2-binary==2.9.9
+
+# Rate Limiting
+slowapi==0.1.9
+
+# Caching (optional - install if using Redis)
+# redis==5.0.1
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.23.2
+pytest-cov==4.1.0
+
+# Security & Quality (dev)
+# bandit==1.7.6
+# ruff==0.1.8
+# safety==2.3.5
