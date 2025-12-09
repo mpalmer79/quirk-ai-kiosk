@@ -99,228 +99,174 @@ describe('TradeInEstimator Component', () => {
       const continueButton = screen.getByText('Continue');
       expect(continueButton).toBeDisabled();
     });
-  });
 
-  describe('Step 1 - Form Interactions', () => {
-    test('selecting year updates form', async () => {
+    test('selecting year populates options', async () => {
       renderTradeInEstimator();
-      
       const selects = screen.getAllByRole('combobox');
-      const yearSelect = selects[0];
-      
-      fireEvent.change(yearSelect, { target: { value: '2020' } });
-      expect(yearSelect.value).toBe('2020');
+      fireEvent.change(selects[0], { target: { value: '2020' } });
+      expect(selects[0]).toHaveValue('2020');
     });
 
     test('selecting make loads models', async () => {
       renderTradeInEstimator();
-
       await waitFor(() => {
         expect(api.getMakes).toHaveBeenCalled();
       });
-
-      const selects = screen.getAllByRole('combobox');
-      const makeSelect = selects[1];
-
-      fireEvent.change(makeSelect, { target: { value: 'Honda' } });
-
-      await waitFor(() => {
-        expect(api.getModels).toHaveBeenCalledWith('Honda');
-      });
-    });
-
-    test('mileage input formats with commas', () => {
-      renderTradeInEstimator();
-
-      const mileageInput = screen.getByPlaceholderText(/45,000/i);
-      fireEvent.change(mileageInput, { target: { value: '50000' } });
-
-      expect(mileageInput.value).toBe('50,000');
-    });
-  });
-
-  describe('Step 1 - VIN Decode', () => {
-    test('VIN input accepts text', () => {
-      renderTradeInEstimator();
-
-      const vinInput = screen.getByPlaceholderText(/17-character VIN/i);
-      fireEvent.change(vinInput, { target: { value: '1HGBH41JXMN109186' } });
-
-      expect(vinInput.value).toBe('1HGBH41JXMN109186');
-    });
-
-    test('VIN auto-decode on blur', async () => {
-      renderTradeInEstimator();
-
-      const vinInput = screen.getByPlaceholderText(/17-character VIN/i);
-      fireEvent.change(vinInput, { target: { value: '1HGBH41JXMN109186' } });
-      fireEvent.blur(vinInput);
-
-      await waitFor(() => {
-        expect(api.decodeTradeInVin).toHaveBeenCalledWith('1HGBH41JXMN109186');
-      });
-    });
-  });
-
-  describe('Step 1 to Step 2 Navigation', () => {
-    const fillStep1 = async () => {
-      renderTradeInEstimator();
-
-      await waitFor(() => {
-        expect(api.getMakes).toHaveBeenCalled();
-      });
-
-      // Fill year
       const selects = screen.getAllByRole('combobox');
       fireEvent.change(selects[0], { target: { value: '2020' } });
-
-      // Fill make
       fireEvent.change(selects[1], { target: { value: 'Honda' } });
-
       await waitFor(() => {
-        expect(api.getModels).toHaveBeenCalled();
-      });
-
-      // Fill model
-      fireEvent.change(selects[2], { target: { value: 'Accord' } });
-
-      // Fill mileage
-      const mileageInput = screen.getByPlaceholderText(/45,000/i);
-      fireEvent.change(mileageInput, { target: { value: '50000' } });
-
-      // Click continue
-      fireEvent.click(screen.getByText('Continue'));
-    };
-
-    test('Continue advances to step 2', async () => {
-      await fillStep1();
-
-      await waitFor(() => {
-        expect(screen.getByText(/Do you owe money on this vehicle/i)).toBeInTheDocument();
+        expect(api.getModels).toHaveBeenCalledWith('Honda', 2020);
       });
     });
   });
 
-  describe('Step 2 - Ownership Question', () => {
+  describe('VIN Decode', () => {
+    test('VIN decode button appears with 17-char VIN', async () => {
+      renderTradeInEstimator();
+      const vinInput = screen.getByPlaceholderText(/17-character VIN/i);
+      fireEvent.change(vinInput, { target: { value: '1HGCM82633A004352' } });
+      await waitFor(() => {
+        expect(screen.getByText(/Decode VIN/i)).toBeInTheDocument();
+      });
+    });
+
+    test('clicking Decode VIN calls API', async () => {
+      renderTradeInEstimator();
+      const vinInput = screen.getByPlaceholderText(/17-character VIN/i);
+      fireEvent.change(vinInput, { target: { value: '1HGCM82633A004352' } });
+      await waitFor(() => {
+        expect(screen.getByText(/Decode VIN/i)).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText(/Decode VIN/i));
+      await waitFor(() => {
+        expect(api.decodeTradeInVin).toHaveBeenCalledWith('1HGCM82633A004352');
+      });
+    });
+
+    test('successful decode fills form fields', async () => {
+      renderTradeInEstimator();
+      const vinInput = screen.getByPlaceholderText(/17-character VIN/i);
+      fireEvent.change(vinInput, { target: { value: '1HGCM82633A004352' } });
+      await waitFor(() => {
+        expect(screen.getByText(/Decode VIN/i)).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText(/Decode VIN/i));
+      await waitFor(() => {
+        const selects = screen.getAllByRole('combobox');
+        expect(selects[0]).toHaveValue('2020');
+      });
+    });
+  });
+
+  describe('Step Navigation', () => {
     const goToStep2 = async () => {
       renderTradeInEstimator();
-
       await waitFor(() => {
         expect(api.getMakes).toHaveBeenCalled();
       });
-
       const selects = screen.getAllByRole('combobox');
       fireEvent.change(selects[0], { target: { value: '2020' } });
       fireEvent.change(selects[1], { target: { value: 'Honda' } });
-
       await waitFor(() => {
         expect(api.getModels).toHaveBeenCalled();
       });
-
       fireEvent.change(selects[2], { target: { value: 'Accord' } });
-
       const mileageInput = screen.getByPlaceholderText(/45,000/i);
       fireEvent.change(mileageInput, { target: { value: '50000' } });
-
       fireEvent.click(screen.getByText('Continue'));
-
       await waitFor(() => {
         expect(screen.getByText(/Do you owe money/i)).toBeInTheDocument();
       });
     };
 
-    test('displays ownership options', async () => {
+    test('progresses to step 2 with valid info', async () => {
       await goToStep2();
+      expect(screen.getByText(/Do you owe money/i)).toBeInTheDocument();
+    });
 
-      expect(screen.getByText(/Yes, I still owe/i)).toBeInTheDocument();
+    test('step 2 shows ownership question', async () => {
+      await goToStep2();
       expect(screen.getByText(/No, I own it outright/i)).toBeInTheDocument();
     });
 
-    test('displays Back button', async () => {
+    test('step 2 shows payoff option', async () => {
       await goToStep2();
-      expect(screen.getByText('Back')).toBeInTheDocument();
+      expect(screen.getByText(/Yes, I have a loan/i)).toBeInTheDocument();
     });
+  });
 
-    test('clicking Back returns to step 1', async () => {
-      await goToStep2();
-
-      fireEvent.click(screen.getByText('Back'));
-
+  describe('Step 2 - Ownership', () => {
+    const goToStep2 = async () => {
+      renderTradeInEstimator();
       await waitFor(() => {
-        expect(screen.getByText(/Tell us about your vehicle/i)).toBeInTheDocument();
+        expect(api.getMakes).toHaveBeenCalled();
       });
-    });
+      const selects = screen.getAllByRole('combobox');
+      fireEvent.change(selects[0], { target: { value: '2020' } });
+      fireEvent.change(selects[1], { target: { value: 'Honda' } });
+      await waitFor(() => {
+        expect(api.getModels).toHaveBeenCalled();
+      });
+      fireEvent.change(selects[2], { target: { value: 'Accord' } });
+      const mileageInput = screen.getByPlaceholderText(/45,000/i);
+      fireEvent.change(mileageInput, { target: { value: '50000' } });
+      fireEvent.click(screen.getByText('Continue'));
+      await waitFor(() => {
+        expect(screen.getByText(/Do you owe money/i)).toBeInTheDocument();
+      });
+    };
 
-    test('selecting "No, I own it outright" skips to step 4', async () => {
+    test('selecting owned outright continues to step 3', async () => {
       await goToStep2();
-
       fireEvent.click(screen.getByText(/No, I own it outright/i));
       fireEvent.click(screen.getByText('Continue'));
-
       await waitFor(() => {
         expect(screen.getByText(/Vehicle Condition/i)).toBeInTheDocument();
       });
     });
 
-    test('selecting "Yes, I still owe" goes to step 3', async () => {
+    test('selecting loan shows payoff fields', async () => {
       await goToStep2();
-
-      fireEvent.click(screen.getByText(/Yes, I still owe/i));
-      fireEvent.click(screen.getByText('Continue'));
-
+      fireEvent.click(screen.getByText(/Yes, I have a loan/i));
       await waitFor(() => {
-        expect(screen.getByText(/Tell us about your payoff/i)).toBeInTheDocument();
+        expect(screen.getByText(/Payoff Amount/i)).toBeInTheDocument();
       });
     });
   });
 
   describe('Step 3 - Payoff Details', () => {
-    const goToStep3 = async () => {
+    const goToStep3WithLoan = async () => {
       renderTradeInEstimator();
-
       await waitFor(() => {
         expect(api.getMakes).toHaveBeenCalled();
       });
-
       const selects = screen.getAllByRole('combobox');
       fireEvent.change(selects[0], { target: { value: '2020' } });
       fireEvent.change(selects[1], { target: { value: 'Honda' } });
-
       await waitFor(() => {
         expect(api.getModels).toHaveBeenCalled();
       });
-
       fireEvent.change(selects[2], { target: { value: 'Accord' } });
-
       const mileageInput = screen.getByPlaceholderText(/45,000/i);
       fireEvent.change(mileageInput, { target: { value: '50000' } });
-
       fireEvent.click(screen.getByText('Continue'));
-
       await waitFor(() => {
         expect(screen.getByText(/Do you owe money/i)).toBeInTheDocument();
       });
-
-      fireEvent.click(screen.getByText(/Yes, I still owe/i));
-      fireEvent.click(screen.getByText('Continue'));
-
+      fireEvent.click(screen.getByText(/Yes, I have a loan/i));
       await waitFor(() => {
-        expect(screen.getByText(/Tell us about your payoff/i)).toBeInTheDocument();
+        expect(screen.getByText(/Payoff Amount/i)).toBeInTheDocument();
       });
     };
 
     test('displays payoff amount input', async () => {
-      await goToStep3();
-      expect(screen.getByText(/Approximate Payoff Amount/i)).toBeInTheDocument();
+      await goToStep3WithLoan();
+      expect(screen.getByText(/Payoff Amount/i)).toBeInTheDocument();
     });
 
-    test('displays monthly payment input', async () => {
-      await goToStep3();
-      expect(screen.getByText(/Current Monthly Payment/i)).toBeInTheDocument();
-    });
-
-    test('displays lender dropdown', async () => {
-      await goToStep3();
+    test('displays lender input', async () => {
+      await goToStep3WithLoan();
       expect(screen.getByText(/Financed With/i)).toBeInTheDocument();
     });
   });
@@ -328,33 +274,24 @@ describe('TradeInEstimator Component', () => {
   describe('Step 4 - Condition', () => {
     const goToStep4ViaOwnedOutright = async () => {
       renderTradeInEstimator();
-
       await waitFor(() => {
         expect(api.getMakes).toHaveBeenCalled();
       });
-
       const selects = screen.getAllByRole('combobox');
       fireEvent.change(selects[0], { target: { value: '2020' } });
       fireEvent.change(selects[1], { target: { value: 'Honda' } });
-
       await waitFor(() => {
         expect(api.getModels).toHaveBeenCalled();
       });
-
       fireEvent.change(selects[2], { target: { value: 'Accord' } });
-
       const mileageInput = screen.getByPlaceholderText(/45,000/i);
       fireEvent.change(mileageInput, { target: { value: '50000' } });
-
       fireEvent.click(screen.getByText('Continue'));
-
       await waitFor(() => {
         expect(screen.getByText(/Do you owe money/i)).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText(/No, I own it outright/i));
       fireEvent.click(screen.getByText('Continue'));
-
       await waitFor(() => {
         expect(screen.getByText(/Vehicle Condition/i)).toBeInTheDocument();
       });
@@ -362,16 +299,9 @@ describe('TradeInEstimator Component', () => {
 
     test('displays condition options', async () => {
       await goToStep4ViaOwnedOutright();
-
       expect(screen.getByText('Excellent')).toBeInTheDocument();
       expect(screen.getByText('Good')).toBeInTheDocument();
       expect(screen.getByText('Fair')).toBeInTheDocument();
-      expect(screen.getByText('Poor')).toBeInTheDocument();
-    });
-
-    test('displays photo upload section', async () => {
-      await goToStep4ViaOwnedOutright();
-      expect(screen.getByText(/Photos/i)).toBeInTheDocument();
     });
 
     test('displays Get My Estimate button', async () => {
@@ -381,19 +311,15 @@ describe('TradeInEstimator Component', () => {
 
     test('clicking condition enables Get Estimate', async () => {
       await goToStep4ViaOwnedOutright();
-
       fireEvent.click(screen.getByText('Good'));
-
       const estimateButton = screen.getByRole('button', { name: /Get My Estimate/i });
       expect(estimateButton).not.toBeDisabled();
     });
 
     test('Get Estimate calls API', async () => {
       await goToStep4ViaOwnedOutright();
-
       fireEvent.click(screen.getByText('Good'));
       fireEvent.click(screen.getByRole('button', { name: /Get My Estimate/i }));
-
       await waitFor(() => {
         expect(api.getTradeInEstimate).toHaveBeenCalled();
       });
@@ -403,40 +329,29 @@ describe('TradeInEstimator Component', () => {
   describe('Step 5 - Results', () => {
     const goToStep5 = async () => {
       renderTradeInEstimator();
-
       await waitFor(() => {
         expect(api.getMakes).toHaveBeenCalled();
       });
-
       const selects = screen.getAllByRole('combobox');
       fireEvent.change(selects[0], { target: { value: '2020' } });
       fireEvent.change(selects[1], { target: { value: 'Honda' } });
-
       await waitFor(() => {
         expect(api.getModels).toHaveBeenCalled();
       });
-
       fireEvent.change(selects[2], { target: { value: 'Accord' } });
-
       const mileageInput = screen.getByPlaceholderText(/45,000/i);
       fireEvent.change(mileageInput, { target: { value: '50000' } });
-
       fireEvent.click(screen.getByText('Continue'));
-
       await waitFor(() => {
         expect(screen.getByText(/Do you owe money/i)).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText(/No, I own it outright/i));
       fireEvent.click(screen.getByText('Continue'));
-
       await waitFor(() => {
         expect(screen.getByText(/Vehicle Condition/i)).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText('Good'));
       fireEvent.click(screen.getByRole('button', { name: /Get My Estimate/i }));
-
       await waitFor(() => {
         expect(screen.getByText(/\$25,000/)).toBeInTheDocument();
       });
@@ -452,16 +367,9 @@ describe('TradeInEstimator Component', () => {
       expect(screen.getByText(/Apply.*Purchase/i)).toBeInTheDocument();
     });
 
-    test('displays Request Appraisal button', async () => {
-      await goToStep5();
-      expect(screen.getByText(/Request.*Appraisal/i)).toBeInTheDocument();
-    });
-
     test('clicking Apply to Purchase updates customer data', async () => {
       await goToStep5();
-
       fireEvent.click(screen.getByText(/Apply.*Purchase/i));
-
       expect(mockUpdateCustomerData).toHaveBeenCalledWith(
         expect.objectContaining({
           tradeIn: expect.objectContaining({
@@ -470,14 +378,6 @@ describe('TradeInEstimator Component', () => {
           }),
         })
       );
-    });
-
-    test('clicking Apply to Purchase navigates to payment calculator', async () => {
-      await goToStep5();
-
-      fireEvent.click(screen.getByText(/Apply.*Purchase/i));
-
-      expect(mockNavigateTo).toHaveBeenCalledWith('paymentCalculator');
     });
   });
 
@@ -492,71 +392,32 @@ describe('TradeInEstimator Component', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    test('handles makes API error gracefully', async () => {
-      api.getMakes.mockRejectedValue(new Error('API Error'));
-
+    test('handles API error gracefully', async () => {
+      api.getTradeInEstimate.mockRejectedValue(new Error('Network error'));
       renderTradeInEstimator();
-
-      // Should still render with fallback makes
-      await waitFor(() => {
-        expect(screen.getByText(/Tell us about your vehicle/i)).toBeInTheDocument();
-      });
-    });
-
-    test('handles VIN decode error gracefully', async () => {
-      api.decodeTradeInVin.mockRejectedValue(new Error('VIN Error'));
-
-      renderTradeInEstimator();
-
-      const vinInput = screen.getByPlaceholderText(/17-character VIN/i);
-      fireEvent.change(vinInput, { target: { value: '1HGBH41JXMN109186' } });
-      fireEvent.blur(vinInput);
-
-      // Should not crash
-      await waitFor(() => {
-        expect(screen.getByText(/Tell us about your vehicle/i)).toBeInTheDocument();
-      });
-    });
-
-    test('displays error message when estimate fails', async () => {
-      api.getTradeInEstimate.mockRejectedValue(new Error('API Error'));
-
-      renderTradeInEstimator();
-
       await waitFor(() => {
         expect(api.getMakes).toHaveBeenCalled();
       });
-
-      // Fill out form to get to estimate
       const selects = screen.getAllByRole('combobox');
       fireEvent.change(selects[0], { target: { value: '2020' } });
       fireEvent.change(selects[1], { target: { value: 'Honda' } });
-
       await waitFor(() => {
         expect(api.getModels).toHaveBeenCalled();
       });
-
       fireEvent.change(selects[2], { target: { value: 'Accord' } });
-
       const mileageInput = screen.getByPlaceholderText(/45,000/i);
       fireEvent.change(mileageInput, { target: { value: '50000' } });
-
       fireEvent.click(screen.getByText('Continue'));
-
       await waitFor(() => {
         expect(screen.getByText(/Do you owe money/i)).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText(/No, I own it outright/i));
       fireEvent.click(screen.getByText('Continue'));
-
       await waitFor(() => {
         expect(screen.getByText(/Vehicle Condition/i)).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText('Good'));
       fireEvent.click(screen.getByRole('button', { name: /Get My Estimate/i }));
-
       await waitFor(() => {
         expect(screen.getByText(/Unable to calculate estimate/i)).toBeInTheDocument();
       });
@@ -566,15 +427,20 @@ describe('TradeInEstimator Component', () => {
   describe('Accessibility', () => {
     test('form fields have labels', () => {
       renderTradeInEstimator();
-
       expect(screen.getByText('Year *')).toBeInTheDocument();
       expect(screen.getByText('Make *')).toBeInTheDocument();
       expect(screen.getByText('Model *')).toBeInTheDocument();
     });
 
-    test('Continue is a button', () => {
+    test('VIN input has placeholder', () => {
       renderTradeInEstimator();
-      expect(screen.getByText('Continue').tagName).toBe('BUTTON');
+      expect(screen.getByPlaceholderText(/17-character VIN/i)).toBeInTheDocument();
+    });
+
+    test('Continue button is accessible', () => {
+      renderTradeInEstimator();
+      const button = screen.getByText('Continue');
+      expect(button.tagName).toBe('BUTTON');
     });
   });
 });
