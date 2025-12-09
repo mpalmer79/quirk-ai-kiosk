@@ -1,6 +1,7 @@
 import React, { useState, CSSProperties } from 'react';
 import { logTrafficSession } from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
+import { getVehicleImageUrl, getColorCategory, getColorGradient } from '../utils/vehicleHelpers';
 
 interface DetailedVehicle extends Vehicle {
   transmission?: string;
@@ -47,22 +48,6 @@ const decodeGMTruckVIN = (vin: string, model: string): { cabType: string; driveT
   return (cabType || driveType) ? { cabType, driveType } : null;
 };
 
-// Color category mapping
-const getColorCategory = (colorDesc: string): string => {
-  const c = colorDesc.toLowerCase();
-  if (c.includes('black')) return 'black';
-  if (c.includes('white') || c.includes('summit') || c.includes('arctic') || c.includes('polar') || c.includes('iridescent')) return 'white';
-  if (c.includes('red') || c.includes('cherry') || c.includes('cajun') || c.includes('radiant') || c.includes('garnet')) return 'red';
-  if (c.includes('blue') || c.includes('northsky') || c.includes('glacier') || c.includes('reef') || c.includes('midnight')) return 'blue';
-  if (c.includes('gray') || c.includes('grey') || c.includes('shadow') || c.includes('sterling') || c.includes('satin steel')) return 'gray';
-  if (c.includes('silver')) return 'silver';
-  if (c.includes('green') || c.includes('woodland') || c.includes('evergreen')) return 'green';
-  if (c.includes('orange') || c.includes('tangier') || c.includes('cayenne')) return 'orange';
-  if (c.includes('yellow') || c.includes('accelerate') || c.includes('nitro')) return 'yellow';
-  if (c.includes('brown') || c.includes('harvest') || c.includes('auburn')) return 'brown';
-  return '';
-};
-
 // Get color hex for swatch
 const getColorHex = (colorDesc: string): string => {
   const category = getColorCategory(colorDesc);
@@ -81,40 +66,8 @@ const getColorHex = (colorDesc: string): string => {
   return colorHexMap[category] || '#6b7280';
 };
 
-// Get gradient background for image placeholder
-const getGradient = (color?: string): string => {
-  const category = getColorCategory(color || '');
-  const gradientMap: Record<string, string> = {
-    'white': 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
-    'black': 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
-    'red': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-    'blue': 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-    'silver': 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
-    'gray': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-    'green': 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-    'orange': 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
-    'yellow': 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-    'brown': 'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
-  };
-  return gradientMap[category] || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
-};
-
-// Get vehicle image URL
-const getVehicleImageUrl = (vehicle: Vehicle): string | null => {
-  if (vehicle.imageUrl) return vehicle.imageUrl;
-  if (vehicle.image_url) return vehicle.image_url;
-  if (vehicle.images && vehicle.images.length > 0) return vehicle.images[0];
-  
-  const fullModel = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const baseModel = fullModel.replace(/-ev$/, '').replace(/-hd$/, '').replace(/\d+$/, '');
-  const exteriorColor = (vehicle.exteriorColor || vehicle.exterior_color || '').toLowerCase();
-  const colorCategory = getColorCategory(exteriorColor);
-  const modelForImage = baseModel || fullModel;
-  
-  if (modelForImage && colorCategory) return `/images/vehicles/${modelForImage}-${colorCategory}.jpg`;
-  if (modelForImage) return `/images/vehicles/${modelForImage}.jpg`;
-  return null;
-};
+// Get gradient background for image placeholder (uses imported getColorGradient)
+const getGradient = (color?: string): string => getColorGradient(color);
 
 // Format currency
 const formatCurrency = (amount: number | null | undefined): string => {
