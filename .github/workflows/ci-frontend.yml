@@ -15,10 +15,14 @@ on:
     paths:
       - 'frontend/**'
 
-jobs:
-  test_and_build_frontend:
-    runs-on: ubuntu-latest
+env:
+  NODE_VERSION: '20'
 
+jobs:
+  lint_and_typecheck:
+    name: 🔍 Lint & Type Check
+    runs-on: ubuntu-latest
+    
     steps:
       - name: ⬇️ Checkout Repository
         uses: actions/checkout@v4
@@ -26,28 +30,120 @@ jobs:
       - name: 🛠️ Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: 📦 Install Dependencies
         run: |
           cd frontend
-          npm install
+          npm ci
 
-      - name: 🔬 Run Unit and Integration Tests
+      - name: 🔍 TypeScript Type Check
         run: |
           cd frontend
-          npm run test -- --ci --watchAll=false --passWithNoTests
+          npm run type-check
+
+  test:
+    name: 🧪 Test Suite
+    runs-on: ubuntu-latest
+    needs: lint_and_typecheck
+    
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: 🧪 Run Tests with Coverage
+        run: |
+          cd frontend
+          npm run test:coverage
         env:
           CI: true
+
+      - name: 📊 Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: frontend/coverage/
+          retention-days: 7
+
+      - name: 📈 Coverage Summary
+        run: |
+          cd frontend
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat coverage/coverage-summary.json | jq '.total'
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+  build:
+    name: 🏗️ Build Application
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd frontend
+          npm ci
 
       - name: 🏗️ Build Frontend Application
         run: |
           cd frontend
-          npm run build 
+          npm run build
+        env:
+          REACT_APP_ENVIRONMENT: production
+          REACT_APP_VERSION: ${{ github.sha }}
+          REACT_APP_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
 
       - name: ⬆️ Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: kiosk-ui-build-${{ github.sha }}
           path: frontend/build
-          retention-days: 7
+          retention-days: 14
+
+  # Optional: Deploy to staging on development branch
+  deploy_staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/development' && github.event_name == 'push'
+    environment: staging
+    
+    steps:
+      - name: ⬇️ Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kiosk-ui-build-${{ github.sha }}
+          path: build
+
+      - name: 🚀 Deploy to Staging
+        run: |
+          echo "Deploy to staging environment"
+          # Add your deployment commands here
+          # Example: railway up --environment staging
