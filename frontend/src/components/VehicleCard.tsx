@@ -1,5 +1,6 @@
-import React, { CSSProperties, MouseEvent } from 'react';
+import React, { CSSProperties, MouseEvent, useState } from 'react';
 import type { Vehicle } from '../types';
+import { getVehicleImageUrl } from '../utils/vehicleHelpers';
 
 // Component Props
 interface VehicleCardProps {
@@ -78,6 +79,8 @@ const getVehicleIcon = (bodyStyle?: string): JSX.Element => {
 };
 
 const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onClick }) => {
+  const [imageError, setImageError] = useState(false);
+  
   const formatPrice = (price: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -102,6 +105,11 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onClick }) => {
   const bodyStyle = vehicle.bodyStyle || vehicle.body_style;
   const status = vehicle.status || 'In Stock';
   const price = vehicle.price || vehicle.salePrice || vehicle.sale_price || 0;
+  const model = vehicle.model || '';
+
+  // Get image URL - uses API image or local stock photo if available
+  const imageUrl = getVehicleImageUrl(vehicle);
+  const showRealImage = !imageError && imageUrl;
 
   const cardStyle: CSSProperties = {
     background: '#ffffff',
@@ -118,13 +126,20 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onClick }) => {
   const imageContainerStyle: CSSProperties = {
     width: '100%',
     height: '180px',
-    background: getVehicleGradient(bodyStyle, vehicle.model),
+    background: getVehicleGradient(bodyStyle, model),
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
+  };
+
+  const realImageStyle: CSSProperties = {
+    width: '100%',
+    height: '180px',
+    objectFit: 'cover',
+    objectPosition: 'center',
   };
 
   const chevyLogoStyle: CSSProperties = {
@@ -202,6 +217,26 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onClick }) => {
     color: status === 'In Stock' ? '#2e7d32' : '#e65100',
   };
 
+  // Image overlay for real photos (shows model/year)
+  const imageOverlayStyle: CSSProperties = {
+    position: 'absolute',
+    bottom: '0',
+    left: '0',
+    right: '0',
+    background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+    padding: '20px 12px 12px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  };
+
+  const overlayTextStyle: CSSProperties = {
+    color: 'white',
+    fontSize: '16px',
+    fontWeight: '600',
+    textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+  };
+
   return (
     <div
       style={cardStyle}
@@ -209,23 +244,42 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onClick }) => {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div style={imageContainerStyle}>
-        {/* Chevrolet bowtie logo */}
-        <svg style={chevyLogoStyle} viewBox="0 0 100 36" fill="white">
-          <path d="M0,14.4L16.5,0h67L100,14.4v7.2L83.5,36h-67L0,21.6V14.4z M21.2,5.8L8.2,16.9l13,11.1h57.6l13-11.1L78.8,5.8H21.2z"/>
-        </svg>
-        
-        {/* Vehicle type icon */}
-        {getVehicleIcon(bodyStyle)}
-        
-        {/* Model name */}
-        <div style={modelTextStyle}>{vehicle.model}</div>
-        <div style={yearTrimStyle}>{vehicle.year} {vehicle.trim}</div>
-      </div>
+      {showRealImage && imageUrl ? (
+        // Real vehicle photo with overlay
+        <div style={{ ...imageContainerStyle, background: '#1a1a1a' }}>
+          <img
+            src={imageUrl}
+            alt={`${vehicle.year} ${vehicle.make} ${model}`}
+            style={realImageStyle}
+            onError={() => setImageError(true)}
+          />
+          <div style={imageOverlayStyle}>
+            <span style={overlayTextStyle}>{model}</span>
+            <span style={{ ...overlayTextStyle, fontSize: '13px', opacity: 0.9 }}>
+              {vehicle.year}
+            </span>
+          </div>
+        </div>
+      ) : (
+        // Fallback gradient design
+        <div style={imageContainerStyle}>
+          {/* Chevrolet bowtie logo */}
+          <svg style={chevyLogoStyle} viewBox="0 0 100 36" fill="white">
+            <path d="M0,14.4L16.5,0h67L100,14.4v7.2L83.5,36h-67L0,21.6V14.4z M21.2,5.8L8.2,16.9l13,11.1h57.6l13-11.1L78.8,5.8H21.2z"/>
+          </svg>
+          
+          {/* Vehicle type icon */}
+          {getVehicleIcon(bodyStyle)}
+          
+          {/* Model name */}
+          <div style={modelTextStyle}>{model}</div>
+          <div style={yearTrimStyle}>{vehicle.year} {vehicle.trim}</div>
+        </div>
+      )}
 
       <div style={contentStyle}>
         <div style={titleStyle}>
-          {vehicle.year} {vehicle.make} {vehicle.model}
+          {vehicle.year} {vehicle.make} {model}
         </div>
         
         <div style={detailsStyle}>
