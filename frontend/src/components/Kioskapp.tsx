@@ -35,6 +35,14 @@ type ScreenName =
   | 'trafficLog'
   | 'salesDashboard';
 
+// Navigation options for filtering
+interface NavigationOptions {
+  bodyStyle?: string;
+  model?: string;
+  minPrice?: number;
+  maxPrice?: number;
+}
+
 // Screen error boundary props
 interface ScreenErrorBoundaryProps {
   children: ReactNode;
@@ -122,6 +130,8 @@ const initialCustomerData: CustomerData = {
   tradeIn: undefined,
   paymentPreference: undefined,
   contactInfo: undefined,
+  // Filter state for inventory
+  bodyStyleFilter: undefined,
 };
 
 // Main Kiosk Application - Customer Journey Controller
@@ -139,13 +149,32 @@ const KioskApp: React.FC = () => {
   }, []);
 
   // Navigate to a new screen with browser history support
-  const navigateTo = useCallback((screen: string): void => {
+  // Now accepts optional navigation options for filtering
+  const navigateTo = useCallback((screen: string, options?: NavigationOptions): void => {
     const screenName = screen as ScreenName;
     
     // Don't push duplicate consecutive screens
     const currentHistory = navigationHistoryRef.current;
-    if (currentHistory[currentHistory.length - 1] === screenName) {
+    if (currentHistory[currentHistory.length - 1] === screenName && !options) {
       return;
+    }
+    
+    // Apply filter options to customer data if provided
+    if (options) {
+      setCustomerData(prev => ({
+        ...prev,
+        bodyStyleFilter: options.bodyStyle || undefined,
+        selectedModel: options.model || prev.selectedModel,
+        budgetRange: options.minPrice && options.maxPrice 
+          ? { min: options.minPrice, max: options.maxPrice }
+          : prev.budgetRange,
+      }));
+    } else if (screenName === 'inventory') {
+      // Clear filters when navigating to inventory without options
+      setCustomerData(prev => ({
+        ...prev,
+        bodyStyleFilter: undefined,
+      }));
     }
     
     setIsTransitioning(true);
@@ -185,6 +214,12 @@ const KioskApp: React.FC = () => {
     
     // Get the previous screen
     const previousScreen = newHistory[newHistory.length - 1];
+    
+    // Clear filters when going back
+    setCustomerData(prev => ({
+      ...prev,
+      bodyStyleFilter: undefined,
+    }));
     
     setIsTransitioning(true);
     setTimeout(() => {
@@ -234,6 +269,12 @@ const KioskApp: React.FC = () => {
         
         // Mark this as a popstate navigation so navigateTo doesn't push to history
         isPopStateNavigationRef.current = true;
+        
+        // Clear filters when navigating via back/forward
+        setCustomerData(prev => ({
+          ...prev,
+          bodyStyleFilter: undefined,
+        }));
         
         setIsTransitioning(true);
         setTimeout(() => {
