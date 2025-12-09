@@ -362,14 +362,14 @@ describe('TradeInEstimator Component', () => {
       expect(screen.getByText(/\$25,000/)).toBeInTheDocument();
     });
 
-    test('displays Apply to Purchase button', async () => {
+    test('displays Apply to Payment Calculator button', async () => {
       await goToStep5();
-      expect(screen.getByText(/Apply.*Purchase/i)).toBeInTheDocument();
+      expect(screen.getByText(/Apply to Payment Calculator/i)).toBeInTheDocument();
     });
 
-    test('clicking Apply to Purchase updates customer data', async () => {
+    test('clicking Apply to Payment Calculator updates customer data', async () => {
       await goToStep5();
-      fireEvent.click(screen.getByText(/Apply.*Purchase/i));
+      fireEvent.click(screen.getByText(/Apply to Payment Calculator/i));
       expect(mockUpdateCustomerData).toHaveBeenCalledWith(
         expect.objectContaining({
           tradeIn: expect.objectContaining({
