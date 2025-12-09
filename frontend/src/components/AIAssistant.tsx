@@ -290,7 +290,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         } : undefined,
         actions: ['ai_chat']
       });
-      console.log('Session updated with chat data');
+      // Session updated with chat data
     } catch (err) {
       console.error('Failed to log session update:', err);
     }
