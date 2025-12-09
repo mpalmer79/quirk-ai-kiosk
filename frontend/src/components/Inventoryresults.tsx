@@ -34,7 +34,6 @@ const getColorCategory = (colorDesc: string): string => {
   if (c.includes('white') || c.includes('summit') || c.includes('arctic') || c.includes('polar') || c.includes('iridescent')) return 'white';
   if (c.includes('red') || c.includes('cherry') || c.includes('cajun') || c.includes('radiant') || c.includes('garnet')) return 'red';
   if (c.includes('blue') || c.includes('northsky') || c.includes('glacier') || c.includes('reef') || c.includes('midnight')) return 'blue';
-  // Check gray BEFORE silver so "Sterling Gray" maps to gray
   if (c.includes('gray') || c.includes('grey') || c.includes('shadow') || c.includes('sterling') || c.includes('satin steel')) return 'gray';
   if (c.includes('silver')) return 'silver';
   if (c.includes('green') || c.includes('woodland') || c.includes('evergreen')) return 'green';
@@ -75,7 +74,6 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
 
   // Handle vehicle card click - navigate to VehicleDetail page
   const handleVehicleClick = (vehicle: Vehicle): void => {
-    // Add gradient and rebates to the vehicle data
     const enrichedVehicle = {
       ...vehicle,
       gradient: getGradient(vehicle.exteriorColor || vehicle.exterior_color),
@@ -84,11 +82,7 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
         { name: 'Bonus Cash', amount: 1000 },
       ],
     };
-    
-    // Update customer data with the selected vehicle
     updateCustomerData({ selectedVehicle: enrichedVehicle });
-    
-    // Navigate to vehicle detail page
     navigateTo('vehicleDetail');
   };
 
@@ -98,7 +92,6 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
       setError(null);
       
       try {
-        // Build filter params based on customer selections
         const params: Record<string, string | number> = {};
         
         if (customerData?.selectedModel) {
@@ -106,7 +99,6 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
         }
         
         if (customerData?.budgetRange) {
-          // Convert monthly payment to rough vehicle price
           params.minPrice = customerData.budgetRange.min * 60;
           params.maxPrice = customerData.budgetRange.max * 80;
         }
@@ -119,28 +111,26 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
           params.bodyType = customerData.preferences.bodyStyle;
         }
         
+        // Add bodyStyleFilter to API params if set
+        if (customerData?.bodyStyleFilter) {
+          params.body_style = customerData.bodyStyleFilter;
+        }
+        
         const data = await api.getInventory(params);
         
-        // Handle different response formats
         let vehicleList: Vehicle[] = Array.isArray(data) ? data : (data as { vehicles?: Vehicle[] })?.vehicles || [];
         
         // CLIENT-SIDE EXACT MODEL FILTERING
-        // Backend may do partial/fuzzy matching, so we enforce strict model match here
         if (customerData?.selectedModel) {
           const targetModel = customerData.selectedModel.toLowerCase().trim();
           
           vehicleList = vehicleList.filter((vehicle: Vehicle) => {
-            // Get vehicle model - try various field names
             const rawModel = vehicle.model || '';
             const vehicleModel = rawModel.toLowerCase().trim();
             
-            // Check for exact match or model at start of string
-            // "Silverado 1500" should match "Silverado 1500" and "Silverado 1500 LT"
-            // but NOT "Silverado 2500HD" or "Tahoe"
             if (vehicleModel === targetModel) return true;
             if (vehicleModel.startsWith(targetModel + ' ')) return true;
             if (vehicleModel.startsWith(targetModel)) {
-              // Make sure next char isn't a digit (to prevent 1500 matching 15000)
               const nextChar = vehicleModel.charAt(targetModel.length);
               return !nextChar || nextChar === ' ' || !/\d/.test(nextChar);
             }
@@ -148,22 +138,62 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
           });
         }
         
+        // CLIENT-SIDE BODY STYLE FILTERING (SUV vs Truck)
+        if (customerData?.bodyStyleFilter) {
+          const targetBodyStyle = customerData.bodyStyleFilter.toLowerCase();
+          
+          vehicleList = vehicleList.filter((vehicle: Vehicle) => {
+            const bodyStyle = (vehicle.bodyStyle || vehicle.body_style || '').toLowerCase();
+            const model = (vehicle.model || '').toLowerCase();
+            
+            if (targetBodyStyle === 'truck') {
+              // Trucks: Silverado, Colorado - NEVER Traverse, Tahoe, etc.
+              if (model.includes('silverado') || model.includes('colorado')) {
+                return true;
+              }
+              // Also check bodyStyle field
+              if (bodyStyle === 'truck') {
+                return true;
+              }
+              return false;
+            }
+            
+            if (targetBodyStyle === 'suv') {
+              // SUVs: Traverse, Tahoe, Suburban, Equinox, Trailblazer, Trax, Blazer
+              // NEVER Silverado or Colorado
+              if (model.includes('silverado') || model.includes('colorado')) {
+                return false;
+              }
+              const suvModels = ['traverse', 'tahoe', 'suburban', 'equinox', 'trailblazer', 'trax', 'blazer'];
+              if (suvModels.some(suv => model.includes(suv))) {
+                return true;
+              }
+              // Also check bodyStyle field
+              if (bodyStyle === 'suv') {
+                return true;
+              }
+              return false;
+            }
+            
+            // For other body styles, match directly
+            return bodyStyle === targetBodyStyle;
+          });
+        }
+        
         // Filter by cab type if specified
         if (customerData?.selectedCab) {
           const targetCab = customerData.selectedCab.toLowerCase();
           vehicleList = vehicleList.filter((vehicle: Vehicle) => {
-            // Check multiple possible field names for cab/body info
-           const cab = (
-  (vehicle as Record<string, unknown>).cabStyle ||
-  vehicle.cabType || 
-  vehicle.bodyStyle || 
-  vehicle.body_style || 
-  (vehicle as Record<string, unknown>).body ||
-  (vehicle as Record<string, unknown>).Body ||
-  ''
-).toString().toLowerCase(); 
+            const cab = (
+              (vehicle as Record<string, unknown>).cabStyle ||
+              vehicle.cabType || 
+              vehicle.bodyStyle || 
+              vehicle.body_style || 
+              (vehicle as Record<string, unknown>).body ||
+              (vehicle as Record<string, unknown>).Body ||
+              ''
+            ).toString().toLowerCase(); 
             
-            // Handle abbreviation mapping: "Regular" → also match "Reg"
             const cabMappings: Record<string, string[]> = {
               'regular': ['regular', 'reg'],
               'double': ['double', 'dbl'],
@@ -171,29 +201,26 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
               'extended': ['extended', 'ext'],
             };
             
-            const cabKeyword = targetCab.split(' ')[0]; // "regular" from "Regular Cab"
+            const cabKeyword = targetCab.split(' ')[0];
             const keywords = cabMappings[cabKeyword] || [cabKeyword];
             
-            // Check if any keyword variant matches
             return keywords.some(kw => cab.includes(kw));
           });
         }
         
-        // Sort by color preferences if provided (1st choice best, then 2nd, then 3rd)
+        // Sort by color preferences if provided
         if (customerData?.colorPreferences && customerData.colorPreferences.length > 0) {
           const colorPrefs = customerData.colorPreferences.map((c: string) => c.toLowerCase());
           vehicleList = vehicleList.sort((a: Vehicle, b: Vehicle) => {
             const aColor = (a.exteriorColor || a.exterior_color || '').toLowerCase();
             const bColor = (b.exteriorColor || b.exterior_color || '').toLowerCase();
             
-            // Find which preference each color matches (0=1st, 1=2nd, 2=3rd, -1=no match)
             const getMatchIndex = (color: string): number => {
               for (let i = 0; i < colorPrefs.length; i++) {
-                // Match first word of color preference
                 const keyword = colorPrefs[i].split(' ')[0];
                 if (color.includes(keyword)) return i;
               }
-              return 999; // No match goes to end
+              return 999;
             };
             
             return getMatchIndex(aColor) - getMatchIndex(bColor);
@@ -202,7 +229,6 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
         
         setVehicles(vehicleList);
       } catch (err) {
-        console.error('Failed to fetch vehicles:', err);
         setError('Unable to load inventory. Please try again.');
         setVehicles([]);
       } finally {
@@ -215,14 +241,11 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
 
   // Apply additional client-side filtering as a safety net
   const filteredVehicles = vehicles.filter((vehicle: Vehicle) => {
-    if (!customerData?.selectedModel) return true; // No filter if no model selected
+    if (!customerData?.selectedModel) return true;
     
     const targetModel = customerData.selectedModel.toLowerCase().trim();
     const vehicleModel = (vehicle.model || '').toLowerCase().trim();
     
-    // Must match the selected model exactly (or with trim suffix)
-    // "silverado 1500" matches "silverado 1500" or "silverado 1500 lt"
-    // but NOT "silverado 2500hd" or "tahoe"
     return vehicleModel === targetModel || 
            vehicleModel.startsWith(targetModel + ' ') ||
            (vehicleModel.startsWith(targetModel) && !/\d/.test(vehicleModel.charAt(targetModel.length)));
@@ -237,14 +260,31 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
     }
   });
 
-  // Get the appropriate title based on path
+  // Get the appropriate title based on path and filters
   const getTitle = (): string => {
+    // Check for body style filter first
+    if (customerData?.bodyStyleFilter) {
+      if (customerData.bodyStyleFilter === 'SUV') return 'SUVs';
+      if (customerData.bodyStyleFilter === 'Truck') return 'Trucks';
+      return `${customerData.bodyStyleFilter} Inventory`;
+    }
     if (customerData?.path === 'browse') return 'All Inventory';
     if (customerData?.quizAnswers && Object.keys(customerData.quizAnswers).length > 0) {
       return 'Recommended For You';
     }
     if (customerData?.selectedModel) return `${customerData.selectedModel} Inventory`;
     return 'All Inventory';
+  };
+
+  // Get subtitle based on filter
+  const getSubtitle = (): string => {
+    if (customerData?.bodyStyleFilter) {
+      return `Showing all ${customerData.bodyStyleFilter.toLowerCase()}s in stock`;
+    }
+    if (customerData?.path === 'browse') {
+      return 'Browse our complete inventory';
+    }
+    return 'Sorted by best match based on your preferences';
   };
 
   const handleSortChange = (e: ChangeEvent<HTMLSelectElement>): void => {
@@ -282,12 +322,7 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
             {getTitle()}
             <span style={styles.matchCount}> ({filteredVehicles.length})</span>
           </h1>
-          <p style={styles.subtitle}>
-            {customerData?.path === 'browse' 
-              ? 'Browse our complete inventory' 
-              : 'Sorted by best match based on your preferences'
-            }
-          </p>
+          <p style={styles.subtitle}>{getSubtitle()}</p>
         </div>
 
         <div style={styles.headerRight}>
@@ -378,7 +413,7 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
                     </div>
                   )}
 
-                  {/* Pricing - MSRP on left, Your Price on right */}
+                  {/* Pricing */}
                   <div style={styles.pricingSection}>
                     <div style={styles.priceColumn}>
                       <span style={styles.priceLabel}>MSRP</span>
