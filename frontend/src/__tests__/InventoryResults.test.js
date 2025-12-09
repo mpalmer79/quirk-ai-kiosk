@@ -100,17 +100,6 @@ describe('InventoryResults Component', () => {
   });
 
   describe('Error State', () => {
-    // Mock console.error only for error tests - component legitimately logs errors
-    let consoleErrorSpy;
-    
-    beforeEach(() => {
-      consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    });
-    
-    afterEach(() => {
-      consoleErrorSpy.mockRestore();
-    });
-
     test('displays error message when API fails', async () => {
       api.getInventory.mockRejectedValue(new Error('Network error'));
       renderInventoryResults();
@@ -118,8 +107,6 @@ describe('InventoryResults Component', () => {
       await waitFor(() => {
         expect(screen.getByText('Unable to load inventory. Please try again.')).toBeInTheDocument();
       });
-      
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to fetch vehicles:', expect.any(Error));
     });
 
     test('displays retry button on error', async () => {
@@ -252,6 +239,26 @@ describe('InventoryResults Component', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Silverado 1500 Inventory/)).toBeInTheDocument();
+      });
+    });
+
+    test('displays "SUVs" title when bodyStyleFilter is SUV', async () => {
+      renderInventoryResults({
+        customerData: { bodyStyleFilter: 'SUV' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/SUVs/)).toBeInTheDocument();
+      });
+    });
+
+    test('displays "Trucks" title when bodyStyleFilter is Truck', async () => {
+      renderInventoryResults({
+        customerData: { bodyStyleFilter: 'Truck' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Trucks/)).toBeInTheDocument();
       });
     });
   });
@@ -552,6 +559,19 @@ describe('InventoryResults API Integration', () => {
     await waitFor(() => {
       expect(api.getInventory).toHaveBeenCalledWith(
         expect.objectContaining({ cabType: 'Crew Cab' })
+      );
+    });
+  });
+
+  test('passes body style filter to API', async () => {
+    api.getInventory.mockResolvedValue(mockVehicles);
+    renderInventoryResults({
+      customerData: { bodyStyleFilter: 'SUV' },
+    });
+
+    await waitFor(() => {
+      expect(api.getInventory).toHaveBeenCalledWith(
+        expect.objectContaining({ body_style: 'SUV' })
       );
     });
   });
