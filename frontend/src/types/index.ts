@@ -100,6 +100,14 @@ export interface TradeVehicleInfo {
   mileage: number | null;
 }
 
+// Navigation options for filtering
+export interface NavigationOptions {
+  bodyStyle?: string;
+  model?: string;
+  minPrice?: number;
+  maxPrice?: number;
+}
+
 export interface CustomerData {
   customerName?: string;
   phone?: string;
@@ -121,6 +129,8 @@ export interface CustomerData {
   protectionTotal?: number;
   sortBy?: SortOption;
   stockNumber?: string;
+  // Body style filter for SUV/Truck filtering from stats bar
+  bodyStyleFilter?: string;
   preferences?: {
     bodyStyle?: string;
     [key: string]: unknown;
@@ -200,7 +210,7 @@ export interface ApiError {
 
 // Component Props Types
 export interface NavigationProps {
-  navigateTo: (screen: string) => void;
+  navigateTo: (screen: string, options?: NavigationOptions) => void;
   resetJourney?: () => void;
 }
 
