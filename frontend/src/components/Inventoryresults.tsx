@@ -30,7 +30,8 @@ const formatPrice = (price?: number): string => {
 // Map color descriptions to base color categories
 const getColorCategory = (colorDesc: string): string => {
   const c = colorDesc.toLowerCase();
-  if (c.includes('black')) return 'black';
+  // Check black first, including "mosaic" for Mosaic Black Metallic
+  if (c.includes('black') || c.includes('mosaic')) return 'black';
   if (c.includes('white') || c.includes('summit') || c.includes('arctic') || c.includes('polar') || c.includes('iridescent')) return 'white';
   if (c.includes('red') || c.includes('cherry') || c.includes('cajun') || c.includes('radiant') || c.includes('garnet')) return 'red';
   if (c.includes('blue') || c.includes('northsky') || c.includes('glacier') || c.includes('reef') || c.includes('midnight')) return 'blue';
@@ -44,19 +45,27 @@ const getColorCategory = (colorDesc: string): string => {
 };
 
 // Get vehicle image URL based on model and color rules
+// PRIORITIZE local images over API URLs (API URLs often fail)
 const getVehicleImageUrl = (vehicle: Vehicle): string | null => {
-  if (vehicle.imageUrl) return vehicle.imageUrl;
-  if (vehicle.image_url) return vehicle.image_url;
-  if (vehicle.images && vehicle.images.length > 0) return vehicle.images[0];
-  
   const fullModel = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   const baseModel = fullModel.replace(/-ev$/, '').replace(/-hd$/, '').replace(/\d+$/, '');
   const exteriorColor = (vehicle.exteriorColor || vehicle.exterior_color || '').toLowerCase();
   const colorCategory = getColorCategory(exteriorColor);
   const modelForImage = baseModel || fullModel;
   
-  if (modelForImage && colorCategory) return `/images/vehicles/${modelForImage}-${colorCategory}.jpg`;
-  if (modelForImage) return `/images/vehicles/${modelForImage}.jpg`;
+  // Try local image first (most reliable)
+  if (modelForImage && colorCategory) {
+    return `/images/vehicles/${modelForImage}-${colorCategory}.jpg`;
+  }
+  if (modelForImage) {
+    return `/images/vehicles/${modelForImage}.jpg`;
+  }
+  
+  // Fall back to API URLs only if no local path can be generated
+  if (vehicle.imageUrl) return vehicle.imageUrl;
+  if (vehicle.image_url) return vehicle.image_url;
+  if (vehicle.images && vehicle.images.length > 0) return vehicle.images[0];
+  
   return null;
 };
 
@@ -228,7 +237,7 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
         }
         
         setVehicles(vehicleList);
-      } catch (err) {
+      } catch {
         setError('Unable to load inventory. Please try again.');
         setVehicles([]);
       } finally {
