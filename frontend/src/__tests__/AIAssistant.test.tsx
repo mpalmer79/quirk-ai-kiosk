@@ -38,6 +38,9 @@ Object.defineProperty(window, 'speechSynthesis', {
   writable: true,
 });
 
+// Mock scrollIntoView - not available in jsdom
+Element.prototype.scrollIntoView = jest.fn();
+
 // Mock props
 const mockNavigateTo = jest.fn();
 const mockUpdateCustomerData = jest.fn();
@@ -101,24 +104,32 @@ describe('AIAssistant Component', () => {
   });
 
   describe('Initial Render', () => {
-    test('displays personalized greeting when customer name provided', () => {
+    test('displays personalized greeting when customer name provided', async () => {
       renderAIAssistant();
-      expect(screen.getByText(/Hi John/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/Hi John/i)).toBeInTheDocument();
+      });
     });
 
-    test('displays generic greeting when no customer name', () => {
+    test('displays generic greeting when no customer name', async () => {
       renderAIAssistant({ customerData: {} });
-      expect(screen.getByText(/find your perfect vehicle/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/find your perfect vehicle/i)).toBeInTheDocument();
+      });
     });
 
-    test('displays subtitle text', () => {
+    test('displays subtitle text', async () => {
       renderAIAssistant();
-      expect(screen.getByText(/Ask me anything about our inventory/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/Ask me anything about our inventory/i)).toBeInTheDocument();
+      });
     });
 
-    test('displays message input field', () => {
+    test('displays message input field', async () => {
       renderAIAssistant();
-      expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
     });
 
     test('loads inventory on mount', async () => {
@@ -130,24 +141,34 @@ describe('AIAssistant Component', () => {
   });
 
   describe('Suggested Prompts', () => {
-    test('displays suggested prompts when no messages', () => {
+    test('displays suggested prompts when no messages', async () => {
       renderAIAssistant();
-      expect(screen.getByText(/Try asking me/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/Try asking me/i)).toBeInTheDocument();
+      });
     });
 
-    test('displays truck towing prompt', () => {
+    test('displays truck towing prompt', async () => {
       renderAIAssistant();
-      expect(screen.getByText(/I need a truck that can tow a boat/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/I need a truck that can tow a boat/i)).toBeInTheDocument();
+      });
     });
 
-    test('displays family SUV prompt', () => {
+    test('displays family SUV prompt', async () => {
       renderAIAssistant();
-      expect(screen.getByText(/best family SUV/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/best family SUV/i)).toBeInTheDocument();
+      });
     });
 
     test('clicking suggested prompt sends message', async () => {
       renderAIAssistant();
       
+      await waitFor(() => {
+        expect(screen.getByText(/I need a truck that can tow a boat/i)).toBeInTheDocument();
+      });
+
       const prompt = screen.getByText(/I need a truck that can tow a boat/i);
       fireEvent.click(prompt);
 
@@ -161,6 +182,10 @@ describe('AIAssistant Component', () => {
     test('sends message when Enter key pressed', async () => {
       renderAIAssistant();
 
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
       fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
@@ -173,6 +198,10 @@ describe('AIAssistant Component', () => {
     test('does not send empty message', async () => {
       renderAIAssistant();
 
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
 
@@ -181,6 +210,10 @@ describe('AIAssistant Component', () => {
 
     test('clears input after sending', async () => {
       renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
@@ -194,6 +227,10 @@ describe('AIAssistant Component', () => {
     test('displays user message in chat', async () => {
       renderAIAssistant();
 
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
       fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
@@ -205,6 +242,10 @@ describe('AIAssistant Component', () => {
 
     test('displays AI response in chat', async () => {
       renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
@@ -224,6 +265,10 @@ describe('AIAssistant Component', () => {
 
       renderAIAssistant();
 
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
       fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
@@ -240,6 +285,10 @@ describe('AIAssistant Component', () => {
       );
 
       renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
@@ -260,6 +309,10 @@ describe('AIAssistant Component', () => {
 
       renderAIAssistant();
 
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
       fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
@@ -279,6 +332,10 @@ describe('AIAssistant Component', () => {
 
       renderAIAssistant();
 
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
       fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
@@ -295,6 +352,10 @@ describe('AIAssistant Component', () => {
       });
 
       renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
@@ -315,6 +376,10 @@ describe('AIAssistant Component', () => {
       });
 
       renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
@@ -337,37 +402,54 @@ describe('AIAssistant Component', () => {
   });
 
   describe('Start Over', () => {
-    test('displays Start Over button', () => {
+    test('displays Start Over button', async () => {
       renderAIAssistant();
-      expect(screen.getByText('Start Over')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Start Over')).toBeInTheDocument();
+      });
     });
 
-    test('clicking Start Over calls resetJourney', () => {
+    test('clicking Start Over calls resetJourney', async () => {
       renderAIAssistant();
+      await waitFor(() => {
+        expect(screen.getByText('Start Over')).toBeInTheDocument();
+      });
       fireEvent.click(screen.getByText('Start Over'));
       expect(mockResetJourney).toHaveBeenCalled();
     });
   });
 
   describe('Audio Toggle', () => {
-    test('displays Audio Off by default', () => {
+    test('displays Audio Off by default', async () => {
       renderAIAssistant();
-      expect(screen.getByText('Audio Off')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Audio Off')).toBeInTheDocument();
+      });
     });
 
-    test('clicking audio button toggles audio state', () => {
+    test('clicking audio button toggles audio state', async () => {
       renderAIAssistant();
       
+      await waitFor(() => {
+        expect(screen.getByText('Audio Off')).toBeInTheDocument();
+      });
+
       const audioButton = screen.getByText('Audio Off').closest('button');
       fireEvent.click(audioButton);
 
-      expect(screen.getByText('Audio On')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Audio On')).toBeInTheDocument();
+      });
     });
   });
 
   describe('API Integration', () => {
     test('includes customer name in chat request', async () => {
       renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Hi' } });
@@ -406,6 +488,10 @@ describe('AIAssistant Component', () => {
     test('logs session on message send', async () => {
       renderAIAssistant();
 
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
       fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
@@ -432,6 +518,10 @@ describe('AIAssistant Component', () => {
 
       renderAIAssistant();
 
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
       const input = screen.getByPlaceholderText(/Type your message/i);
       fireEvent.change(input, { target: { value: 'Show me trucks' } });
       fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
@@ -448,13 +538,19 @@ describe('AIAssistant Component', () => {
       renderAIAssistant();
 
       // Component should still render
-      expect(screen.getByText(/find your perfect vehicle/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/find your perfect vehicle/i)).toBeInTheDocument();
+      });
     });
   });
 
   describe('Conversation History', () => {
     test('builds conversation history across messages', async () => {
       renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
 
       // Send first message
       const input = screen.getByPlaceholderText(/Type your message/i);
@@ -483,14 +579,18 @@ describe('AIAssistant Component', () => {
   });
 
   describe('Accessibility', () => {
-    test('input has accessible placeholder', () => {
+    test('input has accessible placeholder', async () => {
       renderAIAssistant();
-      expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
     });
 
-    test('Start Over is a button', () => {
+    test('Start Over is a button', async () => {
       renderAIAssistant();
-      expect(screen.getByText('Start Over').closest('button')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Start Over').closest('button')).toBeInTheDocument();
+      });
     });
   });
 });
