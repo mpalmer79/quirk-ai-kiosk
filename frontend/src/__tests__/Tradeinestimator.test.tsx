@@ -374,9 +374,9 @@ describe('TradeInEstimator Component', () => {
       expect(screen.getByText(/Photos/i)).toBeInTheDocument();
     });
 
-    test('displays Get Estimate button', async () => {
+    test('displays Get My Estimate button', async () => {
       await goToStep4ViaOwnedOutright();
-      expect(screen.getByText(/Get.*Estimate/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Get My Estimate/i })).toBeInTheDocument();
     });
 
     test('clicking condition enables Get Estimate', async () => {
@@ -384,7 +384,7 @@ describe('TradeInEstimator Component', () => {
 
       fireEvent.click(screen.getByText('Good'));
 
-      const estimateButton = screen.getByText(/Get.*Estimate/i);
+      const estimateButton = screen.getByRole('button', { name: /Get My Estimate/i });
       expect(estimateButton).not.toBeDisabled();
     });
 
@@ -392,7 +392,7 @@ describe('TradeInEstimator Component', () => {
       await goToStep4ViaOwnedOutright();
 
       fireEvent.click(screen.getByText('Good'));
-      fireEvent.click(screen.getByText(/Get.*Estimate/i));
+      fireEvent.click(screen.getByRole('button', { name: /Get My Estimate/i }));
 
       await waitFor(() => {
         expect(api.getTradeInEstimate).toHaveBeenCalled();
@@ -435,7 +435,7 @@ describe('TradeInEstimator Component', () => {
       });
 
       fireEvent.click(screen.getByText('Good'));
-      fireEvent.click(screen.getByText(/Get.*Estimate/i));
+      fireEvent.click(screen.getByRole('button', { name: /Get My Estimate/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/\$25,000/)).toBeInTheDocument();
@@ -555,7 +555,7 @@ describe('TradeInEstimator Component', () => {
       });
 
       fireEvent.click(screen.getByText('Good'));
-      fireEvent.click(screen.getByText(/Get.*Estimate/i));
+      fireEvent.click(screen.getByRole('button', { name: /Get My Estimate/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/Unable to calculate estimate/i)).toBeInTheDocument();
