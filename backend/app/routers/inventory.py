@@ -563,6 +563,10 @@ def load_inventory_from_excel() -> List[dict]:
 INVENTORY = load_inventory_from_excel()
 print(f"Loaded {len(INVENTORY)} vehicles from PBS inventory")
 
+# Helper function for health checks
+def get_vehicle_count() -> int:
+    """Get total vehicle count for health checks"""
+    return len(INVENTORY)
 
 # =============================================================================
 # API ENDPOINTS
