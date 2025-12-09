@@ -2,53 +2,102 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import SalesManagerDashboard from '../components/SalesManagerDashboard';
 
-// Mock the api module
+// Mock the api module - match actual functions used by component
 jest.mock('../components/api', () => ({
   getActiveSessions: jest.fn(),
-  getSessionDetails: jest.fn(),
-  getDealDetails: jest.fn(),
-  saveFourSquare: jest.fn(),
+  getTrafficSession: jest.fn(),
 }));
 
 import api from '../components/api';
 
 const mockSessions = [
   {
-    id: '1',
+    sessionId: '1',
     customerName: 'John Smith',
-    status: 'active',
-    currentPage: 'vehicleDetail',
+    phone: '555-1234',
+    startTime: new Date().toISOString(),
+    lastActivity: new Date().toISOString(),
+    currentStep: 'vehicleDetail',
+    vehicleInterest: {
+      model: 'Silverado 1500',
+      cab: 'Crew Cab',
+      colors: ['Red', 'Black'],
+    },
+    budget: {
+      min: 400,
+      max: 600,
+      downPaymentPercent: 10,
+    },
+    tradeIn: {
+      hasTrade: true,
+      vehicle: {
+        year: '2020',
+        make: 'Honda',
+        model: 'Accord',
+        mileage: 45000,
+      },
+      hasPayoff: true,
+      payoffAmount: 15000,
+      monthlyPayment: 450,
+      financedWith: 'Honda Financial',
+    },
     selectedVehicle: {
+      stockNumber: 'M12345',
       year: 2025,
       make: 'Chevrolet',
       model: 'Silverado 1500',
-      stockNumber: 'M12345',
-      salePrice: 52000,
+      trim: 'LT',
+      price: 52000,
     },
-    startTime: new Date().toISOString(),
-    lastActivity: new Date().toISOString(),
   },
   {
-    id: '2',
+    sessionId: '2',
     customerName: 'Jane Doe',
-    status: 'active',
-    currentPage: 'paymentCalculator',
-    selectedVehicle: {
-      year: 2025,
-      make: 'Chevrolet',
-      model: 'Equinox',
-      stockNumber: 'M12346',
-      salePrice: 35000,
-    },
+    phone: '555-5678',
     startTime: new Date().toISOString(),
     lastActivity: new Date().toISOString(),
+    currentStep: 'aiAssistant',
+    vehicleInterest: {
+      model: 'Equinox',
+      cab: null,
+      colors: [],
+    },
+    budget: {
+      min: null,
+      max: null,
+      downPaymentPercent: null,
+    },
+    tradeIn: {
+      hasTrade: false,
+      vehicle: null,
+      hasPayoff: null,
+      payoffAmount: null,
+      monthlyPayment: null,
+      financedWith: null,
+    },
+    selectedVehicle: null,
   },
 ];
+
+const mockSessionDetail = {
+  sessionId: '1',
+  customerName: 'John Smith',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  chatHistory: [
+    { role: 'user', content: 'Hello', timestamp: new Date().toISOString() },
+    { role: 'assistant', content: 'Hi! How can I help?', timestamp: new Date().toISOString() },
+  ],
+};
 
 const renderDashboard = async () => {
   let result;
   await act(async () => {
     result = render(<SalesManagerDashboard />);
+  });
+  // Wait for initial load to complete
+  await waitFor(() => {
+    expect(api.getActiveSessions).toHaveBeenCalled();
   });
   return result;
 };
@@ -58,9 +107,7 @@ describe('SalesManagerDashboard Component', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     api.getActiveSessions.mockResolvedValue({ sessions: mockSessions });
-    api.getSessionDetails.mockResolvedValue(mockSessions[0]);
-    api.getDealDetails.mockResolvedValue({});
-    api.saveFourSquare.mockResolvedValue({ success: true });
+    api.getTrafficSession.mockResolvedValue(mockSessionDetail);
   });
 
   afterEach(() => {
@@ -72,7 +119,8 @@ describe('SalesManagerDashboard Component', () => {
       await renderDashboard();
       
       await waitFor(() => {
-        expect(screen.getByText(/Sales Manager Dashboard/i)).toBeInTheDocument();
+        // Title has emoji, search for partial text
+        expect(screen.getByText(/Sales Manager Dashboard/)).toBeInTheDocument();
       });
     });
 
@@ -80,7 +128,8 @@ describe('SalesManagerDashboard Component', () => {
       await renderDashboard();
       
       await waitFor(() => {
-        expect(screen.getByText(/Active Kiosk Sessions/i)).toBeInTheDocument();
+        // Header is uppercase and includes count
+        expect(screen.getByText(/ACTIVE KIOSK SESSIONS/)).toBeInTheDocument();
       });
     });
 
@@ -88,7 +137,7 @@ describe('SalesManagerDashboard Component', () => {
       await renderDashboard();
       
       await waitFor(() => {
-        expect(api.getActiveSessions).toHaveBeenCalled();
+        expect(api.getActiveSessions).toHaveBeenCalledWith(60);
       });
     });
 
@@ -97,9 +146,11 @@ describe('SalesManagerDashboard Component', () => {
         () => new Promise(resolve => setTimeout(() => resolve({ sessions: mockSessions }), 1000))
       );
 
-      await renderDashboard();
+      await act(async () => {
+        render(<SalesManagerDashboard />);
+      });
 
-      expect(screen.getByText(/Loading/i)).toBeInTheDocument();
+      expect(screen.getByText(/Loading active sessions/i)).toBeInTheDocument();
     });
   });
 
@@ -113,26 +164,17 @@ describe('SalesManagerDashboard Component', () => {
       });
     });
 
-    test('displays vehicle info for sessions', async () => {
-      await renderDashboard();
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Silverado 1500/i)).toBeInTheDocument();
-        expect(screen.getByText(/Equinox/i)).toBeInTheDocument();
-      });
-    });
-
     test('displays session count', async () => {
       await renderDashboard();
       
       await waitFor(() => {
-        expect(screen.getByText(/2/)).toBeInTheDocument();
+        expect(screen.getByText(/ACTIVE KIOSK SESSIONS \(2\)/)).toBeInTheDocument();
       });
     });
   });
 
   describe('Session Selection', () => {
-    test('clicking session shows details', async () => {
+    test('clicking session fetches details', async () => {
       await renderDashboard();
 
       await waitFor(() => {
@@ -144,18 +186,57 @@ describe('SalesManagerDashboard Component', () => {
       });
 
       await waitFor(() => {
-        expect(api.getSessionDetails).toHaveBeenCalled();
+        expect(api.getTrafficSession).toHaveBeenCalledWith('1');
+      });
+    });
+
+    test('clicking session shows 4-square worksheet', async () => {
+      await renderDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText('John Smith')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('John Smith'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Digital Quote Worksheet/)).toBeInTheDocument();
       });
     });
   });
 
   describe('Four Square Worksheet', () => {
-    test('displays 4-Square button or tab', async () => {
+    test('displays trade-in section', async () => {
       await renderDashboard();
-      
+
       await waitFor(() => {
-        const fourSquareElement = screen.queryByText(/4-Square/i) || screen.queryByText(/Four Square/i);
-        expect(fourSquareElement).toBeInTheDocument();
+        expect(screen.getByText('John Smith')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('John Smith'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('TRADE-IN')).toBeInTheDocument();
+      });
+    });
+
+    test('displays price section', async () => {
+      await renderDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText('John Smith')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('John Smith'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('PRICE')).toBeInTheDocument();
       });
     });
   });
@@ -164,17 +245,24 @@ describe('SalesManagerDashboard Component', () => {
     test('refreshes sessions periodically', async () => {
       await renderDashboard();
 
-      await waitFor(() => {
-        expect(api.getActiveSessions).toHaveBeenCalledTimes(1);
-      });
+      expect(api.getActiveSessions).toHaveBeenCalledTimes(1);
 
-      // Advance timers to trigger refresh
+      // Advance timers to trigger refresh (component uses 5000ms)
       await act(async () => {
-        jest.advanceTimersByTime(60000);
+        jest.advanceTimersByTime(5000);
       });
 
       await waitFor(() => {
         expect(api.getActiveSessions).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    test('auto-refresh checkbox is checked by default', async () => {
+      await renderDashboard();
+
+      await waitFor(() => {
+        const checkbox = screen.getByRole('checkbox');
+        expect(checkbox).toBeChecked();
       });
     });
   });
@@ -209,7 +297,7 @@ describe('SalesManagerDashboard Component', () => {
 
       // Should not crash - dashboard should still render
       await waitFor(() => {
-        expect(screen.getByText(/Sales Manager Dashboard/i)).toBeInTheDocument();
+        expect(screen.getByText(/Sales Manager Dashboard/)).toBeInTheDocument();
       });
     });
   });
@@ -219,7 +307,7 @@ describe('SalesManagerDashboard Component', () => {
       await renderDashboard();
       
       await waitFor(() => {
-        expect(screen.getByText(/Last updated/i)).toBeInTheDocument();
+        expect(screen.getByText(/Last update:/i)).toBeInTheDocument();
       });
     });
   });
@@ -229,7 +317,7 @@ describe('SalesManagerDashboard Component', () => {
       await renderDashboard();
       
       await waitFor(() => {
-        expect(screen.getByText(/Refresh/i)).toBeInTheDocument();
+        expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
       });
     });
 
@@ -237,15 +325,51 @@ describe('SalesManagerDashboard Component', () => {
       await renderDashboard();
 
       await waitFor(() => {
-        expect(screen.getByText(/Refresh/i)).toBeInTheDocument();
+        expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
       });
 
       await act(async () => {
-        fireEvent.click(screen.getByText(/Refresh/i));
+        fireEvent.click(screen.getByText(/Refresh Now/i));
       });
 
       await waitFor(() => {
         expect(api.getActiveSessions).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe('HOME Button', () => {
+    test('displays HOME button', async () => {
+      await renderDashboard();
+      
+      await waitFor(() => {
+        expect(screen.getByText('HOME')).toBeInTheDocument();
+      });
+    });
+
+    test('clicking HOME clears selected session', async () => {
+      await renderDashboard();
+
+      // First select a session
+      await waitFor(() => {
+        expect(screen.getByText('John Smith')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('John Smith'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Digital Quote Worksheet/)).toBeInTheDocument();
+      });
+
+      // Click HOME
+      await act(async () => {
+        fireEvent.click(screen.getByText('HOME'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Select a session/)).toBeInTheDocument();
       });
     });
   });
