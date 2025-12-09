@@ -130,7 +130,7 @@ const SalesManagerDashboard: React.FC = () => {
   const renderFourSquare = (session: CustomerSession) => (
     <div style={s.fourSquare}>
       <div style={s.fourSquareHeader}>
-        <h2 style={s.fourSquareTitle}>📋 Digital 4-Square Worksheet</h2>
+        <h2 style={s.fourSquareTitle}>📋 Digital Quote Worksheet</h2>
         <span style={s.sessionTime}>Started {getTimeSince(session.startTime)}</span>
       </div>
       <div style={s.customerInfoBar}>
