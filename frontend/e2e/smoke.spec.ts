@@ -1,0 +1,105 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('Quirk AI Kiosk - Smoke Tests', () => {
+  
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
+
+  test('app loads and shows welcome screen', async ({ page }) => {
+    await expect(page.getByText("I'm your Quirk AI assistant")).toBeVisible();
+    await expect(page.getByPlaceholderText(/first name/i)).toBeVisible();
+  });
+
+  test('can skip name and see path selection', async ({ page }) => {
+    await page.getByText(/skip/i).click();
+    
+    await expect(page.getByText('How can I help you today?')).toBeVisible();
+    await expect(page.getByText('I Have a Stock Number')).toBeVisible();
+    await expect(page.getByText('I Know What I Want')).toBeVisible();
+    await expect(page.getByText('Chat with Quirk AI')).toBeVisible();
+  });
+
+  test('can enter name and see personalized greeting', async ({ page }) => {
+    await page.getByPlaceholderText(/first name/i).fill('TestUser');
+    await page.getByRole('button', { name: /continue/i }).click();
+    
+    await expect(page.getByText(/Nice to meet you, TestUser/i)).toBeVisible();
+  });
+
+  test('can navigate to inventory via browse all', async ({ page }) => {
+    await page.getByText(/skip/i).click();
+    await page.getByText(/browse all inventory/i).click();
+    
+    await expect(page).toHaveURL(/#inventory/);
+  });
+
+  test('can navigate to AI Assistant', async ({ page }) => {
+    await page.getByText(/skip/i).click();
+    await page.getByText('Chat with Quirk AI').click();
+    
+    await expect(page).toHaveURL(/#aiAssistant/);
+    await expect(page.getByPlaceholderText(/type your message/i)).toBeVisible();
+  });
+
+  test('can navigate to Model/Budget selector', async ({ page }) => {
+    await page.getByText(/skip/i).click();
+    await page.getByText('I Know What I Want').click();
+    
+    await expect(page).toHaveURL(/#modelBudget/);
+  });
+
+  test('can navigate to Stock Lookup', async ({ page }) => {
+    await page.getByText(/skip/i).click();
+    await page.getByText('I Have a Stock Number').click();
+    
+    await expect(page).toHaveURL(/#stockLookup/);
+  });
+
+  test('back button returns to previous screen', async ({ page }) => {
+    await page.getByText(/skip/i).click();
+    await page.getByText('Chat with Quirk AI').click();
+    await expect(page).toHaveURL(/#aiAssistant/);
+    
+    await page.getByRole('button', { name: /back/i }).click();
+    
+    await expect(page.getByText('How can I help you today?')).toBeVisible();
+  });
+
+  test('admin link navigates to traffic log', async ({ page }) => {
+    await page.getByText(/skip/i).click();
+    await page.getByRole('button', { name: /admin/i }).click();
+    
+    await expect(page).toHaveURL(/#trafficLog/);
+  });
+
+  test('sales desk link navigates to dashboard', async ({ page }) => {
+    await page.getByText(/skip/i).click();
+    await page.getByRole('button', { name: /sales desk/i }).click();
+    
+    await expect(page).toHaveURL(/#salesDashboard/);
+  });
+
+  test('logo click resets journey to welcome', async ({ page }) => {
+    await page.getByText(/skip/i).click();
+    await page.getByText('Chat with Quirk AI').click();
+    await expect(page).toHaveURL(/#aiAssistant/);
+    
+    await page.getByText('QUIRK').click();
+    
+    await expect(page).toHaveURL(/#welcome/);
+  });
+
+});
+
+test.describe('Quirk AI Kiosk - Error Resilience', () => {
+
+  test('app handles missing API gracefully', async ({ page }) => {
+    await page.route('**/api/**', route => route.abort());
+    
+    await page.goto('/');
+    
+    await expect(page.getByText("I'm your Quirk AI assistant")).toBeVisible();
+  });
+
+});
