@@ -160,17 +160,23 @@ describe('SalesManagerDashboard Component', () => {
 
     test('displays auto-refresh checkbox', async () => {
       render(<SalesManagerDashboard />);
-      expect(screen.getByText(/Auto-refresh/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/Auto-refresh/i)).toBeInTheDocument();
+      });
     });
 
     test('displays Refresh Now button', async () => {
       render(<SalesManagerDashboard />);
-      expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
+      });
     });
 
     test('displays HOME button', async () => {
       render(<SalesManagerDashboard />);
-      expect(screen.getByText('HOME')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('HOME')).toBeInTheDocument();
+      });
     });
 
     test('loads sessions on mount', async () => {
@@ -318,15 +324,23 @@ describe('SalesManagerDashboard Component', () => {
   });
 
   describe('Auto-Refresh', () => {
-    test('auto-refresh checkbox is checked by default', () => {
+    test('auto-refresh checkbox is checked by default', async () => {
       render(<SalesManagerDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox')).toBeInTheDocument();
+      });
 
       const checkbox = screen.getByRole('checkbox');
       expect(checkbox).toBeChecked();
     });
 
-    test('clicking checkbox toggles auto-refresh', () => {
+    test('clicking checkbox toggles auto-refresh', async () => {
       render(<SalesManagerDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox')).toBeInTheDocument();
+      });
 
       const checkbox = screen.getByRole('checkbox');
       fireEvent.click(checkbox);
@@ -336,6 +350,10 @@ describe('SalesManagerDashboard Component', () => {
 
     test('Refresh Now triggers manual refresh', async () => {
       render(<SalesManagerDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
+      });
 
       await waitFor(() => {
         expect(api.getActiveSessions).toHaveBeenCalledTimes(1);
@@ -367,6 +385,10 @@ describe('SalesManagerDashboard Component', () => {
 
     test('disabling auto-refresh stops polling', async () => {
       render(<SalesManagerDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox')).toBeInTheDocument();
+      });
 
       await waitFor(() => {
         expect(api.getActiveSessions).toHaveBeenCalledTimes(1);
@@ -498,15 +520,23 @@ describe('SalesManagerDashboard Component', () => {
   });
 
   describe('Accessibility', () => {
-    test('Refresh Now is a button', () => {
+    test('Refresh Now is a button', async () => {
       render(<SalesManagerDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
+      });
 
       const refreshButton = screen.getByText(/Refresh Now/i);
       expect(refreshButton.tagName).toBe('BUTTON');
     });
 
-    test('checkbox is accessible', () => {
+    test('checkbox is accessible', async () => {
       render(<SalesManagerDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox')).toBeInTheDocument();
+      });
 
       const checkbox = screen.getByRole('checkbox');
       expect(checkbox).toBeInTheDocument();
