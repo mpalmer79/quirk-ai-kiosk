@@ -11,6 +11,7 @@
     "framer-motion": "^10.16.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.40.0",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.1",
@@ -30,6 +31,10 @@
     "test": "react-scripts test",
     "test:ci": "react-scripts test --ci --watchAll=false --passWithNoTests",
     "test:coverage": "react-scripts test --coverage --watchAll=false --passWithNoTests",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "playwright:install": "playwright install chromium",
     "eject": "react-scripts eject",
     "lint": "eslint src/ --ext .ts,.tsx,.js,.jsx",
     "type-check": "tsc --noEmit"
