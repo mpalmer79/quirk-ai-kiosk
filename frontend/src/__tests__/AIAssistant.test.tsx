@@ -263,7 +263,9 @@ describe('AIAssistant Component', () => {
       fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
 
       await waitFor(() => {
-        expect(screen.getByText(/Silverado 1500/i)).toBeInTheDocument();
+        // May match multiple elements if vehicle appears in multiple places
+        const silveradoMatches = screen.getAllByText(/Silverado 1500/i);
+        expect(silveradoMatches.length).toBeGreaterThan(0);
       });
     });
 
