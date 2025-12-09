@@ -18,66 +18,31 @@ const mockSessions = [
     sessionId: 'K12345ABC',
     customerName: 'John Doe',
     phone: '555-123-4567',
-    startTime: new Date(Date.now() - 600000).toISOString(), // 10 mins ago
-    lastActivity: new Date(Date.now() - 60000).toISOString(), // 1 min ago
+    startTime: new Date(Date.now() - 600000).toISOString(),
+    lastActivity: new Date(Date.now() - 60000).toISOString(),
     currentStep: 'modelBudget',
-    vehicleInterest: {
-      model: 'Silverado 1500',
-      cab: 'Crew Cab',
-      colors: ['White', 'Black'],
-    },
-    budget: {
-      min: 40000,
-      max: 60000,
-      downPaymentPercent: 10,
-    },
+    vehicleInterest: { model: 'Silverado 1500', cab: 'Crew Cab', colors: ['White', 'Black'] },
+    budget: { min: 40000, max: 60000, downPaymentPercent: 10 },
     tradeIn: {
       hasTrade: true,
-      vehicle: {
-        year: '2018',
-        make: 'Ford',
-        model: 'F-150',
-        mileage: 75000,
-      },
+      vehicle: { year: '2018', make: 'Ford', model: 'F-150', mileage: 75000 },
       hasPayoff: true,
       payoffAmount: 15000,
       monthlyPayment: 450,
       financedWith: 'Ford Credit',
     },
-    selectedVehicle: {
-      stockNumber: 'M54321',
-      year: 2025,
-      make: 'Chevrolet',
-      model: 'Silverado 1500',
-      trim: 'LT',
-      price: 52000,
-    },
+    selectedVehicle: { stockNumber: 'M54321', year: 2025, make: 'Chevrolet', model: 'Silverado 1500', trim: 'LT', price: 52000 },
   },
   {
     sessionId: 'K67890XYZ',
     customerName: null,
     phone: null,
-    startTime: new Date(Date.now() - 300000).toISOString(), // 5 mins ago
-    lastActivity: new Date(Date.now() - 120000).toISOString(), // 2 mins ago
+    startTime: new Date(Date.now() - 300000).toISOString(),
+    lastActivity: new Date(Date.now() - 120000).toISOString(),
     currentStep: 'aiChat',
-    vehicleInterest: {
-      model: null,
-      cab: null,
-      colors: [],
-    },
-    budget: {
-      min: null,
-      max: null,
-      downPaymentPercent: null,
-    },
-    tradeIn: {
-      hasTrade: null,
-      vehicle: null,
-      hasPayoff: null,
-      payoffAmount: null,
-      monthlyPayment: null,
-      financedWith: null,
-    },
+    vehicleInterest: { model: null, cab: null, colors: [] },
+    budget: { min: null, max: null, downPaymentPercent: null },
+    tradeIn: { hasTrade: null, vehicle: null, hasPayoff: null, payoffAmount: null, monthlyPayment: null, financedWith: null },
     selectedVehicle: null,
   },
 ];
@@ -90,38 +55,17 @@ const mockSessionDetail = {
   currentStep: 'modelBudget',
   createdAt: new Date(Date.now() - 600000).toISOString(),
   updatedAt: new Date(Date.now() - 60000).toISOString(),
-  vehicleInterest: {
-    model: 'Silverado 1500',
-    cab: 'Crew Cab',
-    colors: ['White', 'Black'],
-  },
-  budget: {
-    min: 40000,
-    max: 60000,
-    downPaymentPercent: 10,
-  },
+  vehicleInterest: { model: 'Silverado 1500', cab: 'Crew Cab', colors: ['White', 'Black'] },
+  budget: { min: 40000, max: 60000, downPaymentPercent: 10 },
   tradeIn: {
     hasTrade: true,
-    vehicle: {
-      year: '2018',
-      make: 'Ford',
-      model: 'F-150',
-      mileage: 75000,
-    },
+    vehicle: { year: '2018', make: 'Ford', model: 'F-150', mileage: 75000 },
     hasPayoff: true,
     payoffAmount: 15000,
     monthlyPayment: 450,
     financedWith: 'Ford Credit',
   },
-  vehicle: {
-    stockNumber: 'M54321',
-    year: 2025,
-    make: 'Chevrolet',
-    model: 'Silverado 1500',
-    trim: 'LT',
-    msrp: 54000,
-    salePrice: 52000,
-  },
+  vehicle: { stockNumber: 'M54321', year: 2025, make: 'Chevrolet', model: 'Silverado 1500', trim: 'LT', msrp: 54000, salePrice: 52000 },
   chatHistory: [],
   actions: ['viewed_silverado', 'set_budget'],
 };
@@ -132,6 +76,13 @@ const mockActiveSessionsResponse = {
   timeout_minutes: 60,
   server_time: new Date().toISOString(),
   timezone: 'America/New_York',
+};
+
+// Helper to wait for loading to complete
+const waitForLoaded = async () => {
+  await waitFor(() => {
+    expect(screen.queryByText(/Loading active sessions/i)).not.toBeInTheDocument();
+  });
 };
 
 describe('SalesManagerDashboard Component', () => {
@@ -160,23 +111,20 @@ describe('SalesManagerDashboard Component', () => {
 
     test('displays auto-refresh checkbox', async () => {
       render(<SalesManagerDashboard />);
-      await waitFor(() => {
-        expect(screen.getByText(/Auto-refresh/i)).toBeInTheDocument();
-      });
+      await waitForLoaded();
+      expect(screen.getByText(/Auto-refresh/i)).toBeInTheDocument();
     });
 
     test('displays Refresh Now button', async () => {
       render(<SalesManagerDashboard />);
-      await waitFor(() => {
-        expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
-      });
+      await waitForLoaded();
+      expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
     });
 
     test('displays HOME button', async () => {
       render(<SalesManagerDashboard />);
-      await waitFor(() => {
-        expect(screen.getByText('HOME')).toBeInTheDocument();
-      });
+      await waitForLoaded();
+      expect(screen.getByText('HOME')).toBeInTheDocument();
     });
 
     test('loads sessions on mount', async () => {
@@ -218,13 +166,10 @@ describe('SalesManagerDashboard Component', () => {
 
     test('clicking session loads details', async () => {
       render(<SalesManagerDashboard />);
-      
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText('John Doe'));
-
       await waitFor(() => {
         expect(api.getTrafficSession).toHaveBeenCalledWith('K12345ABC');
       });
@@ -233,28 +178,16 @@ describe('SalesManagerDashboard Component', () => {
 
   describe('Empty State', () => {
     test('displays empty message when no sessions', async () => {
-      api.getActiveSessions.mockResolvedValue({
-        ...mockActiveSessionsResponse,
-        sessions: [],
-        count: 0,
-      });
-
+      api.getActiveSessions.mockResolvedValue({ ...mockActiveSessionsResponse, sessions: [], count: 0 });
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText(/No active sessions/i)).toBeInTheDocument();
       });
     });
 
     test('displays helper text in empty state', async () => {
-      api.getActiveSessions.mockResolvedValue({
-        ...mockActiveSessionsResponse,
-        sessions: [],
-        count: 0,
-      });
-
+      api.getActiveSessions.mockResolvedValue({ ...mockActiveSessionsResponse, sessions: [], count: 0 });
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText(/Sessions will appear/i)).toBeInTheDocument();
       });
@@ -264,7 +197,6 @@ describe('SalesManagerDashboard Component', () => {
   describe('Selection Prompt', () => {
     test('displays selection prompt when no session selected', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText(/Select a session/i)).toBeInTheDocument();
       });
@@ -272,7 +204,6 @@ describe('SalesManagerDashboard Component', () => {
 
     test('displays pointing emoji', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText('👈')).toBeInTheDocument();
       });
@@ -282,13 +213,10 @@ describe('SalesManagerDashboard Component', () => {
   describe('Session Detail View', () => {
     test('displays customer info when session selected', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText('John Doe'));
-
       await waitFor(() => {
         expect(screen.getByText('555-123-4567')).toBeInTheDocument();
       });
@@ -296,13 +224,10 @@ describe('SalesManagerDashboard Component', () => {
 
     test('displays trade-in section', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText('John Doe'));
-
       await waitFor(() => {
         expect(screen.getByText(/TRADE-IN/i)).toBeInTheDocument();
       });
@@ -310,13 +235,10 @@ describe('SalesManagerDashboard Component', () => {
 
     test('displays budget section', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText('John Doe'));
-
       await waitFor(() => {
         expect(screen.getByText(/BUDGET/i)).toBeInTheDocument();
       });
@@ -326,41 +248,26 @@ describe('SalesManagerDashboard Component', () => {
   describe('Auto-Refresh', () => {
     test('auto-refresh checkbox is checked by default', async () => {
       render(<SalesManagerDashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('checkbox')).toBeInTheDocument();
-      });
-
+      await waitForLoaded();
       const checkbox = screen.getByRole('checkbox');
       expect(checkbox).toBeChecked();
     });
 
     test('clicking checkbox toggles auto-refresh', async () => {
       render(<SalesManagerDashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('checkbox')).toBeInTheDocument();
-      });
-
+      await waitForLoaded();
       const checkbox = screen.getByRole('checkbox');
       fireEvent.click(checkbox);
-
       expect(checkbox).not.toBeChecked();
     });
 
     test('Refresh Now triggers manual refresh', async () => {
       render(<SalesManagerDashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
-      });
-
+      await waitForLoaded();
       await waitFor(() => {
         expect(api.getActiveSessions).toHaveBeenCalledTimes(1);
       });
-
       fireEvent.click(screen.getByText(/Refresh Now/i));
-
       await waitFor(() => {
         expect(api.getActiveSessions).toHaveBeenCalledTimes(2);
       });
@@ -368,16 +275,12 @@ describe('SalesManagerDashboard Component', () => {
 
     test('auto-refresh polls on interval', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(api.getActiveSessions).toHaveBeenCalledTimes(1);
       });
-
-      // Advance timer by 5 seconds
       act(() => {
         jest.advanceTimersByTime(5000);
       });
-
       await waitFor(() => {
         expect(api.getActiveSessions).toHaveBeenCalledTimes(2);
       });
@@ -385,25 +288,15 @@ describe('SalesManagerDashboard Component', () => {
 
     test('disabling auto-refresh stops polling', async () => {
       render(<SalesManagerDashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('checkbox')).toBeInTheDocument();
-      });
-
+      await waitForLoaded();
       await waitFor(() => {
         expect(api.getActiveSessions).toHaveBeenCalledTimes(1);
       });
-
-      // Disable auto-refresh
       const checkbox = screen.getByRole('checkbox');
       fireEvent.click(checkbox);
-
-      // Advance timer
       act(() => {
         jest.advanceTimersByTime(10000);
       });
-
-      // Should still only have 1 call
       expect(api.getActiveSessions).toHaveBeenCalledTimes(1);
     });
   });
@@ -411,19 +304,14 @@ describe('SalesManagerDashboard Component', () => {
   describe('HOME Button', () => {
     test('clicking HOME deselects session', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText('John Doe'));
-
       await waitFor(() => {
         expect(api.getTrafficSession).toHaveBeenCalled();
       });
-
       fireEvent.click(screen.getByText('HOME'));
-
       await waitFor(() => {
         expect(screen.getByText(/Select a session/i)).toBeInTheDocument();
       });
@@ -433,7 +321,6 @@ describe('SalesManagerDashboard Component', () => {
   describe('Step Labels', () => {
     test('maps aiChat to AI Assistant Chat', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText(/AI Assistant Chat/i)).toBeInTheDocument();
       });
@@ -441,7 +328,6 @@ describe('SalesManagerDashboard Component', () => {
 
     test('maps modelBudget to Model & Budget Flow', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText(/Model & Budget Flow/i)).toBeInTheDocument();
       });
@@ -461,10 +347,7 @@ describe('SalesManagerDashboard Component', () => {
 
     test('handles sessions API error gracefully', async () => {
       api.getActiveSessions.mockRejectedValue(new Error('Network error'));
-
       render(<SalesManagerDashboard />);
-
-      // Should still render without crashing
       await waitFor(() => {
         expect(screen.getByText(/Sales Manager Dashboard/i)).toBeInTheDocument();
       });
@@ -472,16 +355,11 @@ describe('SalesManagerDashboard Component', () => {
 
     test('handles session detail API error gracefully', async () => {
       api.getTrafficSession.mockRejectedValue(new Error('Network error'));
-
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText('John Doe'));
-
-      // Should not crash
       await waitFor(() => {
         expect(screen.getByText(/Sales Manager Dashboard/i)).toBeInTheDocument();
       });
@@ -491,13 +369,10 @@ describe('SalesManagerDashboard Component', () => {
   describe('Currency Formatting', () => {
     test('formats payoff amount correctly', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText('John Doe'));
-
       await waitFor(() => {
         expect(screen.getByText(/\$15,000/)).toBeInTheDocument();
       });
@@ -505,13 +380,10 @@ describe('SalesManagerDashboard Component', () => {
 
     test('displays dash for null values', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText('Anonymous')).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText('Anonymous'));
-
       await waitFor(() => {
         const dashes = screen.getAllByText('—');
         expect(dashes.length).toBeGreaterThan(0);
@@ -522,33 +394,23 @@ describe('SalesManagerDashboard Component', () => {
   describe('Accessibility', () => {
     test('Refresh Now is a button', async () => {
       render(<SalesManagerDashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
-      });
-
+      await waitForLoaded();
       const refreshButton = screen.getByText(/Refresh Now/i);
       expect(refreshButton.tagName).toBe('BUTTON');
     });
 
     test('checkbox is accessible', async () => {
       render(<SalesManagerDashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('checkbox')).toBeInTheDocument();
-      });
-
+      await waitForLoaded();
       const checkbox = screen.getByRole('checkbox');
       expect(checkbox).toBeInTheDocument();
     });
 
-    test('session cards are buttons', async () => {
+    test('session cards are clickable', async () => {
       render(<SalesManagerDashboard />);
-
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
-
       const sessionCard = screen.getByText('John Doe').closest('button');
       expect(sessionCard).toBeTruthy();
     });
@@ -576,15 +438,11 @@ describe('SalesManagerDashboard Chat Transcript', () => {
         { role: 'assistant', content: 'Great choice!', timestamp: new Date().toISOString() },
       ],
     });
-
     render(<SalesManagerDashboard />);
-
     await waitFor(() => {
       expect(screen.getByText('Anonymous')).toBeInTheDocument();
     });
-
     fireEvent.click(screen.getByText('Anonymous'));
-
     await waitFor(() => {
       expect(screen.getByText(/View Chat/i)).toBeInTheDocument();
     });
@@ -601,21 +459,15 @@ describe('SalesManagerDashboard Chat Transcript', () => {
         { role: 'assistant', content: 'Great choice!', timestamp: new Date().toISOString() },
       ],
     });
-
     render(<SalesManagerDashboard />);
-
     await waitFor(() => {
       expect(screen.getByText('Anonymous')).toBeInTheDocument();
     });
-
     fireEvent.click(screen.getByText('Anonymous'));
-
     await waitFor(() => {
       expect(screen.getByText(/View Chat/i)).toBeInTheDocument();
     });
-
     fireEvent.click(screen.getByText(/View Chat/i));
-
     await waitFor(() => {
       expect(screen.getByText(/Customer Chat/i)).toBeInTheDocument();
     });
