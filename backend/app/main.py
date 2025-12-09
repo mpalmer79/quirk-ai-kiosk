@@ -562,7 +562,6 @@ if __name__ == "__main__":
         log_level="debug" if IS_DEVELOPMENT else "info",
         access_log=IS_DEVELOPMENT,
     )
-```
 
 **Also add to `backend/requirements.txt`:**
 ```
