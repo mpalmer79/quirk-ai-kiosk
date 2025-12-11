@@ -368,6 +368,65 @@ export const getInventoryStats = async (): Promise<Record<string, unknown>> => {
 };
 
 // ============================================
+// INVENTORY SYNC STATUS
+// ============================================
+
+export interface SyncStatusResponse {
+  status: 'healthy' | 'error';
+  source: string;
+  vehicleCount: number;
+  lastLoadTime: string | null;
+  lastFileModified: string | null;
+  currentFileModified: string | null;
+  filePath: string | null;
+  fileExists: boolean;
+  fileSizeKb: number;
+  loadDurationMs: number;
+  freshnessStatus: 'fresh' | 'stale' | 'outdated' | 'unknown';
+  minutesSinceLoad: number | null;
+  needsRefresh: boolean;
+  lastError: string | null;
+  lastErrorTime: string | null;
+  breakdown: {
+    byStatus: Record<string, number>;
+    byBodyStyle: Record<string, number>;
+  };
+}
+
+export interface RefreshResponse {
+  success: boolean;
+  message: string;
+  previousCount: number;
+  newCount: number;
+  change: number;
+  loadDurationMs: number;
+  timestamp: string;
+}
+
+/**
+ * Get inventory sync status
+ */
+export const getSyncStatus = async (): Promise<SyncStatusResponse> => {
+  return apiRequest<SyncStatusResponse>('/inventory/sync/status');
+};
+
+/**
+ * Trigger manual inventory refresh
+ */
+export const refreshInventory = async (): Promise<RefreshResponse> => {
+  return apiRequest<RefreshResponse>('/inventory/sync/refresh', {
+    method: 'POST',
+  });
+};
+
+/**
+ * Get sync history
+ */
+export const getSyncHistory = async (): Promise<{ history: Array<Record<string, unknown>>; note: string }> => {
+  return apiRequest<{ history: Array<Record<string, unknown>>; note: string }>('/inventory/sync/history');
+};
+
+// ============================================
 // TRADE-IN ENDPOINTS
 // ============================================
 
@@ -679,6 +738,11 @@ const api = {
   getVehicleByVin,
   searchByPreferences,
   getInventoryStats,
+  
+  // Inventory Sync
+  getSyncStatus,
+  refreshInventory,
+  getSyncHistory,
   
   // Trade-In
   getTradeInEstimate,
