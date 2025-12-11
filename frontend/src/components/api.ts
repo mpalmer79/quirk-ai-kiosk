@@ -728,6 +728,66 @@ export const chatWithAI = async (request: AIChatRequest): Promise<AIChatResponse
 };
 
 // ============================================
+// TEXT-TO-SPEECH (ELEVENLABS)
+// ============================================
+
+export interface TTSStatusResponse {
+  available: boolean;
+  provider: 'elevenlabs' | 'browser';
+  voice_id: string | null;
+  voices: Record<string, string>;
+}
+
+export interface TTSRequest {
+  text: string;
+  voice_id?: string;
+  stability?: number;
+  similarity_boost?: number;
+  style?: number;
+}
+
+/**
+ * Check if ElevenLabs TTS is available
+ */
+export const getTTSStatus = async (): Promise<TTSStatusResponse> => {
+  return apiRequest<TTSStatusResponse>('/tts/status');
+};
+
+/**
+ * Convert text to speech using ElevenLabs
+ * Returns audio blob or throws error with fallback flag
+ */
+export const textToSpeech = async (request: TTSRequest): Promise<Blob> => {
+  const response = await fetch(`${API_BASE_URL}/tts/speak`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error = new Error(errorData.detail?.message || 'TTS request failed') as Error & { fallback?: boolean };
+    error.fallback = errorData.detail?.fallback ?? true;
+    throw error;
+  }
+  
+  return response.blob();
+};
+
+/**
+ * Get available ElevenLabs voices
+ */
+export const getTTSVoices = async (): Promise<{
+  available: boolean;
+  voices: Array<{ voice_id: string; name: string; category: string; preview_url?: string }>;
+  presets: Record<string, string>;
+}> => {
+  return apiRequest('/tts/voices');
+};
+
+// ============================================
 // EXPORT DEFAULT API OBJECT
 // ============================================
 
@@ -782,6 +842,11 @@ const api = {
   
   // AI Assistant
   chatWithAI,
+  
+  // Text-to-Speech
+  getTTSStatus,
+  textToSpeech,
+  getTTSVoices,
 };
 
 export default api;
