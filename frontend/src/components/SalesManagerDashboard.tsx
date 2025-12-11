@@ -155,6 +155,7 @@ const SalesManagerDashboard: React.FC = () => {
       if (updated) setSelectedSession(updated);
       fetchSessionDetail(selectedSession.sessionId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, selectedSession?.sessionId]);
 
   const handleSessionSelect = (session: CustomerSession) => {
@@ -269,6 +270,11 @@ const SalesManagerDashboard: React.FC = () => {
           {!selectedSession ? (
             <div style={styles.noSelection}>
               <span>Select a session to view details</span>
+            </div>
+          ) : loadingDetail ? (
+            <div style={styles.noSelection}>
+              <div style={styles.spinner} />
+              <span>Loading session details...</span>
             </div>
           ) : showChatTranscript && sessionDetail?.chatHistory ? (
             <div style={styles.chatTranscript}>
@@ -612,8 +618,10 @@ const styles: Record<string, CSSProperties> = {
   },
   noSelection: {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: '12px',
     height: '100%',
     minHeight: '400px',
     color: 'rgba(255,255,255,0.4)',
