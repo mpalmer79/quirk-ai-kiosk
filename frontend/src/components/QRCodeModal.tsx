@@ -1,4 +1,4 @@
-import React, { useState, useRef, CSSProperties } from 'react';
+import React, { useState, CSSProperties } from 'react';
 import type { Vehicle } from '../types';
 
 interface QRCodeModalProps {
@@ -22,7 +22,6 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ vehicle, isOpen, onClose }) =
   const [qrLoaded, setQrLoaded] = useState(false);
   const [qrError, setQrError] = useState(false);
   const [copied, setCopied] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
 
@@ -55,9 +54,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ vehicle, isOpen, onClose }) =
 
   // Print the QR code card
   const handlePrint = () => {
-    const printContent = printRef.current;
-    if (!printContent) return;
-
+    // Modal must be open to print (checked by isOpen above)
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -206,7 +203,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ vehicle, isOpen, onClose }) =
 
   return (
     <div style={styles.overlay} onClick={handleBackdropClick}>
-      <div style={styles.modal} ref={printRef}>
+      <div style={styles.modal}>
         {/* Close Button */}
         <button style={styles.closeBtn} onClick={onClose}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
