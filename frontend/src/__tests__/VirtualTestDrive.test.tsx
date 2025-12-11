@@ -65,11 +65,12 @@ describe('VirtualTestDrive Component', () => {
     it('renders all video category tabs', () => {
       renderVirtualTestDrive();
       
-      expect(screen.getByText('360° Walkaround')).toBeInTheDocument();
-      expect(screen.getByText('Interior Tour')).toBeInTheDocument();
-      expect(screen.getByText('Tech & Features')).toBeInTheDocument();
-      expect(screen.getByText('Test Drive')).toBeInTheDocument();
-      expect(screen.getByText('vs Competition')).toBeInTheDocument();
+      // Use getAllByText since some text appears multiple times
+      expect(screen.getAllByText('360° Walkaround').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Interior Tour').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Tech & Features').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Test Drive').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('vs Competition').length).toBeGreaterThan(0);
     });
 
     it('renders back button', () => {
@@ -90,7 +91,9 @@ describe('VirtualTestDrive Component', () => {
     it('changes category when Interior Tour is clicked', () => {
       renderVirtualTestDrive();
       
-      fireEvent.click(screen.getByText('Interior Tour'));
+      // Click the first Interior Tour element (the tab)
+      const interiorTabs = screen.getAllByText('Interior Tour');
+      fireEvent.click(interiorTabs[0]);
       
       expect(screen.getByText('Detailed cabin walkthrough and features')).toBeInTheDocument();
     });
@@ -98,7 +101,8 @@ describe('VirtualTestDrive Component', () => {
     it('changes category when Tech & Features is clicked', () => {
       renderVirtualTestDrive();
       
-      fireEvent.click(screen.getByText('Tech & Features'));
+      const techTabs = screen.getAllByText('Tech & Features');
+      fireEvent.click(techTabs[0]);
       
       expect(screen.getByText('Technology, safety & convenience features')).toBeInTheDocument();
     });
@@ -106,7 +110,8 @@ describe('VirtualTestDrive Component', () => {
     it('changes category when Test Drive is clicked', () => {
       renderVirtualTestDrive();
       
-      fireEvent.click(screen.getByText('Test Drive'));
+      const driveTabs = screen.getAllByText('Test Drive');
+      fireEvent.click(driveTabs[0]);
       
       expect(screen.getByText('Real driving footage and performance')).toBeInTheDocument();
     });
@@ -114,7 +119,8 @@ describe('VirtualTestDrive Component', () => {
     it('changes category when vs Competition is clicked', () => {
       renderVirtualTestDrive();
       
-      fireEvent.click(screen.getByText('vs Competition'));
+      const compTabs = screen.getAllByText('vs Competition');
+      fireEvent.click(compTabs[0]);
       
       expect(screen.getByText('How it stacks up against competitors')).toBeInTheDocument();
     });
