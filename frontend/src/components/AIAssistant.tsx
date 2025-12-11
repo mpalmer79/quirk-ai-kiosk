@@ -491,7 +491,6 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       try {
         const status = await api.getTTSStatus();
         setTtsAvailable(status.available);
-        console.log(`TTS Provider: ${status.provider}${status.available ? ` (voice: ${status.voice_id})` : ''}`);
       } catch {
         setTtsAvailable(false);
       }
@@ -580,7 +579,6 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         };
         
         audio.onerror = () => {
-          console.warn('ElevenLabs audio playback failed, using browser fallback');
           setIsSpeaking(false);
           URL.revokeObjectURL(audioUrl);
           audioRef.current = null;
@@ -590,8 +588,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         await audio.play();
         return;
         
-      } catch (error: unknown) {
-        console.warn('ElevenLabs TTS failed, using browser fallback:', error);
+      } catch {
         setIsSpeaking(false);
         // Fall through to browser speech
       }
