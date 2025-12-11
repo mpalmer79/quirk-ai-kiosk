@@ -1,388 +1,799 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import VirtualTestDrive from '../components/VirtualTestDrive';
+import React, { useState, useEffect, CSSProperties } from 'react';
+import api from './api';
 
-// Mock props
-const mockNavigateTo = jest.fn();
-const mockUpdateCustomerData = jest.fn();
+// Types
+interface CustomerSession {
+  sessionId: string;
+  customerName: string | null;
+  phone: string | null;
+  startTime: string;
+  lastActivity: string;
+  currentStep: string;
+  vehicleInterest: {
+    model: string | null;
+    cab: string | null;
+    colors: string[];
+  };
+  budget: {
+    min: number | null;
+    max: number | null;
+    downPaymentPercent: number | null;
+  };
+  tradeIn: {
+    hasTrade: boolean | null;
+    vehicle: {
+      year: string | null;
+      make: string | null;
+      model: string | null;
+      mileage: number | null;
+    } | null;
+    hasPayoff: boolean | null;
+    payoffAmount: number | null;
+    monthlyPayment: number | null;
+    financedWith: string | null;
+  };
+  selectedVehicle: {
+    stockNumber: string | null;
+    year: number | null;
+    make: string | null;
+    model: string | null;
+    trim: string | null;
+    price: number | null;
+  } | null;
+}
 
-const mockVehicle = {
-  id: '1',
-  stockNumber: 'STK001',
-  stock_number: 'STK001',
-  year: 2025,
-  make: 'Chevrolet',
-  model: 'Equinox',
-  trim: 'RS AWD',
-  exteriorColor: 'Radiant Red',
-  exterior_color: 'Radiant Red',
-  msrp: 34000,
-  salePrice: 32000,
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+interface SessionDetail {
+  sessionId: string;
+  customerName?: string;
+  phone?: string;
+  path?: string;
+  currentStep?: string;
+  createdAt: string;
+  updatedAt: string;
+  vehicleInterest?: CustomerSession['vehicleInterest'];
+  budget?: CustomerSession['budget'];
+  tradeIn?: CustomerSession['tradeIn'];
+  vehicle?: CustomerSession['selectedVehicle'];
+  chatHistory?: ChatMessage[];
+  actions?: string[];
+}
+
+const STEP_LABELS: Record<string, string> = {
+  welcome: 'Welcome Screen',
+  category: 'Selecting Category',
+  model: 'Selecting Model',
+  cab: 'Selecting Cab',
+  colors: 'Choosing Colors',
+  budget: 'Setting Budget',
+  tradeIn: 'Trade-In Info',
+  'trade-in': 'Trade-In Info',
+  inventory: 'Browsing Inventory',
+  vehicleDetail: 'Viewing Vehicle',
+  handoff: 'Ready for Handoff',
+  aiChat: 'AI Assistant Chat',
+  aiAssistant: 'AI Assistant Chat',
+  modelBudget: 'Model & Budget Flow',
+  stockLookup: 'Stock Lookup',
+  guidedQuiz: 'Guided Quiz',
+  browse: 'Browsing',
+  browsing: 'Browsing',
+  name_entered: 'Just Started',
 };
 
-const mockCustomerData = {
-  selectedVehicle: mockVehicle,
-};
+const SalesManagerDashboard: React.FC = () => {
+  const [sessions, setSessions] = useState<CustomerSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<CustomerSession | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState('');
+  const [showChatTranscript, setShowChatTranscript] = useState(false);
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
-const renderVirtualTestDrive = (props = {}) => {
-  return render(
-    <VirtualTestDrive
-      navigateTo={mockNavigateTo}
-      updateCustomerData={mockUpdateCustomerData}
-      customerData={{ ...mockCustomerData, ...props.customerData }}
-      resetJourney={jest.fn()}
-      {...props}
-    />
+  const fetchSessions = async () => {
+    try {
+      const data = await api.getActiveSessions(60);
+      setSessions(data.sessions || []);
+      setLastUpdate(new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error('Error fetching sessions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSessionDetail = async (sessionId: string) => {
+    setLoadingDetail(true);
+    try {
+      setSessionDetail(await api.getTrafficSession(sessionId));
+    } catch (err) {
+      console.error('Error fetching session detail:', err);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSessions();
+    let interval: ReturnType<typeof setInterval>;
+    if (autoRefresh) interval = setInterval(fetchSessions, 5000);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [autoRefresh]);
+
+  useEffect(() => {
+    if (selectedSession) {
+      const updated = sessions.find(s => s.sessionId === selectedSession.sessionId);
+      if (updated) setSelectedSession(updated);
+      fetchSessionDetail(selectedSession.sessionId);
+    }
+  }, [sessions, selectedSession?.sessionId]);
+
+  const handleSessionSelect = (session: CustomerSession) => {
+    setSelectedSession(session);
+    setShowChatTranscript(false);
+    fetchSessionDetail(session.sessionId);
+  };
+
+  const handleHomeClick = () => {
+    setSelectedSession(null);
+    setSessionDetail(null);
+    setShowChatTranscript(false);
+  };
+
+  const getStepLabel = (step: string) => STEP_LABELS[step] || step || 'Browsing';
+
+  const getTimeSince = (dateStr: string): string => {
+    if (!dateStr) return 'Unknown';
+    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins === 1) return '1 min ago';
+    if (mins < 60) return `${mins} mins ago`;
+    return `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
+  };
+
+  const formatCurrency = (val: number | null | undefined): string => {
+    if (val == null) return 'Not specified';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(val);
+  };
+
+  return (
+    <div style={styles.container}>
+      {/* Header */}
+      <div style={styles.header}>
+        <h1 style={styles.title}>📊 Sales Manager Dashboard</h1>
+        <div style={styles.headerControls}>
+          <span style={styles.lastUpdate}>Last update: {lastUpdate}</span>
+          <label style={styles.autoRefreshLabel}>
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+              style={styles.checkbox}
+            />
+            Auto-refresh
+          </label>
+          <button style={styles.refreshBtn} onClick={fetchSessions}>
+            Refresh Now
+          </button>
+          <button style={styles.homeBtn} onClick={handleHomeClick}>
+            HOME
+          </button>
+        </div>
+      </div>
+
+      <div style={styles.mainContent}>
+        {/* Session List */}
+        <div style={styles.sessionList}>
+          <h2 style={styles.sessionListTitle}>
+            ACTIVE KIOSK SESSIONS ({sessions.length})
+          </h2>
+
+          {loading ? (
+            <div style={styles.loadingState}>
+              <div style={styles.spinner} />
+              <span>Loading active sessions...</span>
+            </div>
+          ) : sessions.length === 0 ? (
+            <div style={styles.emptyState}>
+              <span>No active sessions at this time</span>
+            </div>
+          ) : (
+            <div style={styles.sessionCards}>
+              {sessions.map((session) => (
+                <div
+                  key={session.sessionId}
+                  style={{
+                    ...styles.sessionCard,
+                    ...(selectedSession?.sessionId === session.sessionId
+                      ? styles.sessionCardActive
+                      : {}),
+                  }}
+                  onClick={() => handleSessionSelect(session)}
+                >
+                  <div style={styles.sessionHeader}>
+                    <span style={styles.customerName}>
+                      {session.customerName || 'Anonymous'}
+                    </span>
+                    <span style={styles.sessionTime}>
+                      {getTimeSince(session.lastActivity)}
+                    </span>
+                  </div>
+                  <div style={styles.sessionStep}>
+                    {getStepLabel(session.currentStep)}
+                  </div>
+                  {session.phone && (
+                    <div style={styles.sessionPhone}>{session.phone}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Detail Panel */}
+        <div style={styles.detailPanel}>
+          {!selectedSession ? (
+            <div style={styles.noSelection}>
+              <span>Select a session to view details</span>
+            </div>
+          ) : showChatTranscript && sessionDetail?.chatHistory ? (
+            <div style={styles.chatTranscript}>
+              <div style={styles.transcriptHeader}>
+                <h3>Customer Chat with Quirk AI</h3>
+                <button
+                  style={styles.backBtn}
+                  onClick={() => setShowChatTranscript(false)}
+                >
+                  Back to Worksheet
+                </button>
+              </div>
+              <div style={styles.chatMessages}>
+                {sessionDetail.chatHistory.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      ...styles.chatMessage,
+                      ...(msg.role === 'user'
+                        ? styles.userMessage
+                        : styles.assistantMessage),
+                    }}
+                  >
+                    <span style={styles.messageRole}>
+                      {msg.role === 'user' ? 'Customer' : 'Quirk AI'}
+                    </span>
+                    <p style={styles.messageContent}>{msg.content}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={styles.worksheet}>
+              <div style={styles.worksheetHeader}>
+                <h3 style={styles.worksheetTitle}>
+                  Digital Quote Worksheet - {selectedSession.customerName || 'Customer'}
+                </h3>
+                {sessionDetail?.chatHistory && sessionDetail.chatHistory.length > 0 && (
+                  <button
+                    style={styles.viewChatBtn}
+                    onClick={() => setShowChatTranscript(true)}
+                  >
+                    View Chat Transcript
+                  </button>
+                )}
+              </div>
+
+              {/* 4-Square Grid */}
+              <div style={styles.fourSquareGrid}>
+                {/* Trade-In */}
+                <div style={styles.quadrant}>
+                  <h4 style={styles.quadrantTitle}>TRADE-IN</h4>
+                  <div style={styles.quadrantContent}>
+                    {selectedSession.tradeIn?.hasTrade ? (
+                      <>
+                        <div style={styles.tradeVehicleInfo}>
+                          <span style={styles.tradeModel}>
+                            {selectedSession.tradeIn.vehicle?.year}{' '}
+                            {selectedSession.tradeIn.vehicle?.make}{' '}
+                            {selectedSession.tradeIn.vehicle?.model}
+                          </span>
+                          <span style={styles.tradeMileage}>
+                            {selectedSession.tradeIn.vehicle?.mileage?.toLocaleString()} miles
+                          </span>
+                        </div>
+                        {selectedSession.tradeIn.hasPayoff ? (
+                          <div style={styles.payoffInfo}>
+                            <div style={styles.payoffRow}>
+                              <span>Payoff:</span>
+                              <span>{formatCurrency(selectedSession.tradeIn.payoffAmount)}</span>
+                            </div>
+                            <div style={styles.payoffRow}>
+                              <span>Monthly:</span>
+                              <span>{formatCurrency(selectedSession.tradeIn.monthlyPayment)}</span>
+                            </div>
+                            <div style={styles.payoffRow}>
+                              <span>Lender:</span>
+                              <span>{selectedSession.tradeIn.financedWith || 'Not specified'}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={styles.paidOff}>✓ Paid Off</span>
+                        )}
+                      </>
+                    ) : (
+                      <span style={styles.noTrade}>No trade-in</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Price */}
+                <div style={styles.quadrant}>
+                  <h4 style={styles.quadrantTitle}>PRICE</h4>
+                  <div style={styles.quadrantContent}>
+                    {selectedSession.selectedVehicle ? (
+                      <>
+                        <span style={styles.bigPrice}>
+                          {formatCurrency(selectedSession.selectedVehicle.price)}
+                        </span>
+                        <span style={styles.subValue}>
+                          {selectedSession.selectedVehicle.year}{' '}
+                          {selectedSession.selectedVehicle.make}{' '}
+                          {selectedSession.selectedVehicle.model}
+                        </span>
+                        <span style={styles.subValue}>
+                          Stock #{selectedSession.selectedVehicle.stockNumber}
+                        </span>
+                      </>
+                    ) : (
+                      <span style={styles.pending}>No vehicle selected</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Down Payment */}
+                <div style={styles.quadrant}>
+                  <h4 style={styles.quadrantTitle}>DOWN PAYMENT</h4>
+                  <div style={styles.quadrantContent}>
+                    {selectedSession.budget?.downPaymentPercent ? (
+                      <span style={styles.bigValue}>
+                        {selectedSession.budget.downPaymentPercent}%
+                      </span>
+                    ) : (
+                      <span style={styles.pending}>Not specified</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Monthly Budget */}
+                <div style={styles.quadrant}>
+                  <h4 style={styles.quadrantTitle}>MONTHLY BUDGET</h4>
+                  <div style={styles.quadrantContent}>
+                    {selectedSession.budget?.min || selectedSession.budget?.max ? (
+                      <span style={styles.budgetRange}>
+                        ${selectedSession.budget.min || 0} - ${selectedSession.budget.max || '∞'}
+                      </span>
+                    ) : (
+                      <span style={styles.pending}>Not specified</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Vehicle Interest */}
+              {selectedSession.vehicleInterest?.model && (
+                <div style={styles.interestSection}>
+                  <h4 style={styles.sectionTitle}>Vehicle Interest</h4>
+                  <div style={styles.interestDetails}>
+                    <span>Model: {selectedSession.vehicleInterest.model}</span>
+                    {selectedSession.vehicleInterest.cab && (
+                      <span>Cab: {selectedSession.vehicleInterest.cab}</span>
+                    )}
+                    {selectedSession.vehicleInterest.colors?.length > 0 && (
+                      <span>Colors: {selectedSession.vehicleInterest.colors.join(', ')}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* CSS for spinner animation */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
   );
 };
 
-describe('VirtualTestDrive Component', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
+const styles: Record<string, CSSProperties> = {
+  container: {
+    minHeight: '100vh',
+    background: '#0a0a0a',
+    color: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    fontFamily: '"Montserrat", sans-serif',
+  },
 
-  describe('Rendering', () => {
-    it('renders the component with vehicle info', () => {
-      renderVirtualTestDrive();
-      
-      expect(screen.getByText('Virtual Experience')).toBeInTheDocument();
-      expect(screen.getByText(/2025 Chevrolet Equinox RS AWD/)).toBeInTheDocument();
-    });
+  // Header
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px 32px',
+    background: '#1a1a1a',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+  },
+  title: {
+    fontSize: '24px',
+    fontWeight: 700,
+    color: '#fff',
+    margin: 0,
+  },
+  headerControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+  lastUpdate: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  autoRefreshLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.7)',
+    cursor: 'pointer',
+  },
+  checkbox: {
+    width: '16px',
+    height: '16px',
+    cursor: 'pointer',
+  },
+  refreshBtn: {
+    padding: '8px 16px',
+    background: 'rgba(27,115,64,0.2)',
+    border: '1px solid rgba(27,115,64,0.4)',
+    borderRadius: '6px',
+    color: '#4ade80',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  homeBtn: {
+    padding: '8px 16px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '6px',
+    color: '#fff',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
 
-    it('displays vehicle price', () => {
-      renderVirtualTestDrive();
-      
-      expect(screen.getByText('$32,000')).toBeInTheDocument();
-    });
+  // Main Content
+  mainContent: {
+    flex: 1,
+    display: 'grid',
+    gridTemplateColumns: '300px 1fr',
+    gap: '24px',
+    padding: '24px 32px',
+  },
 
-    it('displays stock number', () => {
-      renderVirtualTestDrive();
-      
-      expect(screen.getByText('Stock #STK001')).toBeInTheDocument();
-    });
+  // Session List
+  sessionList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  sessionListTitle: {
+    fontSize: '12px',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    margin: 0,
+  },
+  loadingState: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '40px 20px',
+    gap: '12px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  spinner: {
+    width: '32px',
+    height: '32px',
+    borderWidth: '3px',
+    borderStyle: 'solid',
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: '#1B7340',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  emptyState: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '40px 20px',
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: '14px',
+  },
+  sessionCards: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  sessionCard: {
+    padding: '16px',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  sessionCardActive: {
+    background: 'rgba(27,115,64,0.15)',
+    border: '1px solid #1B7340',
+  },
+  sessionHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+  },
+  customerName: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#fff',
+  },
+  sessionTime: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  sessionStep: {
+    fontSize: '13px',
+    color: '#4ade80',
+    marginBottom: '4px',
+  },
+  sessionPhone: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.5)',
+  },
 
-    it('renders all video category tabs', () => {
-      renderVirtualTestDrive();
-      
-      // Use getAllByText since some text appears multiple times
-      expect(screen.getAllByText('360° Walkaround').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Interior Tour').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Tech & Features').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Test Drive').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('vs Competition').length).toBeGreaterThan(0);
-    });
+  // Detail Panel
+  detailPanel: {
+    background: 'rgba(255,255,255,0.02)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.05)',
+    overflow: 'hidden',
+  },
+  noSelection: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    minHeight: '400px',
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: '16px',
+  },
 
-    it('renders back button', () => {
-      renderVirtualTestDrive();
-      
-      expect(screen.getByText('Back to Details')).toBeInTheDocument();
-    });
-  });
+  // Worksheet
+  worksheet: {
+    padding: '24px',
+  },
+  worksheetHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '24px',
+  },
+  worksheetTitle: {
+    fontSize: '20px',
+    fontWeight: 700,
+    color: '#fff',
+    margin: 0,
+  },
+  viewChatBtn: {
+    padding: '10px 16px',
+    background: 'rgba(96,165,250,0.2)',
+    border: '1px solid rgba(96,165,250,0.4)',
+    borderRadius: '8px',
+    color: '#60a5fa',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
 
-  describe('Category Selection', () => {
-    it('selects walkaround category by default', () => {
-      renderVirtualTestDrive();
-      
-      // The description for walkaround should be visible
-      expect(screen.getByText('Full exterior tour showing every angle')).toBeInTheDocument();
-    });
+  // 4-Square Grid
+  fourSquareGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '16px',
+    marginBottom: '24px',
+  },
+  quadrant: {
+    padding: '20px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '2px solid rgba(255,255,255,0.1)',
+    borderRadius: '12px',
+    minHeight: '150px',
+  },
+  quadrantTitle: {
+    fontSize: '12px',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    marginBottom: '16px',
+    paddingBottom: '8px',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+  },
+  quadrantContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  tradeVehicleInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    marginBottom: '12px',
+  },
+  tradeModel: {
+    fontSize: '18px',
+    fontWeight: 700,
+    color: '#ffffff',
+  },
+  tradeMileage: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  payoffInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    padding: '12px',
+    background: 'rgba(0,0,0,0.2)',
+    borderRadius: '8px',
+  },
+  payoffRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.8)',
+  },
+  paidOff: {
+    color: '#4ade80',
+    fontWeight: 600,
+  },
+  noTrade: {
+    color: 'rgba(255,255,255,0.4)',
+    fontStyle: 'italic',
+  },
+  pending: {
+    color: 'rgba(255,255,255,0.3)',
+    fontStyle: 'italic',
+  },
+  bigPrice: {
+    fontSize: '32px',
+    fontWeight: 700,
+    color: '#4ade80',
+  },
+  budgetRange: {
+    fontSize: '18px',
+    fontWeight: 600,
+    color: '#60a5fa',
+  },
+  bigValue: {
+    fontSize: '28px',
+    fontWeight: 700,
+    color: '#ffffff',
+  },
+  subValue: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+  },
 
-    it('changes category when Interior Tour is clicked', () => {
-      renderVirtualTestDrive();
-      
-      // Click the first Interior Tour element (the tab)
-      const interiorTabs = screen.getAllByText('Interior Tour');
-      fireEvent.click(interiorTabs[0]);
-      
-      expect(screen.getByText('Detailed cabin walkthrough and features')).toBeInTheDocument();
-    });
+  // Interest Section
+  interestSection: {
+    padding: '16px',
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: '12px',
+  },
+  sectionTitle: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: '12px',
+  },
+  interestDetails: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.8)',
+  },
 
-    it('changes category when Tech & Features is clicked', () => {
-      renderVirtualTestDrive();
-      
-      const techTabs = screen.getAllByText('Tech & Features');
-      fireEvent.click(techTabs[0]);
-      
-      expect(screen.getByText('Technology, safety & convenience features')).toBeInTheDocument();
-    });
+  // Chat Transcript
+  chatTranscript: {
+    padding: '24px',
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  transcriptHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '20px',
+  },
+  backBtn: {
+    padding: '8px 16px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '6px',
+    color: '#fff',
+    fontSize: '13px',
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  chatMessages: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    overflowY: 'auto',
+  },
+  chatMessage: {
+    padding: '12px 16px',
+    borderRadius: '12px',
+    maxWidth: '80%',
+  },
+  userMessage: {
+    alignSelf: 'flex-end',
+    background: 'rgba(27,115,64,0.2)',
+    border: '1px solid rgba(27,115,64,0.3)',
+  },
+  assistantMessage: {
+    alignSelf: 'flex-start',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+  },
+  messageRole: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    marginBottom: '4px',
+    display: 'block',
+  },
+  messageContent: {
+    fontSize: '14px',
+    color: '#fff',
+    margin: 0,
+    lineHeight: 1.5,
+  },
+};
 
-    it('changes category when Test Drive is clicked', () => {
-      renderVirtualTestDrive();
-      
-      const driveTabs = screen.getAllByText('Test Drive');
-      fireEvent.click(driveTabs[0]);
-      
-      expect(screen.getByText('Real driving footage and performance')).toBeInTheDocument();
-    });
-
-    it('changes category when vs Competition is clicked', () => {
-      renderVirtualTestDrive();
-      
-      const compTabs = screen.getAllByText('vs Competition');
-      fireEvent.click(compTabs[0]);
-      
-      expect(screen.getByText('How it stacks up against competitors')).toBeInTheDocument();
-    });
-  });
-
-  describe('Navigation', () => {
-    it('navigates back to vehicle detail when back button is clicked', () => {
-      renderVirtualTestDrive();
-      
-      fireEvent.click(screen.getByText('Back to Details'));
-      
-      expect(mockNavigateTo).toHaveBeenCalledWith('vehicleDetail');
-    });
-
-    it('navigates to vehicle detail when See It In Person is clicked', () => {
-      renderVirtualTestDrive();
-      
-      fireEvent.click(screen.getByText('See It In Person'));
-      
-      expect(mockNavigateTo).toHaveBeenCalledWith('vehicleDetail');
-    });
-
-    it('navigates to vehicle comparison when Compare Vehicles is clicked', () => {
-      renderVirtualTestDrive();
-      
-      fireEvent.click(screen.getByText('Compare Vehicles'));
-      
-      expect(mockNavigateTo).toHaveBeenCalledWith('vehicleComparison');
-    });
-  });
-
-  describe('Model-specific Content', () => {
-    it('displays Equinox competitors', () => {
-      renderVirtualTestDrive();
-      
-      expect(screen.getByText('Honda CR-V')).toBeInTheDocument();
-      expect(screen.getByText('Toyota RAV4')).toBeInTheDocument();
-      expect(screen.getByText('Ford Escape')).toBeInTheDocument();
-    });
-
-    it('displays Equinox category keywords', () => {
-      renderVirtualTestDrive();
-      
-      expect(screen.getByText('compact SUV')).toBeInTheDocument();
-      expect(screen.getByText('crossover')).toBeInTheDocument();
-      expect(screen.getByText('family SUV')).toBeInTheDocument();
-    });
-
-    it('displays different competitors for Silverado', () => {
-      const silveradoVehicle = {
-        ...mockVehicle,
-        model: 'Silverado 1500',
-        trim: 'LT',
-      };
-      
-      renderVirtualTestDrive({
-        customerData: { selectedVehicle: silveradoVehicle },
-      });
-      
-      // Use flexible text matching for competitors
-      expect(screen.getByText((content, element) => 
-        element?.tagName.toLowerCase() === 'span' && content === 'Ford F-150'
-      )).toBeInTheDocument();
-      expect(screen.getByText((content, element) => 
-        element?.tagName.toLowerCase() === 'span' && content === 'Ram 1500'
-      )).toBeInTheDocument();
-      expect(screen.getByText((content, element) => 
-        element?.tagName.toLowerCase() === 'span' && content === 'Toyota Tundra'
-      )).toBeInTheDocument();
-    });
-
-    it('displays Tahoe competitors', () => {
-      const tahoeVehicle = {
-        ...mockVehicle,
-        model: 'Tahoe',
-        trim: 'Z71',
-      };
-      
-      renderVirtualTestDrive({
-        customerData: { selectedVehicle: tahoeVehicle },
-      });
-      
-      expect(screen.getByText((content, element) => 
-        element?.tagName.toLowerCase() === 'span' && content === 'Ford Expedition'
-      )).toBeInTheDocument();
-      expect(screen.getByText((content, element) => 
-        element?.tagName.toLowerCase() === 'span' && content === 'Toyota Sequoia'
-      )).toBeInTheDocument();
-    });
-  });
-
-  describe('Suggested Searches', () => {
-    it('renders suggested search links', () => {
-      renderVirtualTestDrive();
-      
-      expect(screen.getByText('Owner Reviews')).toBeInTheDocument();
-      expect(screen.getByText('Known Issues')).toBeInTheDocument();
-      expect(screen.getByText('Off-Road Capability')).toBeInTheDocument();
-      expect(screen.getByText('Towing & Hauling')).toBeInTheDocument();
-    });
-
-    it('suggested search links have correct href format', () => {
-      renderVirtualTestDrive();
-      
-      const ownerReviewsLink = screen.getByText('Owner Reviews');
-      expect(ownerReviewsLink).toHaveAttribute('href');
-      expect(ownerReviewsLink.getAttribute('href')).toContain('youtube.com');
-      expect(ownerReviewsLink.getAttribute('href')).toContain('owner+review');
-    });
-  });
-
-  describe('YouTube Integration', () => {
-    it('renders YouTube iframe', () => {
-      renderVirtualTestDrive();
-      
-      const iframe = document.querySelector('iframe');
-      expect(iframe).toBeInTheDocument();
-    });
-
-    it('iframe has correct title based on category and vehicle', () => {
-      renderVirtualTestDrive();
-      
-      const iframe = document.querySelector('iframe');
-      expect(iframe).toHaveAttribute('title', '360° Walkaround - 2025 Chevrolet Equinox');
-    });
-
-    it('iframe src contains search query with vehicle info', () => {
-      renderVirtualTestDrive();
-      
-      const iframe = document.querySelector('iframe');
-      const src = iframe?.getAttribute('src') || '';
-      
-      expect(src).toContain('youtube.com');
-      expect(src).toContain('2025');
-      expect(src).toContain('Chevrolet');
-      expect(src).toContain('Equinox');
-    });
-
-    it('More Videos link opens YouTube search', () => {
-      renderVirtualTestDrive();
-      
-      const moreVideosLink = screen.getByText('More Videos');
-      expect(moreVideosLink).toHaveAttribute('target', '_blank');
-      expect(moreVideosLink).toHaveAttribute('href');
-      expect(moreVideosLink.getAttribute('href')).toContain('youtube.com/results');
-    });
-  });
-
-  describe('Vehicle Card', () => {
-    it('displays vehicle name in sidebar', () => {
-      renderVirtualTestDrive();
-      
-      // There are multiple instances, find in sidebar context
-      const vehicleNames = screen.getAllByText('2025 Chevrolet Equinox');
-      expect(vehicleNames.length).toBeGreaterThan(0);
-    });
-
-    it('displays trim in sidebar', () => {
-      renderVirtualTestDrive();
-      
-      const trims = screen.getAllByText('RS AWD');
-      expect(trims.length).toBeGreaterThan(0);
-    });
-
-    it('displays exterior color in sidebar', () => {
-      renderVirtualTestDrive();
-      
-      const colors = screen.getAllByText('Radiant Red');
-      expect(colors.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Footer Tips', () => {
-    it('displays video source disclaimer', () => {
-      renderVirtualTestDrive();
-      
-      expect(screen.getByText(/Videos are sourced from YouTube/)).toBeInTheDocument();
-    });
-
-    it('displays sales consultant availability message', () => {
-      renderVirtualTestDrive();
-      
-      expect(screen.getByText(/sales consultant is available/)).toBeInTheDocument();
-    });
-  });
-
-  describe('Default Vehicle Handling', () => {
-    it('renders with demo vehicle when no vehicle selected', () => {
-      render(
-        <VirtualTestDrive
-          navigateTo={mockNavigateTo}
-          updateCustomerData={mockUpdateCustomerData}
-          customerData={{}}
-          resetJourney={jest.fn()}
-        />
-      );
-      
-      // Should still render with default/demo vehicle
-      expect(screen.getByText('Virtual Experience')).toBeInTheDocument();
-    });
-  });
-
-  describe('Accessibility', () => {
-    it('all category tabs are buttons', () => {
-      renderVirtualTestDrive();
-      
-      const walkaroundTab = screen.getByText('360° Walkaround');
-      expect(walkaroundTab.closest('button')).toBeInTheDocument();
-    });
-
-    it('CTA buttons are accessible', () => {
-      renderVirtualTestDrive();
-      
-      expect(screen.getByText('See It In Person').closest('button')).toBeInTheDocument();
-      expect(screen.getByText('Compare Vehicles').closest('button')).toBeInTheDocument();
-    });
-
-    it('external links open in new tab', () => {
-      renderVirtualTestDrive();
-      
-      const externalLinks = screen.getAllByRole('link');
-      externalLinks.forEach(link => {
-        if (link.getAttribute('href')?.includes('youtube.com')) {
-          expect(link).toHaveAttribute('target', '_blank');
-          expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-        }
-      });
-    });
-  });
-});
-
-describe('VirtualTestDrive Model Hints', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  const testModels = [
-    { model: 'Blazer', competitors: ['Ford Edge', 'Hyundai Santa Fe'] },
-    { model: 'Traverse', competitors: ['Honda Pilot', 'Toyota Highlander'] },
-    { model: 'Trax', competitors: ['Honda HR-V', 'Toyota Corolla Cross'] },
-    { model: 'Colorado', competitors: ['Ford Ranger', 'Toyota Tacoma'] },
-  ];
-
-  testModels.forEach(({ model, competitors }) => {
-    it(`displays correct competitors for ${model}`, () => {
-      const vehicle = {
-        ...mockVehicle,
-        model,
-      };
-      
-      render(
-        <VirtualTestDrive
-          navigateTo={mockNavigateTo}
-          updateCustomerData={mockUpdateCustomerData}
-          customerData={{ selectedVehicle: vehicle }}
-          resetJourney={jest.fn()}
-        />
-      );
-      
-      competitors.forEach(competitor => {
-        expect(screen.getByText(competitor)).toBeInTheDocument();
-      });
-    });
-  });
-});
+export default SalesManagerDashboard;
