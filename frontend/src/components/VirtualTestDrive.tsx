@@ -608,7 +608,7 @@ const styles: Record<string, CSSProperties> = {
   },
   categoryTabActive: {
     background: 'rgba(27,115,64,0.2)',
-    borderColor: '#1B7340',
+    border: '1px solid #1B7340',
     color: '#4ade80',
   },
   categoryIcon: {
@@ -654,7 +654,9 @@ const styles: Record<string, CSSProperties> = {
   spinner: {
     width: '48px',
     height: '48px',
-    border: '3px solid rgba(255,255,255,0.1)',
+    borderWidth: '3px',
+    borderStyle: 'solid',
+    borderColor: 'rgba(255,255,255,0.1)',
     borderTopColor: '#1B7340',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
