@@ -481,8 +481,27 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   }, [customerData?.customerName]);
 
   // Text-to-Speech function
-  const speakText = useCallback((text: string) => {
-    if (!audioEnabled || !window.speechSynthesis) return;
+  // Audio player ref for ElevenLabs
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [ttsAvailable, setTtsAvailable] = useState<boolean | null>(null);
+
+  // Check ElevenLabs availability on mount
+  useEffect(() => {
+    const checkTTS = async () => {
+      try {
+        const status = await api.getTTSStatus();
+        setTtsAvailable(status.available);
+        console.log(`TTS Provider: ${status.provider}${status.available ? ` (voice: ${status.voice_id})` : ''}`);
+      } catch {
+        setTtsAvailable(false);
+      }
+    };
+    checkTTS();
+  }, []);
+
+  // Browser speech fallback
+  const speakWithBrowser = useCallback((text: string) => {
+    if (!window.speechSynthesis) return;
     
     window.speechSynthesis.cancel();
     
@@ -518,13 +537,81 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     
     speechSynthRef.current = utterance;
     window.speechSynthesis.speak(utterance);
-  }, [audioEnabled]);
+  }, []);
+
+  // Main speak function - tries ElevenLabs first, falls back to browser
+  const speakText = useCallback(async (text: string) => {
+    if (!audioEnabled) return;
+    
+    // Stop any current speech
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    window.speechSynthesis?.cancel();
+    
+    const cleanText = text
+      .replace(/[\u{1F600}-\u{1F6FF}]/gu, '')
+      .replace(/[#*_~`]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    if (!cleanText) return;
+    
+    // Try ElevenLabs if available
+    if (ttsAvailable) {
+      try {
+        setIsSpeaking(true);
+        const audioBlob = await api.textToSpeech({ 
+          text: cleanText,
+          stability: 0.4,        // More expressive
+          similarity_boost: 0.8,
+          style: 0.6            // Some style exaggeration
+        });
+        
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+        
+        audio.onended = () => {
+          setIsSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+          audioRef.current = null;
+        };
+        
+        audio.onerror = () => {
+          console.warn('ElevenLabs audio playback failed, using browser fallback');
+          setIsSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+          audioRef.current = null;
+          speakWithBrowser(cleanText);
+        };
+        
+        await audio.play();
+        return;
+        
+      } catch (error: unknown) {
+        console.warn('ElevenLabs TTS failed, using browser fallback:', error);
+        setIsSpeaking(false);
+        // Fall through to browser speech
+      }
+    }
+    
+    // Fallback to browser speech
+    speakWithBrowser(cleanText);
+  }, [audioEnabled, ttsAvailable, speakWithBrowser]);
 
   const stopSpeaking = useCallback(() => {
+    // Stop ElevenLabs audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    // Stop browser speech
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
-      setIsSpeaking(false);
     }
+    setIsSpeaking(false);
   }, []);
 
   const toggleAudio = useCallback(() => {
@@ -829,10 +916,11 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         <button
           style={{
             ...styles.audioToggle,
-            background: audioEnabled ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255,255,255,0.1)',
-            borderColor: audioEnabled ? '#4ade80' : 'rgba(255,255,255,0.2)',
+            background: audioEnabled ? (ttsAvailable ? 'rgba(139, 92, 246, 0.2)' : 'rgba(74, 222, 128, 0.2)') : 'rgba(255,255,255,0.1)',
+            borderColor: audioEnabled ? (ttsAvailable ? '#8b5cf6' : '#4ade80') : 'rgba(255,255,255,0.2)',
           }}
           onClick={toggleAudio}
+          title={ttsAvailable ? 'ElevenLabs HD Voice' : 'Browser Speech'}
         >
           {isSpeaking ? (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -853,7 +941,9 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
             </svg>
           )}
           <span style={styles.audioLabel}>
-            {audioEnabled ? (isSpeaking ? 'Speaking...' : 'Audio On') : 'Audio Off'}
+            {audioEnabled 
+              ? (isSpeaking ? 'Speaking...' : (ttsAvailable ? 'HD Audio' : 'Audio On')) 
+              : 'Audio Off'}
           </span>
         </button>
         
