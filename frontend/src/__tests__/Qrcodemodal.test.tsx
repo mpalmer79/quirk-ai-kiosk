@@ -11,26 +11,6 @@ Object.assign(navigator, {
   },
 });
 
-// Mock window.open for print functionality
-const mockPrint = jest.fn();
-const mockClose = jest.fn();
-const mockFocus = jest.fn();
-const mockDocumentWrite = jest.fn();
-const mockDocumentClose = jest.fn();
-
-const mockPrintWindow = {
-  document: {
-    write: mockDocumentWrite,
-    close: mockDocumentClose,
-  },
-  print: mockPrint,
-  close: mockClose,
-  focus: mockFocus,
-};
-
-const mockOpen = jest.fn(() => mockPrintWindow);
-window.open = mockOpen;
-
 // Mock vehicle data
 const mockVehicle = {
   id: '1',
@@ -48,17 +28,37 @@ const mockVehicle = {
 };
 
 describe('QRCodeModal Component', () => {
+  // Declare mocks inside describe so they're reset properly
+  let mockDocumentWrite: jest.Mock;
+  let mockDocumentClose: jest.Mock;
+  let mockPrint: jest.Mock;
+  let mockClose: jest.Mock;
+  let mockFocus: jest.Mock;
+  let mockOpen: jest.Mock;
+
   beforeEach(() => {
-    jest.clearAllMocks();
     jest.useFakeTimers();
-    // Reset specific mocks
-    mockDocumentWrite.mockClear();
-    mockDocumentClose.mockClear();
-    mockPrint.mockClear();
-    mockClose.mockClear();
-    mockFocus.mockClear();
-    mockOpen.mockClear();
     mockWriteText.mockClear();
+    
+    // Create fresh mocks for each test
+    mockDocumentWrite = jest.fn();
+    mockDocumentClose = jest.fn();
+    mockPrint = jest.fn();
+    mockClose = jest.fn();
+    mockFocus = jest.fn();
+    
+    const mockPrintWindow = {
+      document: {
+        write: mockDocumentWrite,
+        close: mockDocumentClose,
+      },
+      print: mockPrint,
+      close: mockClose,
+      focus: mockFocus,
+    };
+    
+    mockOpen = jest.fn().mockReturnValue(mockPrintWindow);
+    window.open = mockOpen;
   });
 
   afterEach(() => {
@@ -201,9 +201,12 @@ describe('QRCodeModal Component', () => {
 
   describe('Print Functionality', () => {
     it('opens print window when Print QR Card is clicked', () => {
-      render(
+      const { container } = render(
         <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
       );
+      
+      // Ensure modal is rendered with ref attached
+      expect(container.querySelector('[style*="position: fixed"]')).toBeInTheDocument();
       
       const printButton = screen.getByText('Print QR Card');
       fireEvent.click(printButton);
@@ -232,6 +235,7 @@ describe('QRCodeModal Component', () => {
       const printButton = screen.getByText('Print QR Card');
       fireEvent.click(printButton);
       
+      expect(mockDocumentWrite).toHaveBeenCalled();
       const htmlContent = mockDocumentWrite.mock.calls[0][0];
       expect(htmlContent).toContain('LT AWD');
       expect(htmlContent).toContain('STK001');
@@ -245,6 +249,9 @@ describe('QRCodeModal Component', () => {
       
       const printButton = screen.getByText('Print QR Card');
       fireEvent.click(printButton);
+      
+      // Verify window was opened
+      expect(mockOpen).toHaveBeenCalled();
       
       // Fast-forward timer
       jest.advanceTimersByTime(500);
