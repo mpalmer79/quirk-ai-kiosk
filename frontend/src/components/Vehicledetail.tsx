@@ -455,6 +455,15 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
             </svg>
             Save to Phone (QR Code)
           </button>
+          
+          {/* Virtual Test Drive Button */}
+          <button style={s.virtualTestDriveBtn} onClick={() => navigateTo('virtualTestDrive')}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <polygon points="10,8 16,12 10,16" fill="currentColor" />
+            </svg>
+            Virtual Experience & Videos
+          </button>
         </div>
       </div>
 
@@ -874,6 +883,23 @@ const s: Record<string, CSSProperties> = {
     border: '1px solid rgba(27, 115, 64, 0.3)',
     borderRadius: '10px',
     color: '#4ade80',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  virtualTestDriveBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    width: '100%',
+    padding: '14px 20px',
+    marginTop: '8px',
+    background: 'rgba(239, 68, 68, 0.15)',
+    border: '1px solid rgba(239, 68, 68, 0.3)',
+    borderRadius: '10px',
+    color: '#f87171',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
