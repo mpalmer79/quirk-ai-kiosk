@@ -78,6 +78,13 @@ useEffect(() => { loadData(); }, [activeFilter]);
           <span style={s.subtitle}>Kiosk Session Monitor</span>
         </div>
         <div style={s.headerRight}>
+          <button style={s.syncDashboardBtn} onClick={() => navigateTo('inventorySync')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+              <path d="M21 3v5h-5"/>
+            </svg>
+            Inventory Sync
+          </button>
           {activeFilter && <button style={s.clearFilterBtn} onClick={() => setActiveFilter(null)}>Clear Filter ✕</button>}
           <button style={s.refreshBtn} onClick={handleRefresh} disabled={refreshing}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }}>
@@ -258,6 +265,7 @@ const s: Record<string, CSSProperties> = {
   subtitle: { fontSize: '14px', color: 'rgba(255,255,255,0.5)' },
   clearFilterBtn: { padding: '8px 16px', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer' },
   refreshBtn: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' },
+  syncDashboardBtn: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '8px', color: '#818cf8', fontSize: '14px', fontWeight: 600, cursor: 'pointer' },
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px', marginBottom: '24px' },
   statCard: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' },
   statCardActive: { background: 'rgba(27,115,64,0.15)', border: '1px solid rgba(27,115,64,0.4)' },
