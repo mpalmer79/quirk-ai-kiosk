@@ -45,6 +45,9 @@ from app.routers import smart_recommendations
 # Import photo analysis router
 from app.routers import photo_analysis
 
+# Import TTS router (ElevenLabs integration)
+from app.routers import tts
+
 # Import database
 from app.database import init_database, close_database, is_database_configured
 
@@ -401,6 +404,9 @@ app.include_router(smart_recommendations.router, prefix="/api/v3/smart", tags=["
 
 # Photo analysis router
 app.include_router(photo_analysis.router, prefix="/api/v1/trade-in-photos", tags=["photo-analysis"])
+
+# TTS Router (ElevenLabs)
+app.include_router(tts.router, prefix="/api/v1/tts", tags=["tts"])
 
 
 # =============================================================================
