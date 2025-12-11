@@ -45,7 +45,7 @@ interface CustomerSession {
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
-  timestamp: string;
+  timestamp?: string;
 }
 
 interface SessionDetail {
@@ -131,7 +131,8 @@ const SalesManagerDashboard: React.FC = () => {
   const fetchSessionDetail = async (sessionId: string) => {
     setLoadingDetail(true);
     try {
-      setSessionDetail(await api.getTrafficSession(sessionId));
+      const data = await api.getTrafficSession(sessionId);
+      setSessionDetail(data as unknown as SessionDetail);
     } catch (err) {
       console.error('Error fetching session detail:', err);
     } finally {
