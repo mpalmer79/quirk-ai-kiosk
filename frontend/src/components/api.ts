@@ -399,6 +399,65 @@ export const requestAppraisal = async (tradeInData: TradeInVehicleData & { custo
 };
 
 // ============================================
+// TRADE-IN PHOTO ANALYSIS
+// ============================================
+
+interface PhotoItem {
+  id: string;
+  data: string;  // Base64 encoded image
+  mimeType?: string;
+}
+
+interface VehicleInfoForAnalysis {
+  year?: string;
+  make?: string;
+  model?: string;
+  mileage?: string;
+}
+
+interface ConditionIssue {
+  location: string;
+  severity: 'minor' | 'moderate' | 'severe';
+  description: string;
+  estimatedImpact?: string;
+}
+
+interface PhotoAnalysisResult {
+  photoId: string;
+  category: string;
+  issues: ConditionIssue[];
+  positives: string[];
+  notes: string;
+}
+
+export interface PhotoAnalysisResponse {
+  overallCondition: 'excellent' | 'good' | 'fair' | 'poor' | 'pending';
+  conditionScore: number;
+  confidenceLevel: 'high' | 'medium' | 'low';
+  summary: string;
+  detectedMileage?: string;
+  photoResults: PhotoAnalysisResult[];
+  recommendations: string[];
+  estimatedConditionAdjustment: string;
+}
+
+/**
+ * Analyze trade-in photos using AI vision
+ */
+export const analyzeTradeInPhotos = async (
+  photos: PhotoItem[],
+  vehicleInfo?: VehicleInfoForAnalysis
+): Promise<PhotoAnalysisResponse> => {
+  return apiRequest<PhotoAnalysisResponse>('/v1/trade-in-photos/analyze', {
+    method: 'POST',
+    body: JSON.stringify({
+      photos,
+      vehicleInfo,
+    }),
+  });
+};
+
+// ============================================
 // PAYMENT CALCULATION ENDPOINTS
 // ============================================
 
@@ -625,6 +684,7 @@ const api = {
   getTradeInEstimate,
   decodeTradeInVin,
   requestAppraisal,
+  analyzeTradeInPhotos,
   
   // Payments
   calculateLease,
