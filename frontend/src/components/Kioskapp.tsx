@@ -7,6 +7,7 @@ import ModelBudgetSelector from './ModelBudgetSelector';
 import GuidedQuiz from './Guidedquiz';
 import InventoryResults from './Inventoryresults';
 import VehicleDetail from './Vehicledetail';
+import VehicleComparison from './VehicleComparison';
 import PaymentCalculator from './Paymentcalculator';
 import TradeInEstimator from './TradeInestimator';
 import CustomerHandoff from './Customerhandoff';
@@ -28,6 +29,7 @@ type ScreenName =
   | 'aiAssistant'
   | 'inventory'
   | 'vehicleDetail'
+  | 'vehicleComparison'
   | 'paymentCalculator'
   | 'tradeIn'
   | 'handoff'
@@ -435,6 +437,7 @@ const KioskApp: React.FC = () => {
     aiAssistant: AIAssistant,
     inventory: InventoryResults,
     vehicleDetail: VehicleDetail,
+    vehicleComparison: VehicleComparison,
     paymentCalculator: PaymentCalculator,
     tradeIn: TradeInEstimator,
     handoff: CustomerHandoff,
