@@ -1,344 +1,388 @@
-import React, { useState, useEffect } from 'react';
-import api from './api';
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import VirtualTestDrive from '../components/VirtualTestDrive';
 
-interface ChatMessage { role: 'user' | 'assistant'; content: string; timestamp?: string; }
-interface TradeInVehicle { year: string | null; make: string | null; model: string | null; mileage: number | null; }
-interface CustomerSession {
-  sessionId: string; customerName: string | null; phone: string | null; startTime: string; lastActivity: string; currentStep: string;
-  vehicleInterest: { model: string | null; cab: string | null; colors: string[]; };
-  budget: { min: number | null; max: number | null; downPaymentPercent: number | null; };
-  tradeIn: { hasTrade: boolean | null; vehicle: TradeInVehicle | null; hasPayoff: boolean | null; payoffAmount: number | null; monthlyPayment: number | null; financedWith: string | null; };
-  selectedVehicle: { stockNumber: string | null; year: number | null; make: string | null; model: string | null; trim: string | null; price: number | null; } | null;
-  chatHistory?: ChatMessage[];
-}
-interface SessionDetail {
-  sessionId: string; customerName?: string; phone?: string; path?: string; currentStep?: string; createdAt: string; updatedAt: string;
-  vehicleInterest?: any; budget?: any; tradeIn?: any; vehicle?: any; chatHistory?: ChatMessage[]; actions?: string[];
-}
+// Mock props
+const mockNavigateTo = jest.fn();
+const mockUpdateCustomerData = jest.fn();
 
-const STEP_LABELS: Record<string, string> = {
-  welcome: 'Welcome Screen', category: 'Selecting Category', model: 'Selecting Model', cab: 'Selecting Cab',
-  colors: 'Choosing Colors', budget: 'Setting Budget', tradeIn: 'Trade-In Info', 'trade-in': 'Trade-In Info', inventory: 'Browsing Inventory',
-  vehicleDetail: 'Viewing Vehicle', handoff: 'Ready for Handoff', aiChat: 'AI Assistant Chat', aiAssistant: 'AI Assistant Chat',
-  modelBudget: 'Model & Budget Flow', stockLookup: 'Stock Lookup', guidedQuiz: 'Guided Quiz', browse: 'Browsing',
-  browsing: 'Browsing', name_entered: 'Just Started',
+const mockVehicle = {
+  id: '1',
+  stockNumber: 'STK001',
+  stock_number: 'STK001',
+  year: 2025,
+  make: 'Chevrolet',
+  model: 'Equinox',
+  trim: 'RS AWD',
+  exteriorColor: 'Radiant Red',
+  exterior_color: 'Radiant Red',
+  msrp: 34000,
+  salePrice: 32000,
 };
 
-const SalesManagerDashboard: React.FC = () => {
-  const [sessions, setSessions] = useState<CustomerSession[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState<CustomerSession | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState('');
-  const [showChatTranscript, setShowChatTranscript] = useState(false);
-  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+const mockCustomerData = {
+  selectedVehicle: mockVehicle,
+};
 
-  const fetchSessions = async () => {
-    try {
-      const data = await api.getActiveSessions(60);
-      setSessions(data.sessions || []);
-      setLastUpdate(new Date().toLocaleTimeString());
-    } catch (err) { console.error('Error fetching sessions:', err); }
-    finally { setLoading(false); }
-  };
+const renderVirtualTestDrive = (props = {}) => {
+  return render(
+    <VirtualTestDrive
+      navigateTo={mockNavigateTo}
+      updateCustomerData={mockUpdateCustomerData}
+      customerData={{ ...mockCustomerData, ...props.customerData }}
+      resetJourney={jest.fn()}
+      {...props}
+    />
+  );
+};
 
-  const fetchSessionDetail = async (sessionId: string) => {
-    setLoadingDetail(true);
-    try { setSessionDetail(await api.getTrafficSession(sessionId)); }
-    catch (err) { console.error('Error fetching session detail:', err); }
-    finally { setLoadingDetail(false); }
-  };
+describe('VirtualTestDrive Component', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-  useEffect(() => {
-    fetchSessions();
-    let interval: ReturnType<typeof setInterval>;
-    if (autoRefresh) interval = setInterval(fetchSessions, 5000);
-    return () => { if (interval) clearInterval(interval); };
-  }, [autoRefresh]);
+  describe('Rendering', () => {
+    it('renders the component with vehicle info', () => {
+      renderVirtualTestDrive();
+      
+      expect(screen.getByText('Virtual Experience')).toBeInTheDocument();
+      expect(screen.getByText(/2025 Chevrolet Equinox RS AWD/)).toBeInTheDocument();
+    });
 
-  useEffect(() => {
-    const currentSessionId = selectedSession?.sessionId;
-    if (currentSessionId) {
-      const updated = sessions.find(s => s.sessionId === currentSessionId);
-      if (updated) setSelectedSession(updated);
-      fetchSessionDetail(currentSessionId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, selectedSession?.sessionId]);
+    it('displays vehicle price', () => {
+      renderVirtualTestDrive();
+      
+      expect(screen.getByText('$32,000')).toBeInTheDocument();
+    });
 
-  const handleSessionSelect = (session: CustomerSession) => {
-    setSelectedSession(session);
-    setShowChatTranscript(false);
-    fetchSessionDetail(session.sessionId);
-  };
+    it('displays stock number', () => {
+      renderVirtualTestDrive();
+      
+      expect(screen.getByText('Stock #STK001')).toBeInTheDocument();
+    });
 
-  const handleGoHome = () => {
-    setSelectedSession(null);
-    setSessionDetail(null);
-    setShowChatTranscript(false);
-  };
+    it('renders all video category tabs', () => {
+      renderVirtualTestDrive();
+      
+      // Use getAllByText since some text appears multiple times
+      expect(screen.getAllByText('360° Walkaround').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Interior Tour').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Tech & Features').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Test Drive').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('vs Competition').length).toBeGreaterThan(0);
+    });
 
-  const getStepLabel = (step: string) => STEP_LABELS[step] || step || 'Browsing';
-  const getTimeSince = (dateStr: string): string => {
-    if (!dateStr) return 'Unknown';
-    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins === 1) return '1 min ago';
-    if (mins < 60) return `${mins} mins ago`;
-    return `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
-  };
-  const formatCurrency = (val: number | null) => val == null ? '—' : `$${val.toLocaleString()}`;
-  const formatTime = (ts?: string) => {
-    if (!ts) return '';
-    try { return new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); }
-    catch { return ''; }
-  };
-  const isAIChatSession = (step: string) => ['aiChat', 'aiAssistant', 'AI Assistant Chat'].includes(step);
+    it('renders back button', () => {
+      renderVirtualTestDrive();
+      
+      expect(screen.getByText('Back to Details')).toBeInTheDocument();
+    });
+  });
 
-  const renderChatTranscript = () => {
-    const chatHistory = sessionDetail?.chatHistory || [];
-    if (chatHistory.length === 0) {
-      return (
-        <div style={s.noChat}>
-          <p>No conversation history available yet.</p>
-          <p style={s.noChatSubtext}>The customer hasn't started chatting with the AI assistant.</p>
-        </div>
+  describe('Category Selection', () => {
+    it('selects walkaround category by default', () => {
+      renderVirtualTestDrive();
+      
+      // The description for walkaround should be visible
+      expect(screen.getByText('Full exterior tour showing every angle')).toBeInTheDocument();
+    });
+
+    it('changes category when Interior Tour is clicked', () => {
+      renderVirtualTestDrive();
+      
+      // Click the first Interior Tour element (the tab)
+      const interiorTabs = screen.getAllByText('Interior Tour');
+      fireEvent.click(interiorTabs[0]);
+      
+      expect(screen.getByText('Detailed cabin walkthrough and features')).toBeInTheDocument();
+    });
+
+    it('changes category when Tech & Features is clicked', () => {
+      renderVirtualTestDrive();
+      
+      const techTabs = screen.getAllByText('Tech & Features');
+      fireEvent.click(techTabs[0]);
+      
+      expect(screen.getByText('Technology, safety & convenience features')).toBeInTheDocument();
+    });
+
+    it('changes category when Test Drive is clicked', () => {
+      renderVirtualTestDrive();
+      
+      const driveTabs = screen.getAllByText('Test Drive');
+      fireEvent.click(driveTabs[0]);
+      
+      expect(screen.getByText('Real driving footage and performance')).toBeInTheDocument();
+    });
+
+    it('changes category when vs Competition is clicked', () => {
+      renderVirtualTestDrive();
+      
+      const compTabs = screen.getAllByText('vs Competition');
+      fireEvent.click(compTabs[0]);
+      
+      expect(screen.getByText('How it stacks up against competitors')).toBeInTheDocument();
+    });
+  });
+
+  describe('Navigation', () => {
+    it('navigates back to vehicle detail when back button is clicked', () => {
+      renderVirtualTestDrive();
+      
+      fireEvent.click(screen.getByText('Back to Details'));
+      
+      expect(mockNavigateTo).toHaveBeenCalledWith('vehicleDetail');
+    });
+
+    it('navigates to vehicle detail when See It In Person is clicked', () => {
+      renderVirtualTestDrive();
+      
+      fireEvent.click(screen.getByText('See It In Person'));
+      
+      expect(mockNavigateTo).toHaveBeenCalledWith('vehicleDetail');
+    });
+
+    it('navigates to vehicle comparison when Compare Vehicles is clicked', () => {
+      renderVirtualTestDrive();
+      
+      fireEvent.click(screen.getByText('Compare Vehicles'));
+      
+      expect(mockNavigateTo).toHaveBeenCalledWith('vehicleComparison');
+    });
+  });
+
+  describe('Model-specific Content', () => {
+    it('displays Equinox competitors', () => {
+      renderVirtualTestDrive();
+      
+      expect(screen.getByText('Honda CR-V')).toBeInTheDocument();
+      expect(screen.getByText('Toyota RAV4')).toBeInTheDocument();
+      expect(screen.getByText('Ford Escape')).toBeInTheDocument();
+    });
+
+    it('displays Equinox category keywords', () => {
+      renderVirtualTestDrive();
+      
+      expect(screen.getByText('compact SUV')).toBeInTheDocument();
+      expect(screen.getByText('crossover')).toBeInTheDocument();
+      expect(screen.getByText('family SUV')).toBeInTheDocument();
+    });
+
+    it('displays different competitors for Silverado', () => {
+      const silveradoVehicle = {
+        ...mockVehicle,
+        model: 'Silverado 1500',
+        trim: 'LT',
+      };
+      
+      renderVirtualTestDrive({
+        customerData: { selectedVehicle: silveradoVehicle },
+      });
+      
+      // Use flexible text matching for competitors
+      expect(screen.getByText((content, element) => 
+        element?.tagName.toLowerCase() === 'span' && content === 'Ford F-150'
+      )).toBeInTheDocument();
+      expect(screen.getByText((content, element) => 
+        element?.tagName.toLowerCase() === 'span' && content === 'Ram 1500'
+      )).toBeInTheDocument();
+      expect(screen.getByText((content, element) => 
+        element?.tagName.toLowerCase() === 'span' && content === 'Toyota Tundra'
+      )).toBeInTheDocument();
+    });
+
+    it('displays Tahoe competitors', () => {
+      const tahoeVehicle = {
+        ...mockVehicle,
+        model: 'Tahoe',
+        trim: 'Z71',
+      };
+      
+      renderVirtualTestDrive({
+        customerData: { selectedVehicle: tahoeVehicle },
+      });
+      
+      expect(screen.getByText((content, element) => 
+        element?.tagName.toLowerCase() === 'span' && content === 'Ford Expedition'
+      )).toBeInTheDocument();
+      expect(screen.getByText((content, element) => 
+        element?.tagName.toLowerCase() === 'span' && content === 'Toyota Sequoia'
+      )).toBeInTheDocument();
+    });
+  });
+
+  describe('Suggested Searches', () => {
+    it('renders suggested search links', () => {
+      renderVirtualTestDrive();
+      
+      expect(screen.getByText('Owner Reviews')).toBeInTheDocument();
+      expect(screen.getByText('Known Issues')).toBeInTheDocument();
+      expect(screen.getByText('Off-Road Capability')).toBeInTheDocument();
+      expect(screen.getByText('Towing & Hauling')).toBeInTheDocument();
+    });
+
+    it('suggested search links have correct href format', () => {
+      renderVirtualTestDrive();
+      
+      const ownerReviewsLink = screen.getByText('Owner Reviews');
+      expect(ownerReviewsLink).toHaveAttribute('href');
+      expect(ownerReviewsLink.getAttribute('href')).toContain('youtube.com');
+      expect(ownerReviewsLink.getAttribute('href')).toContain('owner+review');
+    });
+  });
+
+  describe('YouTube Integration', () => {
+    it('renders YouTube iframe', () => {
+      renderVirtualTestDrive();
+      
+      const iframe = document.querySelector('iframe');
+      expect(iframe).toBeInTheDocument();
+    });
+
+    it('iframe has correct title based on category and vehicle', () => {
+      renderVirtualTestDrive();
+      
+      const iframe = document.querySelector('iframe');
+      expect(iframe).toHaveAttribute('title', '360° Walkaround - 2025 Chevrolet Equinox');
+    });
+
+    it('iframe src contains search query with vehicle info', () => {
+      renderVirtualTestDrive();
+      
+      const iframe = document.querySelector('iframe');
+      const src = iframe?.getAttribute('src') || '';
+      
+      expect(src).toContain('youtube.com');
+      expect(src).toContain('2025');
+      expect(src).toContain('Chevrolet');
+      expect(src).toContain('Equinox');
+    });
+
+    it('More Videos link opens YouTube search', () => {
+      renderVirtualTestDrive();
+      
+      const moreVideosLink = screen.getByText('More Videos');
+      expect(moreVideosLink).toHaveAttribute('target', '_blank');
+      expect(moreVideosLink).toHaveAttribute('href');
+      expect(moreVideosLink.getAttribute('href')).toContain('youtube.com/results');
+    });
+  });
+
+  describe('Vehicle Card', () => {
+    it('displays vehicle name in sidebar', () => {
+      renderVirtualTestDrive();
+      
+      // There are multiple instances, find in sidebar context
+      const vehicleNames = screen.getAllByText('2025 Chevrolet Equinox');
+      expect(vehicleNames.length).toBeGreaterThan(0);
+    });
+
+    it('displays trim in sidebar', () => {
+      renderVirtualTestDrive();
+      
+      const trims = screen.getAllByText('RS AWD');
+      expect(trims.length).toBeGreaterThan(0);
+    });
+
+    it('displays exterior color in sidebar', () => {
+      renderVirtualTestDrive();
+      
+      const colors = screen.getAllByText('Radiant Red');
+      expect(colors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Footer Tips', () => {
+    it('displays video source disclaimer', () => {
+      renderVirtualTestDrive();
+      
+      expect(screen.getByText(/Videos are sourced from YouTube/)).toBeInTheDocument();
+    });
+
+    it('displays sales consultant availability message', () => {
+      renderVirtualTestDrive();
+      
+      expect(screen.getByText(/sales consultant is available/)).toBeInTheDocument();
+    });
+  });
+
+  describe('Default Vehicle Handling', () => {
+    it('renders with demo vehicle when no vehicle selected', () => {
+      render(
+        <VirtualTestDrive
+          navigateTo={mockNavigateTo}
+          updateCustomerData={mockUpdateCustomerData}
+          customerData={{}}
+          resetJourney={jest.fn()}
+        />
       );
-    }
-    return (
-      <div style={s.chatContainer}>
-        <div style={s.chatHeader}>
-          <h3 style={s.chatTitle}>💬 Customer Chat with Quirk AI</h3>
-          <span style={s.chatCount}>{chatHistory.length} messages</span>
-        </div>
-        <div style={s.chatMessages}>
-          {chatHistory.map((msg, idx) => (
-            <div key={idx} style={{ ...s.chatMessage, ...(msg.role === 'user' ? s.userMessage : s.assistantMessage) }}>
-              <div style={s.chatMsgHeader}>
-                <span style={s.chatRole}>{msg.role === 'user' ? `👤 ${selectedSession?.customerName || 'Customer'}` : '🤖 Quirk AI'}</span>
-                <span style={s.chatTime}>{formatTime(msg.timestamp)}</span>
-              </div>
-              <p style={s.chatContent}>{msg.content}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
+      
+      // Should still render with default/demo vehicle
+      expect(screen.getByText('Virtual Experience')).toBeInTheDocument();
+    });
+  });
 
-  const renderFourSquare = (session: CustomerSession) => (
-    <div style={s.fourSquare}>
-      <div style={s.fourSquareHeader}>
-        <h2 style={s.fourSquareTitle}>📋 Digital Quote Worksheet</h2>
-        <span style={s.sessionTime}>Started {getTimeSince(session.startTime)}</span>
-      </div>
-      <div style={s.customerInfoBar}>
-        {[{ label: 'NAME', value: session.customerName }, { label: 'PHONE', value: session.phone }, { label: 'STATUS', value: getStepLabel(session.currentStep), color: '#4ade80' }].map((item, i) => (
-          <div key={i} style={s.infoItem}>
-            <span style={s.infoLabel}>{item.label}</span>
-            <span style={{ ...s.infoValue, ...(item.color ? { color: item.color } : {}) }}>{item.value || '—'}</span>
-          </div>
-        ))}
-      </div>
-      {isAIChatSession(session.currentStep) && (
-        <button style={s.viewChatBtn} onClick={() => setShowChatTranscript(!showChatTranscript)}>
-          <span>💬</span>
-          <span>{showChatTranscript ? 'Hide Chat Transcript' : 'View Customer Chat with Quirk AI'}</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: showChatTranscript ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </button>
-      )}
-      {showChatTranscript && (loadingDetail ? <div style={s.loadingChat}>Loading conversation...</div> : renderChatTranscript())}
-      <div style={s.vehicleSection}>
-        <h3 style={s.sectionTitle}>🚗 Vehicle Interest</h3>
-        <div style={s.vehicleGrid}>
-          {[{ label: 'MODEL', value: session.vehicleInterest?.model }, { label: 'CAB/CONFIG', value: session.vehicleInterest?.cab }, { label: 'COLOR PREF', value: session.vehicleInterest?.colors?.length > 0 ? session.vehicleInterest.colors.join(', ') : null }].map((f, i) => (
-            <div key={i} style={s.vehicleField}><span style={s.fieldLabel}>{f.label}</span><span style={s.fieldValue}>{f.value || '—'}</span></div>
-          ))}
-        </div>
-        {session.selectedVehicle && (
-          <div style={s.selectedVehicleCard}>
-            <span style={s.selectedLabel}>SELECTED VEHICLE</span>
-            <span style={s.selectedVehicle}>Stock #{session.selectedVehicle.stockNumber} — {session.selectedVehicle.year} {session.selectedVehicle.make} {session.selectedVehicle.model} {session.selectedVehicle.trim}</span>
-            <span style={s.selectedPrice}>{formatCurrency(session.selectedVehicle.price)}</span>
-          </div>
-        )}
-      </div>
-      <div style={s.fourSquareGrid}>
-        {/* Trade-In */}
-        <div style={s.quadrant}>
-          <h4 style={s.quadrantTitle}>TRADE-IN</h4>
-          {session.tradeIn?.hasTrade === true && session.tradeIn?.vehicle ? (
-            <div style={s.quadrantContent}>
-              <div style={s.tradeVehicleInfo}>
-                <span>{session.tradeIn.vehicle.year} {session.tradeIn.vehicle.make}</span>
-                <span style={s.tradeModel}>{session.tradeIn.vehicle.model}</span>
-                <span style={s.tradeMileage}>{session.tradeIn.vehicle.mileage ? `${session.tradeIn.vehicle.mileage.toLocaleString()} miles` : '— miles'}</span>
-              </div>
-              {session.tradeIn.hasPayoff && (
-                <div style={s.payoffInfo}>
-                  {[{ label: 'Payoff:', value: formatCurrency(session.tradeIn.payoffAmount) }, { label: 'Current Pmt:', value: `${formatCurrency(session.tradeIn.monthlyPayment)}/mo` }, { label: 'Lender:', value: session.tradeIn.financedWith || '—' }].map((row, i) => (
-                    <div key={i} style={s.payoffRow}><span>{row.label}</span><strong>{row.value}</strong></div>
-                  ))}
-                </div>
-              )}
-              {session.tradeIn.hasPayoff === false && <span style={s.paidOff}>✓ Paid Off / No Loan</span>}
-            </div>
-          ) : session.tradeIn?.hasTrade === false ? <span style={s.noTrade}>No Trade-In</span> : <span style={s.pending}>Pending...</span>}
-        </div>
-        {/* Price */}
-        <div style={s.quadrant}>
-          <h4 style={s.quadrantTitle}>PRICE</h4>
-          <div style={s.quadrantContent}>
-            {session.selectedVehicle ? <span style={s.bigPrice}>{formatCurrency(session.selectedVehicle.price)}</span>
-              : session.budget?.max ? <span style={s.budgetRange}>Budget: {formatCurrency(session.budget.min)} - {formatCurrency(session.budget.max)}</span>
-              : <span style={s.pending}>No vehicle selected</span>}
-          </div>
-        </div>
-        {/* Cash Down */}
-        <div style={s.quadrant}>
-          <h4 style={s.quadrantTitle}>CASH DOWN</h4>
-          <div style={s.quadrantContent}>
-            {session.budget?.downPaymentPercent != null ? (<><span style={s.bigValue}>{session.budget.downPaymentPercent}%</span><span style={s.subValue}>Down Payment</span></>) : <span style={s.pending}>Pending...</span>}
-          </div>
-        </div>
-        {/* Monthly Payment */}
-        <div style={s.quadrant}>
-          <h4 style={s.quadrantTitle}>MONTHLY PAYMENTS</h4>
-          <div style={s.quadrantContent}>
-            {session.budget?.min != null && session.budget?.max != null ? (<><span style={s.bigValue}>{formatCurrency(session.budget.min)} - {formatCurrency(session.budget.max)}</span><span style={s.subValue}>Target Range /mo</span></>)
-              : session.tradeIn?.monthlyPayment ? (<><span style={s.bigValue}>{formatCurrency(session.tradeIn.monthlyPayment)}</span><span style={s.subValue}>Current Payment (Trade)</span></>)
-              : <span style={s.pending}>Pending...</span>}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  describe('Accessibility', () => {
+    it('all category tabs are buttons', () => {
+      renderVirtualTestDrive();
+      
+      const walkaroundTab = screen.getByText('360° Walkaround');
+      expect(walkaroundTab.closest('button')).toBeInTheDocument();
+    });
 
-  if (loading) {
-    return (
-      <div style={s.container}>
-        <div style={s.loadingContainer}><div style={s.spinner} /><p>Loading active sessions...</p></div>
-      </div>
-    );
-  }
+    it('CTA buttons are accessible', () => {
+      renderVirtualTestDrive();
+      
+      expect(screen.getByText('See It In Person').closest('button')).toBeInTheDocument();
+      expect(screen.getByText('Compare Vehicles').closest('button')).toBeInTheDocument();
+    });
 
-  return (
-    <div style={s.container}>
-      <div style={s.header}>
-        <h1 style={s.headerTitle}>📊 Sales Manager Dashboard</h1>
-        <div style={s.headerActions}>
-          <span style={s.lastUpdate}>Last update: {lastUpdate}</span>
-          <label style={s.autoRefreshLabel}>
-            <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} style={s.checkbox} />
-            Auto-refresh (5s)
-          </label>
-          <button style={s.refreshBtn} onClick={fetchSessions}>🔄 Refresh Now</button>
-        </div>
-      </div>
-      <div style={s.content}>
-        <div style={s.sessionsList}>
-          <button style={s.homeButton} onClick={handleGoHome}>HOME</button>
-          <h3 style={s.sectionHeader}>ACTIVE KIOSK SESSIONS ({sessions.length})</h3>
-          {sessions.length === 0 ? (
-            <div style={s.emptyState}><p>No active sessions</p><p style={{ fontSize: '13px', marginTop: '8px' }}>Sessions will appear when customers use the kiosk</p></div>
-          ) : sessions.map((session) => (
-            <button key={session.sessionId} style={{ ...s.sessionCard, ...(selectedSession?.sessionId === session.sessionId ? s.sessionCardActive : {}) }} onClick={() => handleSessionSelect(session)}>
-              <div style={s.sessionCardHeader}>
-                <span style={s.sessionName}>{session.customerName || 'Anonymous'}</span>
-                <span style={s.sessionStatus}>{getStepLabel(session.currentStep)}</span>
-              </div>
-              <div style={s.sessionCardDetails}><span>{getStepLabel(session.currentStep)}</span><span>{getTimeSince(session.lastActivity)}</span></div>
-            </button>
-          ))}
-        </div>
-        <div style={s.detailPanel}>
-          {selectedSession ? renderFourSquare(selectedSession) : (
-            <div style={s.selectPrompt}><span style={s.selectIcon}>👈</span><p>Select a session to view the 4-square worksheet</p></div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
+    it('external links open in new tab', () => {
+      renderVirtualTestDrive();
+      
+      const externalLinks = screen.getAllByRole('link');
+      externalLinks.forEach(link => {
+        if (link.getAttribute('href')?.includes('youtube.com')) {
+          expect(link).toHaveAttribute('target', '_blank');
+          expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+        }
+      });
+    });
+  });
+});
 
-const s: Record<string, React.CSSProperties> = {
-  container: { minHeight: '100vh', background: '#0a0a0a', color: '#fff', padding: '24px' },
-  loadingContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', gap: '16px' },
-  spinner: { width: '48px', height: '48px', border: '4px solid rgba(255,255,255,0.1)', borderTopColor: '#1B7340', borderRadius: '50%', animation: 'spin 1s linear infinite' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' },
-  headerTitle: { fontSize: '24px', fontWeight: 700, margin: 0 },
-  headerActions: { display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' },
-  lastUpdate: { fontSize: '13px', color: 'rgba(255,255,255,0.5)' },
-  autoRefreshLabel: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' },
-  checkbox: { cursor: 'pointer' },
-  refreshBtn: { padding: '10px 16px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: '#fff', fontSize: '14px', cursor: 'pointer' },
-  content: { display: 'grid', gridTemplateColumns: '300px 1fr', gap: '24px', alignItems: 'start' },
-  sessionsList: { background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '20px', maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' },
-  sectionHeader: { fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: '16px', textTransform: 'uppercase' },
-  homeButton: { width: '100%', padding: '12px 16px', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '24px', fontWeight: 700, cursor: 'pointer', textAlign: 'left', marginBottom: '16px', letterSpacing: '0.5px' },
-  emptyState: { padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.4)' },
-  sessionCard: { width: '100%', textAlign: 'left', padding: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', transition: 'all 0.2s ease' },
-  sessionCardActive: { borderColor: '#1B7340', background: 'rgba(27,115,64,0.15)' },
-  sessionCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
-  sessionName: { fontSize: '16px', fontWeight: 600, color: '#fff' },
-  sessionStatus: { fontSize: '11px', padding: '4px 8px', background: 'rgba(74,222,128,0.15)', borderRadius: '4px', color: '#4ade80' },
-  sessionCardDetails: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'rgba(255,255,255,0.5)' },
-  detailPanel: { background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '24px', maxHeight: 'calc(100vh - 140px)' },
-  selectPrompt: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '400px', color: 'rgba(255,255,255,0.4)', gap: '16px' },
-  selectIcon: { fontSize: '48px' },
-  fourSquare: { maxWidth: '900px', margin: '0 auto' },
-  fourSquareHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' },
-  fourSquareTitle: { fontSize: '20px', fontWeight: 700, margin: 0 },
-  sessionTime: { fontSize: '14px', color: 'rgba(255,255,255,0.5)' },
-  customerInfoBar: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', marginBottom: '20px' },
-  infoItem: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  infoLabel: { fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' },
-  infoValue: { fontSize: '16px', fontWeight: 600, color: '#fff' },
-  viewChatBtn: { display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '16px 20px', background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(109,40,217,0.2) 100%)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '10px', color: '#a78bfa', fontSize: '15px', fontWeight: 600, cursor: 'pointer', marginBottom: '20px' },
-  chatContainer: { background: 'rgba(139,92,246,0.1)', borderRadius: '10px', padding: '20px', marginBottom: '20px', border: '1px solid rgba(139,92,246,0.2)' },
-  chatHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' },
-  chatTitle: { fontSize: '16px', fontWeight: 600, margin: 0, color: '#a78bfa' },
-  chatCount: { fontSize: '12px', color: 'rgba(255,255,255,0.5)' },
-  chatMessages: { display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto' },
-  chatMessage: { padding: '12px 16px', borderRadius: '10px' },
-  userMessage: { background: 'rgba(27,115,64,0.2)', marginLeft: '20px' },
-  assistantMessage: { background: 'rgba(255,255,255,0.05)', marginRight: '20px' },
-  chatMsgHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' },
-  chatRole: { fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.7)' },
-  chatTime: { fontSize: '11px', color: 'rgba(255,255,255,0.4)' },
-  chatContent: { fontSize: '14px', lineHeight: 1.5, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' },
-  noChat: { textAlign: 'center', padding: '30px', color: 'rgba(255,255,255,0.5)' },
-  noChatSubtext: { fontSize: '13px', marginTop: '8px' },
-  loadingChat: { textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.5)' },
-  vehicleSection: { padding: '16px', background: 'rgba(37,99,235,0.1)', borderRadius: '10px', marginBottom: '20px' },
-  sectionTitle: { fontSize: '14px', fontWeight: 600, color: '#60a5fa', marginBottom: '12px' },
-  vehicleGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' },
-  vehicleField: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  fieldLabel: { fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' },
-  fieldValue: { fontSize: '15px', color: '#fff' },
-  selectedVehicleCard: { marginTop: '16px', padding: '12px', background: 'rgba(74,222,128,0.1)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '4px' },
-  selectedLabel: { fontSize: '10px', fontWeight: 600, color: '#4ade80', textTransform: 'uppercase' },
-  selectedVehicle: { fontSize: '15px', fontWeight: 600, color: '#fff' },
-  selectedPrice: { fontSize: '18px', fontWeight: 700, color: '#4ade80' },
-  fourSquareGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' },
-  quadrant: { padding: '20px', background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.1)', borderRadius: '12px', minHeight: '150px' },
-  quadrantTitle: { fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)' },
-  quadrantContent: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  tradeVehicleInfo: { display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '12px' },
-  tradeModel: { fontSize: '18px', fontWeight: 700, color: '#fff' },
-  tradeMileage: { fontSize: '13px', color: 'rgba(255,255,255,0.5)' },
-  payoffInfo: { display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' },
-  payoffRow: { display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'rgba(255,255,255,0.8)' },
-  paidOff: { color: '#4ade80', fontWeight: 600 },
-  noTrade: { color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' },
-  pending: { color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' },
-  bigPrice: { fontSize: '32px', fontWeight: 700, color: '#4ade80' },
-  budgetRange: { fontSize: '18px', fontWeight: 600, color: '#60a5fa' },
-  bigValue: { fontSize: '28px', fontWeight: 700, color: '#fff' },
-  subValue: { fontSize: '13px', color: 'rgba(255,255,255,0.5)' },
-};
+describe('VirtualTestDrive Model Hints', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-export default SalesManagerDashboard;
+  const testModels = [
+    { model: 'Blazer', competitors: ['Ford Edge', 'Hyundai Santa Fe'] },
+    { model: 'Traverse', competitors: ['Honda Pilot', 'Toyota Highlander'] },
+    { model: 'Trax', competitors: ['Honda HR-V', 'Toyota Corolla Cross'] },
+    { model: 'Colorado', competitors: ['Ford Ranger', 'Toyota Tacoma'] },
+  ];
+
+  testModels.forEach(({ model, competitors }) => {
+    it(`displays correct competitors for ${model}`, () => {
+      const vehicle = {
+        ...mockVehicle,
+        model,
+      };
+      
+      render(
+        <VirtualTestDrive
+          navigateTo={mockNavigateTo}
+          updateCustomerData={mockUpdateCustomerData}
+          customerData={{ selectedVehicle: vehicle }}
+          resetJourney={jest.fn()}
+        />
+      );
+      
+      competitors.forEach(competitor => {
+        expect(screen.getByText(competitor)).toBeInTheDocument();
+      });
+    });
+  });
+});
