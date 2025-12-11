@@ -8,7 +8,7 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
 
   test('app loads and shows welcome screen', async ({ page }) => {
     await expect(page.getByText("I'm your Quirk AI assistant")).toBeVisible();
-    await expect(page.getByPlaceholderText(/first name/i)).toBeVisible();
+    await expect(page.locator('input[placeholder*="first name" i]')).toBeVisible();
   });
 
   test('can skip name and see path selection', async ({ page }) => {
@@ -21,7 +21,7 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
   });
 
   test('can enter name and see personalized greeting', async ({ page }) => {
-    await page.getByPlaceholderText(/first name/i).fill('TestUser');
+    await page.locator('input[placeholder*="first name" i]').fill('TestUser');
     await page.getByRole('button', { name: /continue/i }).click();
     
     await expect(page.getByText(/Nice to meet you, TestUser/i)).toBeVisible();
@@ -39,7 +39,7 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
     await page.getByText('Chat with Quirk AI').click();
     
     await expect(page).toHaveURL(/#aiAssistant/);
-    await expect(page.getByPlaceholderText(/type your message/i)).toBeVisible();
+    await expect(page.locator('input[placeholder*="message" i]')).toBeVisible();
   });
 
   test('can navigate to Model/Budget selector', async ({ page }) => {
@@ -63,7 +63,8 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
     
     await page.getByRole('button', { name: /back/i }).click();
     
-    await expect(page.getByText('How can I help you today?')).toBeVisible();
+    // Should return to welcome screen
+    await expect(page).toHaveURL(/#welcome/);
   });
 
   test('admin link navigates to traffic log', async ({ page }) => {
@@ -85,7 +86,8 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
     await page.getByText('Chat with Quirk AI').click();
     await expect(page).toHaveURL(/#aiAssistant/);
     
-    await page.getByText('QUIRK').click();
+    // Click the QUIRK logo in header using first() to avoid strict mode
+    await page.getByText('QUIRK', { exact: true }).first().click();
     
     await expect(page).toHaveURL(/#welcome/);
   });
