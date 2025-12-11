@@ -48,6 +48,169 @@ const SUGGESTED_PROMPTS = [
   "What electric vehicles do you have?",
 ];
 
+// Objection categories and prompts for quick access
+interface ObjectionCategory {
+  id: string;
+  label: string;
+  icon: string;
+  prompts: string[];
+}
+
+const OBJECTION_CATEGORIES: ObjectionCategory[] = [
+  {
+    id: 'price',
+    label: 'Price Questions',
+    icon: '💰',
+    prompts: [
+      "Why is this priced higher than what I see on CarGurus?",
+      "Is this price negotiable?",
+      "What rebates or incentives are available?",
+      "Why should I pay MSRP when other dealers discount?",
+      "Can you beat this competitor quote I have?",
+    ],
+  },
+  {
+    id: 'comparison',
+    label: 'vs Competitors',
+    icon: '⚖️',
+    prompts: [
+      "How does the Silverado compare to the Ford F-150?",
+      "Why choose Chevy over Toyota?",
+      "Is the Equinox better than the Honda CR-V?",
+      "How does the Tahoe compare to the Ford Expedition?",
+      "What makes Chevy trucks better than RAM?",
+    ],
+  },
+  {
+    id: 'reliability',
+    label: 'Reliability',
+    icon: '🔧',
+    prompts: [
+      "I've heard Chevy has transmission problems - is that true?",
+      "How reliable is the Silverado long-term?",
+      "What are common issues with this model?",
+      "What's the warranty coverage?",
+      "How expensive is maintenance on this vehicle?",
+    ],
+  },
+  {
+    id: 'value',
+    label: 'Value & Features',
+    icon: '✨',
+    prompts: [
+      "Is the higher trim really worth the extra money?",
+      "What's included that I won't find at other brands?",
+      "Why is the Z71 package worth the upcharge?",
+      "What features do I lose by going with the base model?",
+      "How does resale value compare to competitors?",
+    ],
+  },
+  {
+    id: 'concerns',
+    label: 'Common Concerns',
+    icon: '❓',
+    prompts: [
+      "What's the real-world MPG versus the sticker?",
+      "Is this vehicle good in snow?",
+      "How does it handle towing in the mountains?",
+      "Is the infotainment system easy to use?",
+      "How comfortable is this for long road trips?",
+    ],
+  },
+];
+
+// Objection detection patterns
+interface ObjectionPattern {
+  patterns: RegExp[];
+  category: string;
+  suggestedFollowups: string[];
+}
+
+const OBJECTION_PATTERNS: ObjectionPattern[] = [
+  {
+    patterns: [
+      /why\s+(is|are)\s+(this|these|it)\s+(priced|more|higher|expensive)/i,
+      /price\s+(too|seems|is)\s+(high|much|expensive)/i,
+      /cheaper\s+(on|at)\s+(cargurus|autotrader|cars\.com|online)/i,
+      /beat\s+(this|the)\s+(price|quote|offer)/i,
+      /can\s+you\s+(do|go)\s+(better|lower)/i,
+      /negotiate|negotiable|discount|deal/i,
+    ],
+    category: 'price',
+    suggestedFollowups: [
+      "What rebates are available for this vehicle?",
+      "What's included in your price vs online listings?",
+      "Do you offer any loyalty or military discounts?",
+    ],
+  },
+  {
+    patterns: [
+      /compare[ds]?\s+to\s+(ford|toyota|honda|ram|gmc|dodge|nissan|hyundai|kia)/i,
+      /(ford|toyota|honda|ram|gmc|dodge)\s+(is|has|offers|better)/i,
+      /why\s+(chevy|chevrolet|this)\s+(over|instead|versus|vs)/i,
+      /(f-?150|tundra|tacoma|cr-?v|rav-?4|highlander|pilot|explorer|expedition)/i,
+      /better\s+than\s+(the\s+)?(ford|toyota|honda|ram)/i,
+    ],
+    category: 'comparison',
+    suggestedFollowups: [
+      "What specific features matter most to you?",
+      "Would you like a detailed comparison chart?",
+      "Have you driven both to compare?",
+    ],
+  },
+  {
+    patterns: [
+      /reliab(le|ility)|dependab(le|ility)/i,
+      /(transmission|engine)\s+(problem|issue|trouble)/i,
+      /heard\s+(bad|negative|problems|issues)/i,
+      /common\s+(issues|problems|complaints)/i,
+      /break\s*down|breaking\s*down/i,
+      /how\s+long\s+(will|does|do)\s+(it|they)\s+last/i,
+      /maintenance\s+(cost|expensive|cheap)/i,
+    ],
+    category: 'reliability',
+    suggestedFollowups: [
+      "Would you like to see the warranty details?",
+      "I can show you reliability ratings from J.D. Power",
+      "Our service department can explain the maintenance schedule",
+    ],
+  },
+  {
+    patterns: [
+      /worth\s+(it|the|extra|more|paying)/i,
+      /what\s+(do|am)\s+I\s+(get|getting|paying)/i,
+      /why\s+so\s+much\s+more/i,
+      /(lt|rst|z71|high\s*country|ltz|premier)\s+(worth|necessary|need)/i,
+      /difference\s+between\s+(the\s+)?(trims|models|versions)/i,
+      /what('s|\s+is)\s+included/i,
+      /resale|depreciat/i,
+    ],
+    category: 'value',
+    suggestedFollowups: [
+      "Would you like a side-by-side trim comparison?",
+      "What features are most important to you?",
+      "I can break down exactly what you get with each package",
+    ],
+  },
+  {
+    patterns: [
+      /real(-|\s)world\s+(mpg|fuel|gas|mileage)/i,
+      /(actually|really)\s+(get|achieve)/i,
+      /(snow|winter|ice|cold)\s+(driving|handling|performance)/i,
+      /how\s+(does|is)\s+(it|this)\s+(in|during|handle)/i,
+      /towing\s+(capacity|capability|mountains|uphill)/i,
+      /comfortable|comfort|road\s*trip/i,
+      /infotainment|screen|carplay|android\s*auto/i,
+    ],
+    category: 'concerns',
+    suggestedFollowups: [
+      "Would you like to test these features yourself?",
+      "I can get you real owner feedback on this",
+      "Let me show you the detailed specifications",
+    ],
+  },
+];
+
 const AIAssistant: React.FC<KioskComponentProps> = ({ 
   navigateTo, 
   updateCustomerData, 
@@ -66,6 +229,11 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     budget: { min: null, max: null, monthlyPayment: null, downPayment: null },
     tradeIn: { hasTrade: null, vehicle: null, hasPayoff: null, payoffAmount: null, monthlyPayment: null, financedWith: null }
   });
+  
+  // Objection handling state
+  const [showObjectionPanel, setShowObjectionPanel] = useState(false);
+  const [detectedObjection, setDetectedObjection] = useState<string | null>(null);
+  const [suggestedFollowups, setSuggestedFollowups] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -249,6 +417,21 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     }
 
     return newData;
+  }, []);
+
+  // Detect objections in user messages
+  const detectObjection = useCallback((text: string): { category: string | null; followups: string[] } => {
+    for (const pattern of OBJECTION_PATTERNS) {
+      for (const regex of pattern.patterns) {
+        if (regex.test(text)) {
+          return {
+            category: pattern.category,
+            followups: pattern.suggestedFollowups,
+          };
+        }
+      }
+    }
+    return { category: null, followups: [] };
   }, []);
 
   // Log session to backend with chat history and extracted data
@@ -474,6 +657,16 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     // Extract data from user message
     const newExtractedData = extractDataFromMessage(content, extractedData);
     setExtractedData(newExtractedData);
+    
+    // Detect objections in user message
+    const objectionResult = detectObjection(content);
+    if (objectionResult.category) {
+      setDetectedObjection(objectionResult.category);
+      setSuggestedFollowups(objectionResult.followups);
+    } else {
+      // Clear previous objection context after a non-objection message
+      setSuggestedFollowups([]);
+    }
 
     try {
       const response = await api.chatWithAI({
@@ -532,7 +725,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, messages, customerData?.customerName, buildInventoryContext, searchInventory, speakText, stopSpeaking, extractDataFromMessage, extractedData, logSessionUpdate]);
+  }, [isLoading, messages, customerData?.customerName, buildInventoryContext, searchInventory, speakText, stopSpeaking, extractDataFromMessage, extractedData, logSessionUpdate, detectObjection]);
 
   useEffect(() => {
     sendMessageRef.current = sendMessage;
@@ -662,7 +855,64 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
             {audioEnabled ? (isSpeaking ? 'Speaking...' : 'Audio On') : 'Audio Off'}
           </span>
         </button>
+        
+        {/* Common Questions Toggle */}
+        <button
+          style={{
+            ...styles.questionsToggle,
+            background: showObjectionPanel ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.1)',
+            borderColor: showObjectionPanel ? '#6366f1' : 'rgba(255,255,255,0.2)',
+          }}
+          onClick={() => setShowObjectionPanel(!showObjectionPanel)}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span style={styles.audioLabel}>Common Questions</span>
+        </button>
       </div>
+      
+      {/* Objection Categories Panel */}
+      {showObjectionPanel && (
+        <div style={styles.objectionPanel}>
+          <div style={styles.objectionHeader}>
+            <h3 style={styles.objectionTitle}>💡 Have Questions or Concerns?</h3>
+            <p style={styles.objectionSubtitle}>Tap any category to see common questions I can answer</p>
+          </div>
+          <div style={styles.objectionCategories}>
+            {OBJECTION_CATEGORIES.map((category) => (
+              <div key={category.id} style={styles.objectionCategory}>
+                <div style={styles.categoryHeader}>
+                  <span style={styles.categoryIcon}>{category.icon}</span>
+                  <span style={styles.categoryLabel}>{category.label}</span>
+                </div>
+                <div style={styles.categoryPrompts}>
+                  {category.prompts.map((prompt, idx) => (
+                    <button
+                      key={idx}
+                      style={styles.objectionPromptButton}
+                      onClick={() => {
+                        sendMessage(prompt);
+                        setShowObjectionPanel(false);
+                      }}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button 
+            style={styles.closePanelButton}
+            onClick={() => setShowObjectionPanel(false)}
+          >
+            Close
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div style={styles.messagesContainer}>
@@ -756,6 +1006,27 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
 
         <div ref={messagesEndRef} />
       </div>
+      
+      {/* Suggested Follow-ups (appears when objection detected) */}
+      {suggestedFollowups.length > 0 && !isLoading && (
+        <div style={styles.followupContainer}>
+          <span style={styles.followupLabel}>You might also want to know:</span>
+          <div style={styles.followupButtons}>
+            {suggestedFollowups.map((followup, idx) => (
+              <button
+                key={idx}
+                style={styles.followupButton}
+                onClick={() => {
+                  sendMessage(followup);
+                  setSuggestedFollowups([]);
+                }}
+              >
+                {followup}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Input */}
       <div style={styles.inputContainer}>
@@ -1078,6 +1349,131 @@ const styles: Record<string, CSSProperties> = {
     color: '#ffffff',
     fontSize: '14px',
     fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  
+  // Common Questions Toggle
+  questionsToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    borderRadius: '12px',
+    border: '1px solid',
+    color: '#ffffff',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    marginLeft: '8px',
+  },
+  
+  // Objection Panel
+  objectionPanel: {
+    background: 'rgba(99, 102, 241, 0.08)',
+    border: '1px solid rgba(99, 102, 241, 0.2)',
+    borderRadius: '16px',
+    padding: '20px',
+    marginBottom: '16px',
+    maxHeight: '400px',
+    overflowY: 'auto',
+  },
+  objectionHeader: {
+    marginBottom: '16px',
+  },
+  objectionTitle: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#ffffff',
+    margin: '0 0 4px 0',
+  },
+  objectionSubtitle: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.6)',
+    margin: 0,
+  },
+  objectionCategories: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  objectionCategory: {
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: '12px',
+    padding: '14px',
+  },
+  categoryHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '10px',
+  },
+  categoryIcon: {
+    fontSize: '18px',
+  },
+  categoryLabel: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  categoryPrompts: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  objectionPromptButton: {
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    padding: '10px 12px',
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: '13px',
+    textAlign: 'left',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  closePanelButton: {
+    width: '100%',
+    marginTop: '16px',
+    padding: '12px',
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '8px',
+    color: '#ffffff',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  
+  // Follow-up Suggestions
+  followupContainer: {
+    background: 'rgba(74, 222, 128, 0.08)',
+    border: '1px solid rgba(74, 222, 128, 0.2)',
+    borderRadius: '12px',
+    padding: '14px',
+    marginBottom: '12px',
+  },
+  followupLabel: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#4ade80',
+    marginBottom: '10px',
+    display: 'block',
+  },
+  followupButtons: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+  },
+  followupButton: {
+    background: 'rgba(74, 222, 128, 0.1)',
+    border: '1px solid rgba(74, 222, 128, 0.3)',
+    borderRadius: '8px',
+    padding: '8px 12px',
+    color: '#4ade80',
+    fontSize: '12px',
+    fontWeight: '500',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
