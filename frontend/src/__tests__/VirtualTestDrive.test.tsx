@@ -180,9 +180,16 @@ describe('VirtualTestDrive Component', () => {
         customerData: { selectedVehicle: silveradoVehicle },
       });
       
-      expect(screen.getByText('Ford F-150')).toBeInTheDocument();
-      expect(screen.getByText('Ram 1500')).toBeInTheDocument();
-      expect(screen.getByText('Toyota Tundra')).toBeInTheDocument();
+      // Use flexible text matching for competitors
+      expect(screen.getByText((content, element) => 
+        element?.tagName.toLowerCase() === 'span' && content === 'Ford F-150'
+      )).toBeInTheDocument();
+      expect(screen.getByText((content, element) => 
+        element?.tagName.toLowerCase() === 'span' && content === 'Ram 1500'
+      )).toBeInTheDocument();
+      expect(screen.getByText((content, element) => 
+        element?.tagName.toLowerCase() === 'span' && content === 'Toyota Tundra'
+      )).toBeInTheDocument();
     });
 
     it('displays Tahoe competitors', () => {
@@ -196,8 +203,12 @@ describe('VirtualTestDrive Component', () => {
         customerData: { selectedVehicle: tahoeVehicle },
       });
       
-      expect(screen.getByText('Ford Expedition')).toBeInTheDocument();
-      expect(screen.getByText('Toyota Sequoia')).toBeInTheDocument();
+      expect(screen.getByText((content, element) => 
+        element?.tagName.toLowerCase() === 'span' && content === 'Ford Expedition'
+      )).toBeInTheDocument();
+      expect(screen.getByText((content, element) => 
+        element?.tagName.toLowerCase() === 'span' && content === 'Toyota Sequoia'
+      )).toBeInTheDocument();
     });
   });
 
