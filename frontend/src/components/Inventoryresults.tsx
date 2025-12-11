@@ -353,6 +353,15 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
         </div>
 
         <div style={styles.headerRight}>
+          <button
+            style={styles.compareButton}
+            onClick={() => navigateTo('vehicleComparison')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 9V4.5M9 9H4.5M9 9L3.5 3.5M15 9V4.5M15 9h4.5M15 9l5.5-5.5M9 15v4.5M9 15H4.5M9 15l-5.5 5.5M15 15h4.5M15 15v4.5m0-4.5l5.5 5.5"/>
+            </svg>
+            Compare
+          </button>
           <select 
             style={styles.sortSelect}
             value={sortBy}
@@ -581,6 +590,20 @@ const styles: Record<string, CSSProperties> = {
     color: '#ffffff',
     fontSize: '14px',
     cursor: 'pointer',
+  },
+  compareButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    background: 'rgba(27, 115, 64, 0.2)',
+    border: '1px solid rgba(27, 115, 64, 0.4)',
+    borderRadius: '8px',
+    color: '#4ade80',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
   },
   vehicleGrid: {
     display: 'grid',
