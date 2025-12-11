@@ -16,6 +16,7 @@ import ProtectionPackages from './Protectionpackages';
 import TrafficLog from './Trafficlog';
 import AIAssistant from './AIAssistant';
 import SalesManagerDashboard from './SalesManagerDashboard';
+import InventorySyncDashboard from './InventorySyncDashboard';
 import ErrorBoundary from './Errorboundary';
 import api from './api';
 
@@ -37,7 +38,8 @@ type ScreenName =
   | 'handoff'
   | 'protectionPackages'
   | 'trafficLog'
-  | 'salesDashboard';
+  | 'salesDashboard'
+  | 'inventorySync';
 
 // Navigation options for filtering
 interface NavigationOptions {
@@ -447,6 +449,7 @@ const KioskApp: React.FC = () => {
     protectionPackages: ProtectionPackages,
     trafficLog: TrafficLog,
     salesDashboard: SalesManagerDashboard,
+    inventorySync: InventorySyncDashboard,
   };
 
   const CurrentScreenComponent = screens[currentScreen] || WelcomeScreen;
@@ -455,6 +458,7 @@ const KioskApp: React.FC = () => {
   const canGoBack = currentScreen !== 'welcome' && 
                     currentScreen !== 'trafficLog' && 
                     currentScreen !== 'salesDashboard' &&
+                    currentScreen !== 'inventorySync' &&
                     navigationHistoryRef.current.length > 1;
 
   // Props passed to all screen components
