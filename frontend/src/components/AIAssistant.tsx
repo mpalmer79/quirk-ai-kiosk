@@ -232,6 +232,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   
   // Objection handling state
   const [showObjectionPanel, setShowObjectionPanel] = useState(false);
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
   const [detectedObjection, setDetectedObjection] = useState<string | null>(null);
   const [suggestedFollowups, setSuggestedFollowups] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
