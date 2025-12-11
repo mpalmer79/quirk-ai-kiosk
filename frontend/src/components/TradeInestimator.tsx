@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect, useRef, CSSProperties } from 'react';
 import api from './api';
+import type { PhotoAnalysisResponse } from './api';
 
 // ============================================================================
 // Types
@@ -146,6 +147,11 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isDecodingVin, setIsDecodingVin] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Photo analysis state
+  const [photoAnalysis, setPhotoAnalysis] = useState<PhotoAnalysisResponse | null>(null);
+  const [isAnalyzingPhotos, setIsAnalyzingPhotos] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
@@ -249,6 +255,55 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
           : p
       ),
     }));
+    // Clear analysis when photos change
+    setPhotoAnalysis(null);
+    setAnalysisError(null);
+  };
+
+  // Analyze photos with AI Vision
+  const handleAnalyzePhotos = async () => {
+    const photosWithData = tradeData.photos.filter(p => p.preview);
+    
+    if (photosWithData.length === 0) {
+      setAnalysisError('Please upload at least one photo to analyze');
+      return;
+    }
+    
+    setIsAnalyzingPhotos(true);
+    setAnalysisError(null);
+    
+    try {
+      const photoItems = photosWithData.map(p => ({
+        id: p.id,
+        data: p.preview as string,
+        mimeType: 'image/jpeg',
+      }));
+      
+      const result = await api.analyzeTradeInPhotos(photoItems, {
+        year: tradeData.year,
+        make: tradeData.make,
+        model: tradeData.model,
+        mileage: tradeData.mileage,
+      });
+      
+      setPhotoAnalysis(result);
+      
+      // Auto-suggest condition based on AI assessment
+      if (result.overallCondition && result.overallCondition !== 'pending') {
+        handleInputChange('condition', result.overallCondition);
+      }
+      
+      // If AI detected mileage and we don't have it, suggest it
+      if (result.detectedMileage && !tradeData.mileage) {
+        handleInputChange('mileage', result.detectedMileage.replace(/,/g, ''));
+      }
+      
+    } catch (err) {
+      console.error('Photo analysis failed:', err);
+      setAnalysisError('Unable to analyze photos. You can still proceed with manual condition selection.');
+    } finally {
+      setIsAnalyzingPhotos(false);
+    }
   };
 
   const calculateEstimate = async () => {
@@ -663,8 +718,8 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
       {/* Photo Upload Section */}
       <div style={styles.photoSection}>
         <div style={styles.photoHeader}>
-          <label style={styles.label}>Photos (Optional)</label>
-          <span style={styles.photoHint}>Speeds up appraisal</span>
+          <label style={styles.label}>📸 Photos (Optional)</label>
+          <span style={styles.photoHint}>Upload photos for AI condition analysis</span>
         </div>
         <div style={styles.photoGrid}>
           {PHOTO_SPOTS.map((spot) => {
@@ -709,6 +764,146 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
             );
           })}
         </div>
+        
+        {/* Analyze Photos Button */}
+        {tradeData.photos.some(p => p.preview) && !photoAnalysis && (
+          <button
+            style={{
+              ...styles.analyzeButton,
+              opacity: isAnalyzingPhotos ? 0.7 : 1,
+            }}
+            onClick={handleAnalyzePhotos}
+            disabled={isAnalyzingPhotos}
+          >
+            {isAnalyzingPhotos ? (
+              <>
+                <div style={styles.spinner} />
+                Analyzing with AI...
+              </>
+            ) : (
+              <>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+                Analyze Photos with AI
+              </>
+            )}
+          </button>
+        )}
+        
+        {analysisError && (
+          <div style={styles.analysisError}>{analysisError}</div>
+        )}
+        
+        {/* Photo Analysis Results */}
+        {photoAnalysis && (
+          <div style={styles.analysisResults}>
+            <div style={styles.analysisHeader}>
+              <div style={styles.analysisTitle}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 12l2 2 4-4"/>
+                  <circle cx="12" cy="12" r="10"/>
+                </svg>
+                AI Condition Assessment
+              </div>
+              <div style={{
+                ...styles.conditionBadge,
+                background: photoAnalysis.overallCondition === 'excellent' ? 'rgba(74, 222, 128, 0.2)' :
+                           photoAnalysis.overallCondition === 'good' ? 'rgba(96, 165, 250, 0.2)' :
+                           photoAnalysis.overallCondition === 'fair' ? 'rgba(251, 191, 36, 0.2)' :
+                           photoAnalysis.overallCondition === 'poor' ? 'rgba(248, 113, 113, 0.2)' :
+                           'rgba(255,255,255,0.1)',
+                color: photoAnalysis.overallCondition === 'excellent' ? '#4ade80' :
+                       photoAnalysis.overallCondition === 'good' ? '#60a5fa' :
+                       photoAnalysis.overallCondition === 'fair' ? '#fbbf24' :
+                       photoAnalysis.overallCondition === 'poor' ? '#f87171' :
+                       'rgba(255,255,255,0.6)',
+              }}>
+                {photoAnalysis.overallCondition.charAt(0).toUpperCase() + photoAnalysis.overallCondition.slice(1)}
+                {photoAnalysis.conditionScore > 0 && ` (${photoAnalysis.conditionScore}/100)`}
+              </div>
+            </div>
+            
+            <p style={styles.analysisSummary}>{photoAnalysis.summary}</p>
+            
+            {photoAnalysis.detectedMileage && (
+              <div style={styles.detectedMileage}>
+                <span style={styles.mileageIcon}>🔢</span>
+                <span>Detected Mileage: <strong>{photoAnalysis.detectedMileage}</strong></span>
+              </div>
+            )}
+            
+            {/* Issues Found */}
+            {photoAnalysis.photoResults.some(pr => pr.issues.length > 0) && (
+              <div style={styles.issuesSection}>
+                <h4 style={styles.issuesTitle}>⚠️ Issues Detected</h4>
+                {photoAnalysis.photoResults.map((pr) => (
+                  pr.issues.map((issue, idx) => (
+                    <div key={`${pr.photoId}-${idx}`} style={styles.issueItem}>
+                      <span style={{
+                        ...styles.severityBadge,
+                        background: issue.severity === 'minor' ? 'rgba(251, 191, 36, 0.2)' :
+                                   issue.severity === 'moderate' ? 'rgba(251, 146, 60, 0.2)' :
+                                   'rgba(248, 113, 113, 0.2)',
+                        color: issue.severity === 'minor' ? '#fbbf24' :
+                               issue.severity === 'moderate' ? '#fb923c' :
+                               '#f87171',
+                      }}>
+                        {issue.severity}
+                      </span>
+                      <span style={styles.issueLocation}>{issue.location}:</span>
+                      <span style={styles.issueDesc}>{issue.description}</span>
+                      {issue.estimatedImpact && (
+                        <span style={styles.issueImpact}>{issue.estimatedImpact}</span>
+                      )}
+                    </div>
+                  ))
+                ))}
+              </div>
+            )}
+            
+            {/* Positives */}
+            {photoAnalysis.photoResults.some(pr => pr.positives.length > 0) && (
+              <div style={styles.positivesSection}>
+                <h4 style={styles.positivesTitle}>✓ Positive Observations</h4>
+                {photoAnalysis.photoResults.flatMap(pr => pr.positives).slice(0, 5).map((positive, idx) => (
+                  <div key={idx} style={styles.positiveItem}>• {positive}</div>
+                ))}
+              </div>
+            )}
+            
+            {/* Recommendations */}
+            {photoAnalysis.recommendations.length > 0 && (
+              <div style={styles.recommendationsSection}>
+                <h4 style={styles.recommendationsTitle}>💡 Recommendations</h4>
+                {photoAnalysis.recommendations.map((rec, idx) => (
+                  <div key={idx} style={styles.recommendationItem}>• {rec}</div>
+                ))}
+              </div>
+            )}
+            
+            <div style={styles.analysisFooter}>
+              <span style={styles.confidenceLabel}>
+                Confidence: {photoAnalysis.confidenceLevel}
+              </span>
+              <span style={styles.adjustmentLabel}>
+                Est. Adjustment: {photoAnalysis.estimatedConditionAdjustment}
+              </span>
+            </div>
+            
+            <button
+              style={styles.reanalyzeButton}
+              onClick={() => { setPhotoAnalysis(null); setAnalysisError(null); }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 4v6h6M23 20v-6h-6"/>
+                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+              </svg>
+              Re-analyze Photos
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <div style={styles.errorMessage}>{error}</div>}
@@ -1488,6 +1683,181 @@ const styles: { [key: string]: CSSProperties } = {
     textAlign: 'center',
     padding: '8px',
     width: '100%',
+  },
+  
+  // Photo Analysis Styles
+  analyzeButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    width: '100%',
+    padding: '14px 20px',
+    marginTop: '16px',
+    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+    border: 'none',
+    borderRadius: '12px',
+    color: '#fff',
+    fontSize: '15px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  analysisError: {
+    marginTop: '12px',
+    padding: '12px',
+    background: 'rgba(248, 113, 113, 0.1)',
+    border: '1px solid rgba(248, 113, 113, 0.3)',
+    borderRadius: '8px',
+    color: '#f87171',
+    fontSize: '13px',
+  },
+  analysisResults: {
+    marginTop: '20px',
+    padding: '20px',
+    background: 'rgba(99, 102, 241, 0.08)',
+    border: '1px solid rgba(99, 102, 241, 0.2)',
+    borderRadius: '16px',
+  },
+  analysisHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '16px',
+  },
+  analysisTitle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    fontSize: '16px',
+    fontWeight: 700,
+    color: '#fff',
+  },
+  conditionBadge: {
+    padding: '6px 14px',
+    borderRadius: '20px',
+    fontSize: '13px',
+    fontWeight: 600,
+    textTransform: 'capitalize',
+  },
+  analysisSummary: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 1.5,
+    marginBottom: '16px',
+  },
+  detectedMileage: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 14px',
+    background: 'rgba(255,255,255,0.05)',
+    borderRadius: '8px',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: '16px',
+  },
+  mileageIcon: {
+    fontSize: '16px',
+  },
+  issuesSection: {
+    marginBottom: '16px',
+  },
+  issuesTitle: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#fbbf24',
+    marginBottom: '10px',
+  },
+  issueItem: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '8px',
+    padding: '10px 12px',
+    background: 'rgba(0,0,0,0.2)',
+    borderRadius: '8px',
+    marginBottom: '8px',
+    fontSize: '13px',
+  },
+  severityBadge: {
+    padding: '3px 8px',
+    borderRadius: '4px',
+    fontSize: '11px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+  },
+  issueLocation: {
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  issueDesc: {
+    color: 'rgba(255,255,255,0.7)',
+    flex: 1,
+  },
+  issueImpact: {
+    color: '#f87171',
+    fontSize: '12px',
+    fontWeight: 500,
+  },
+  positivesSection: {
+    marginBottom: '16px',
+  },
+  positivesTitle: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#4ade80',
+    marginBottom: '10px',
+  },
+  positiveItem: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: '6px',
+    paddingLeft: '4px',
+  },
+  recommendationsSection: {
+    marginBottom: '16px',
+  },
+  recommendationsTitle: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#60a5fa',
+    marginBottom: '10px',
+  },
+  recommendationItem: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: '6px',
+    paddingLeft: '4px',
+  },
+  analysisFooter: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    paddingTop: '12px',
+    borderTop: '1px solid rgba(255,255,255,0.1)',
+    marginBottom: '12px',
+  },
+  confidenceLabel: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'capitalize',
+  },
+  adjustmentLabel: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  reanalyzeButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    width: '100%',
+    padding: '10px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: '13px',
+    cursor: 'pointer',
   },
 };
 
