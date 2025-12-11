@@ -12,21 +12,24 @@ Object.assign(navigator, {
 });
 
 // Mock window.open for print functionality
-const mockOpen = jest.fn();
 const mockPrint = jest.fn();
 const mockClose = jest.fn();
 const mockFocus = jest.fn();
-const mockDocument = {
-  write: jest.fn(),
-  close: jest.fn(),
-};
+const mockDocumentWrite = jest.fn();
+const mockDocumentClose = jest.fn();
 
-window.open = mockOpen.mockReturnValue({
-  document: mockDocument,
+const mockPrintWindow = {
+  document: {
+    write: mockDocumentWrite,
+    close: mockDocumentClose,
+  },
   print: mockPrint,
   close: mockClose,
   focus: mockFocus,
-});
+};
+
+const mockOpen = jest.fn(() => mockPrintWindow);
+window.open = mockOpen;
 
 // Mock vehicle data
 const mockVehicle = {
@@ -48,6 +51,14 @@ describe('QRCodeModal Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    // Reset specific mocks
+    mockDocumentWrite.mockClear();
+    mockDocumentClose.mockClear();
+    mockPrint.mockClear();
+    mockClose.mockClear();
+    mockFocus.mockClear();
+    mockOpen.mockClear();
+    mockWriteText.mockClear();
   });
 
   afterEach(() => {
@@ -208,9 +219,9 @@ describe('QRCodeModal Component', () => {
       const printButton = screen.getByText('Print QR Card');
       fireEvent.click(printButton);
       
-      expect(mockDocument.write).toHaveBeenCalledWith(
-        expect.stringContaining('2024 Chevrolet Equinox')
-      );
+      expect(mockDocumentWrite).toHaveBeenCalled();
+      const htmlContent = mockDocumentWrite.mock.calls[0][0];
+      expect(htmlContent).toContain('2024 Chevrolet Equinox');
     });
 
     it('includes vehicle details in print content', () => {
@@ -221,7 +232,7 @@ describe('QRCodeModal Component', () => {
       const printButton = screen.getByText('Print QR Card');
       fireEvent.click(printButton);
       
-      const htmlContent = mockDocument.write.mock.calls[0][0];
+      const htmlContent = mockDocumentWrite.mock.calls[0][0];
       expect(htmlContent).toContain('LT AWD');
       expect(htmlContent).toContain('STK001');
       expect(htmlContent).toContain('$32,000');
