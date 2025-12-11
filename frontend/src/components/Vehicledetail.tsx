@@ -2,6 +2,7 @@ import React, { useState, CSSProperties } from 'react';
 import { logTrafficSession } from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
 import { getVehicleImageUrl, getColorCategory, getColorGradient } from '../utils/vehicleHelpers';
+import QRCodeModal from './QRCodeModal';
 
 interface DetailedVehicle extends Vehicle {
   transmission?: string;
@@ -81,6 +82,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
   const [showConditionalOffers, setShowConditionalOffers] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   // Get vehicle from customerData or use placeholder
   const vehicle: DetailedVehicle = customerData?.selectedVehicle || {
@@ -435,15 +437,33 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
               </svg>
               Calculate Payment
             </button>
-            <button style={s.actionBtn} onClick={() => navigateTo('modelBudget')}>
+            <button style={s.actionBtn} onClick={() => navigateTo('tradeIn')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
               </svg>
               Value My Trade
             </button>
           </div>
+          
+          {/* QR Code Button */}
+          <button style={s.qrCodeBtn} onClick={() => setShowQRModal(true)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+            </svg>
+            Save to Phone (QR Code)
+          </button>
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        vehicle={vehicle}
+        isOpen={showQRModal}
+        onClose={() => setShowQRModal(false)}
+      />
     </div>
   );
 };
@@ -841,6 +861,23 @@ const s: Record<string, CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
+  },
+  qrCodeBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    width: '100%',
+    padding: '14px 20px',
+    marginTop: '8px',
+    background: 'rgba(27, 115, 64, 0.15)',
+    border: '1px solid rgba(27, 115, 64, 0.3)',
+    borderRadius: '10px',
+    color: '#4ade80',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
   },
 
   // Success Screen
