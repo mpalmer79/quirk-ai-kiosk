@@ -8,6 +8,7 @@ import GuidedQuiz from './Guidedquiz';
 import InventoryResults from './Inventoryresults';
 import VehicleDetail from './Vehicledetail';
 import VehicleComparison from './VehicleComparison';
+import VirtualTestDrive from './VirtualTestDrive';
 import PaymentCalculator from './Paymentcalculator';
 import TradeInEstimator from './TradeInestimator';
 import CustomerHandoff from './Customerhandoff';
@@ -30,6 +31,7 @@ type ScreenName =
   | 'inventory'
   | 'vehicleDetail'
   | 'vehicleComparison'
+  | 'virtualTestDrive'
   | 'paymentCalculator'
   | 'tradeIn'
   | 'handoff'
@@ -438,6 +440,7 @@ const KioskApp: React.FC = () => {
     inventory: InventoryResults,
     vehicleDetail: VehicleDetail,
     vehicleComparison: VehicleComparison,
+    virtualTestDrive: VirtualTestDrive,
     paymentCalculator: PaymentCalculator,
     tradeIn: TradeInEstimator,
     handoff: CustomerHandoff,
