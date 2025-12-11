@@ -641,4 +641,17 @@ describe('VehicleDetail QR Code Modal', () => {
     
     expect(screen.getByText(/Stock #24789/)).toBeInTheDocument();
   });
+
+  test('renders Virtual Experience button', () => {
+    renderVehicleDetail();
+    expect(screen.getByText(/Virtual Experience/)).toBeInTheDocument();
+  });
+
+  test('Virtual Experience button navigates to virtualTestDrive', () => {
+    renderVehicleDetail();
+    
+    fireEvent.click(screen.getByText(/Virtual Experience/));
+    
+    expect(mockNavigateTo).toHaveBeenCalledWith('virtualTestDrive');
+  });
 });
