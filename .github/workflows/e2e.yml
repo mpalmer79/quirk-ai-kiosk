@@ -41,7 +41,10 @@ jobs:
 
       - name: 🧪 Run E2E Tests
         working-directory: frontend
-        run: npx playwright test
+        run: |
+          npx serve -s build -l 3000 &
+          sleep 3
+          npx playwright test
         env:
           E2E_BASE_URL: http://localhost:3000
           CI: true
