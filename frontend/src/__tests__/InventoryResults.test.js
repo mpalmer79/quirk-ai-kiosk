@@ -465,6 +465,17 @@ describe('InventoryResults Component', () => {
       fireEvent.click(screen.getByText('Start Over'));
       expect(mockNavigateTo).toHaveBeenCalledWith('welcome');
     });
+
+    test('Compare button navigates to vehicleComparison', async () => {
+      renderInventoryResults();
+
+      await waitFor(() => {
+        expect(screen.getByText('Compare')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Compare'));
+      expect(mockNavigateTo).toHaveBeenCalledWith('vehicleComparison');
+    });
   });
 });
 
