@@ -228,7 +228,7 @@ describe('VirtualTestDrive Component', () => {
       const ownerReviewsLink = screen.getByText('Owner Reviews');
       expect(ownerReviewsLink).toHaveAttribute('href');
       expect(ownerReviewsLink.getAttribute('href')).toContain('youtube.com');
-      expect(ownerReviewsLink.getAttribute('href')).toContain('owner+review');
+      expect(ownerReviewsLink.getAttribute('href')).toContain('owner%20review');
     });
   });
 
@@ -327,8 +327,10 @@ describe('VirtualTestDrive Component', () => {
     it('all category tabs are buttons', () => {
       renderVirtualTestDrive();
       
-      const walkaroundTab = screen.getByText('360° Walkaround');
-      expect(walkaroundTab.closest('button')).toBeInTheDocument();
+      // Use getAllByText since text appears in both tab and description
+      const walkaroundElements = screen.getAllByText('360° Walkaround');
+      const walkaroundTab = walkaroundElements.find(el => el.closest('button'));
+      expect(walkaroundTab?.closest('button')).toBeInTheDocument();
     });
 
     it('CTA buttons are accessible', () => {
