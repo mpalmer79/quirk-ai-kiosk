@@ -42,6 +42,9 @@ from app.routers import recommendations_v2, ai_v2
 # Import v3 smart recommendations router
 from app.routers import smart_recommendations
 
+# Import photo analysis router
+from app.routers import photo_analysis
+
 # Import database
 from app.database import init_database, close_database, is_database_configured
 
@@ -395,6 +398,9 @@ app.include_router(ai_v2.router, prefix="/api/v2/ai", tags=["ai-v2"])
 
 # V3 Routes (Smart AI Recommendations)
 app.include_router(smart_recommendations.router, prefix="/api/v3/smart", tags=["smart-recommendations"])
+
+# Photo analysis router
+app.include_router(photo_analysis.router, prefix="/api/v1/trade-in-photos", tags=["photo-analysis"])
 
 
 # =============================================================================
