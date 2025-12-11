@@ -58,8 +58,28 @@ interface SessionDetail {
   updatedAt: string;
   vehicleInterest?: CustomerSession['vehicleInterest'];
   budget?: CustomerSession['budget'];
-  tradeIn?: CustomerSession['tradeIn'];
-  vehicle?: CustomerSession['selectedVehicle'];
+  tradeIn?: Partial<{
+    hasTrade: boolean;
+    vehicle: {
+      year: string;
+      make: string;
+      model: string;
+      mileage: number;
+    } | null;
+    hasPayoff: boolean;
+    payoffAmount: number;
+    monthlyPayment: number;
+    financedWith: string;
+    estimatedValue?: number;
+  }>;
+  vehicle?: Partial<{
+    stockNumber: string;
+    year: number;
+    make: string;
+    model: string;
+    trim: string;
+    price: number;
+  }>;
   chatHistory?: ChatMessage[];
   actions?: string[];
 }
