@@ -253,11 +253,25 @@ describe('VehicleDetail Component', () => {
       expect(mockNavigateTo).toHaveBeenCalledWith('paymentCalculator');
     });
 
-    test('Value My Trade navigates to modelBudget', () => {
+    test('Value My Trade navigates to tradeIn', () => {
       renderVehicleDetail();
       
       fireEvent.click(screen.getByText('Value My Trade'));
-      expect(mockNavigateTo).toHaveBeenCalledWith('modelBudget');
+      expect(mockNavigateTo).toHaveBeenCalledWith('tradeIn');
+    });
+
+    test('renders Save to Phone QR Code button', () => {
+      renderVehicleDetail();
+      expect(screen.getByText(/Save to Phone/)).toBeInTheDocument();
+    });
+
+    test('QR Code button opens QR modal', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText(/Save to Phone/));
+      
+      // QR Modal should appear
+      expect(screen.getByText('Save This Vehicle')).toBeInTheDocument();
     });
   });
 
@@ -558,5 +572,73 @@ describe('VehicleDetail API Error Handling', () => {
     });
     
     consoleSpy.mockRestore();
+  });
+});
+
+describe('VehicleDetail QR Code Modal', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('QR modal displays vehicle information', () => {
+    renderVehicleDetail();
+    
+    fireEvent.click(screen.getByText(/Save to Phone/));
+    
+    // Should show vehicle details in modal
+    expect(screen.getByText('2025 Chevrolet Silverado 1500')).toBeInTheDocument();
+    expect(screen.getByText('LT Crew Cab 4WD')).toBeInTheDocument();
+  });
+
+  test('QR modal shows scan instructions', () => {
+    renderVehicleDetail();
+    
+    fireEvent.click(screen.getByText(/Save to Phone/));
+    
+    expect(screen.getByText('Open camera on your phone')).toBeInTheDocument();
+    expect(screen.getByText('Point at QR code')).toBeInTheDocument();
+  });
+
+  test('QR modal shows Copy Link button', () => {
+    renderVehicleDetail();
+    
+    fireEvent.click(screen.getByText(/Save to Phone/));
+    
+    expect(screen.getByText('Copy Link')).toBeInTheDocument();
+  });
+
+  test('QR modal shows Print QR Card button', () => {
+    renderVehicleDetail();
+    
+    fireEvent.click(screen.getByText(/Save to Phone/));
+    
+    expect(screen.getByText('Print QR Card')).toBeInTheDocument();
+  });
+
+  test('QR modal can be closed', () => {
+    renderVehicleDetail();
+    
+    // Open modal
+    fireEvent.click(screen.getByText(/Save to Phone/));
+    expect(screen.getByText('Save This Vehicle')).toBeInTheDocument();
+    
+    // Find and click close button (first button in modal)
+    const closeButtons = screen.getAllByRole('button');
+    const closeButton = closeButtons.find(btn => 
+      btn.querySelector('svg path[d="M18 6L6 18M6 6l12 12"]')
+    );
+    
+    if (closeButton) {
+      fireEvent.click(closeButton);
+      expect(screen.queryByText('Save This Vehicle')).not.toBeInTheDocument();
+    }
+  });
+
+  test('QR modal displays stock number', () => {
+    renderVehicleDetail();
+    
+    fireEvent.click(screen.getByText(/Save to Phone/));
+    
+    expect(screen.getByText(/Stock #24789/)).toBeInTheDocument();
   });
 });
