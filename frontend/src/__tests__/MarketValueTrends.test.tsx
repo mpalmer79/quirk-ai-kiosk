@@ -66,7 +66,8 @@ describe('MarketValueTrends Component', () => {
           isModal={true}
         />
       );
-      expect(screen.getByText(/22,000/)).toBeInTheDocument();
+      const valueElements = screen.getAllByText(/22,000/);
+      expect(valueElements.length).toBeGreaterThan(0);
     });
   });
 
