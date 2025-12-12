@@ -303,16 +303,19 @@ const MarketValueTrends: React.FC<MarketValueTrendsProps> = ({
           thirtyDay?: Array<{ date: string; value: number }>;
           twelveMonth?: Array<{ month: string; value: number }>;
           depreciationPercent?: number;
-          volatility?: string;
+          volatility?: number;
           confidence?: string;
-          similar?: Array<{ name: string; price: number }>;
+          similar?: Array<{ title: string; price: number; mileage?: number; url?: string }>;
         }>('/market/value-trends', payload);
 
         if (res?.currentValue) {
           result = {
             currentValue: safeNumber(res.currentValue) || immediateCurrentValue,
             thirtyDay: Array.isArray(res.thirtyDay) ? res.thirtyDay : [],
-            twelveMonth: Array.isArray(res.twelveMonth) ? res.twelveMonth : [],
+            // Map month -> date for twelveMonth data
+            twelveMonth: Array.isArray(res.twelveMonth) 
+              ? res.twelveMonth.map(p => ({ date: p.month, value: p.value })) 
+              : [],
             depreciationPercent: res.depreciationPercent,
             volatility: res.volatility,
             confidence: res.confidence ?? 'Medium',
