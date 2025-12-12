@@ -212,9 +212,8 @@ const VINScanner: React.FC<VINScannerProps> = ({ isOpen, onClose, onScan }) => {
     const track = streamRef.current.getVideoTracks()[0];
     
     try {
-      // @ts-ignore - torch constraint not in TypeScript types
       await track.applyConstraints({
-        advanced: [{ torch: !torchOn }]
+        advanced: [{ torch: !torchOn } as unknown as MediaTrackConstraintSet]
       });
       setTorchOn(!torchOn);
     } catch (err) {
