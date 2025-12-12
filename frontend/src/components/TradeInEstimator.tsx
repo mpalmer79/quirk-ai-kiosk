@@ -426,16 +426,23 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
 
         // If backend doesn't support this endpoint yet, this will throw.
         // That's fine—we'll use local estimate.
-        const res = await api.post('/trade/estimate', payload);
-        if (res?.data?.low && res?.data?.mid && res?.data?.high) {
+        const res = await api.post<{
+          low?: number;
+          mid?: number;
+          high?: number;
+          adjustments?: Array<{ label: string; amount: number }>;
+          confidence?: string;
+          disclaimer?: string;
+        }>('/trade/estimate', payload);
+        if (res?.low && res?.mid && res?.high) {
           result = {
-            low: res.data.low,
-            mid: res.data.mid,
-            high: res.data.high,
-            adjustments: Array.isArray(res.data.adjustments) ? res.data.adjustments : [],
-            confidence: res.data.confidence ?? 'Medium',
+            low: res.low,
+            mid: res.mid,
+            high: res.high,
+            adjustments: Array.isArray(res.adjustments) ? res.adjustments : [],
+            confidence: (res.confidence as 'High' | 'Medium' | 'Low') ?? 'Medium',
             disclaimer:
-              res.data.disclaimer ??
+              res.disclaimer ??
               'Estimated range is based on provided details and market factors. Final offer may change after verification.',
           };
         }
