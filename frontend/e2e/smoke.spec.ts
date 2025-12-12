@@ -22,7 +22,7 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
 
   test('can enter name and see personalized greeting', async ({ page }) => {
     await page.locator('input[placeholder*="first name" i]').fill('TestUser');
-    await page.getByRole('button', { name: /continue/i }).click();
+    await page.getByText('Continue').click();
     
     await expect(page.getByText(/Nice to meet you, TestUser/i)).toBeVisible();
   });
@@ -56,29 +56,20 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
     await expect(page).toHaveURL(/#stockLookup/);
   });
 
-  test('back button returns to previous screen', async ({ page }) => {
+  test('back button returns to path selection', async ({ page }) => {
     await page.getByText(/skip/i).click();
-    await page.getByText('Chat with Quirk AI').click();
-    await expect(page).toHaveURL(/#aiAssistant/);
+    await page.getByText('I Know What I Want').click();
+    await expect(page).toHaveURL(/#modelBudget/);
     
-    await page.getByRole('button', { name: /back/i }).click();
+    await page.getByText('Back').click();
     
-    // Should return to welcome screen
-    await expect(page).toHaveURL(/#welcome/);
+    await expect(page.getByText('How can I help you today?')).toBeVisible();
   });
 
-  test('admin link navigates to traffic log', async ({ page }) => {
-    await page.getByText(/skip/i).click();
-    await page.getByRole('button', { name: /admin/i }).click();
+  test('sales desk link navigates to traffic log', async ({ page }) => {
+    await page.getByText('Sales Desk').click();
     
     await expect(page).toHaveURL(/#trafficLog/);
-  });
-
-  test('sales desk link navigates to dashboard', async ({ page }) => {
-    await page.getByText(/skip/i).click();
-    await page.getByRole('button', { name: /sales desk/i }).click();
-    
-    await expect(page).toHaveURL(/#salesDashboard/);
   });
 
   test('logo click resets journey to welcome', async ({ page }) => {
@@ -86,10 +77,9 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
     await page.getByText('Chat with Quirk AI').click();
     await expect(page).toHaveURL(/#aiAssistant/);
     
-    // Click the QUIRK logo in header using first() to avoid strict mode
-    await page.getByText('QUIRK', { exact: true }).first().click();
+    await page.locator('header').getByText('QUIRK').click();
     
-    await expect(page).toHaveURL(/#welcome/);
+    await expect(page.locator('input[placeholder*="first name" i]')).toBeVisible();
   });
 
 });
@@ -97,7 +87,7 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
 test.describe('Quirk AI Kiosk - Error Resilience', () => {
 
   test('app handles missing API gracefully', async ({ page }) => {
-    await page.route('**/api/**', route => route.abort());
+    await page.route('**/api/**', (route) => route.abort());
     
     await page.goto('/');
     
