@@ -1,29 +1,29 @@
+// Import React FIRST before any jest.mock that uses it
 import React from 'react';
 import { render, screen, fireEvent, waitFor, RenderResult } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-// Virtual mock for recharts - doesn't require module to exist
+// Virtual mock for recharts - must come after React import
 jest.mock('recharts', () => {
-  const MockComponent = ({ children, ...props }: any) => {
-    return React.createElement('div', { 'data-testid': props['data-testid'] || 'chart-component' }, children);
-  };
+  // Use require to access React inside the mock factory
+  const ReactMock = require('react');
   
   return {
     __esModule: true,
-    ResponsiveContainer: (props: any) => React.createElement('div', { 'data-testid': 'responsive-container', style: { width: 500, height: 300 } }, props.children),
-    AreaChart: (props: any) => React.createElement('div', { 'data-testid': 'area-chart' }, props.children),
-    LineChart: (props: any) => React.createElement('div', { 'data-testid': 'line-chart' }, props.children),
-    BarChart: (props: any) => React.createElement('div', { 'data-testid': 'bar-chart' }, props.children),
-    Area: () => React.createElement('div', { 'data-testid': 'area' }),
-    Line: () => React.createElement('div', { 'data-testid': 'line' }),
-    Bar: () => React.createElement('div', { 'data-testid': 'bar' }),
-    XAxis: () => React.createElement('div', { 'data-testid': 'x-axis' }),
-    YAxis: () => React.createElement('div', { 'data-testid': 'y-axis' }),
-    CartesianGrid: () => React.createElement('div', { 'data-testid': 'cartesian-grid' }),
-    Tooltip: () => React.createElement('div', { 'data-testid': 'tooltip' }),
-    Legend: () => React.createElement('div', { 'data-testid': 'legend' }),
-    ReferenceLine: () => React.createElement('div', { 'data-testid': 'reference-line' }),
-    Cell: () => React.createElement('div', { 'data-testid': 'cell' }),
+    ResponsiveContainer: (props: any) => ReactMock.createElement('div', { 'data-testid': 'responsive-container', style: { width: 500, height: 300 } }, props.children),
+    AreaChart: (props: any) => ReactMock.createElement('div', { 'data-testid': 'area-chart' }, props.children),
+    LineChart: (props: any) => ReactMock.createElement('div', { 'data-testid': 'line-chart' }, props.children),
+    BarChart: (props: any) => ReactMock.createElement('div', { 'data-testid': 'bar-chart' }, props.children),
+    Area: () => ReactMock.createElement('div', { 'data-testid': 'area' }),
+    Line: () => ReactMock.createElement('div', { 'data-testid': 'line' }),
+    Bar: () => ReactMock.createElement('div', { 'data-testid': 'bar' }),
+    XAxis: () => ReactMock.createElement('div', { 'data-testid': 'x-axis' }),
+    YAxis: () => ReactMock.createElement('div', { 'data-testid': 'y-axis' }),
+    CartesianGrid: () => ReactMock.createElement('div', { 'data-testid': 'cartesian-grid' }),
+    Tooltip: () => ReactMock.createElement('div', { 'data-testid': 'tooltip' }),
+    Legend: () => ReactMock.createElement('div', { 'data-testid': 'legend' }),
+    ReferenceLine: () => ReactMock.createElement('div', { 'data-testid': 'reference-line' }),
+    Cell: () => ReactMock.createElement('div', { 'data-testid': 'cell' }),
   };
 }, { virtual: true });
 
