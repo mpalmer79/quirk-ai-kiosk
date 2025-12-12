@@ -29,13 +29,6 @@ interface TradeVehicleInfo {
 // Inventory count by model name
 type InventoryByModel = Record<string, number>;
 
-// Currency formatter for payoff fields
-const formatCurrency = (value: string): string => {
-  const num = parseFloat(value.replace(/[^0-9.]/g, ''));
-  if (isNaN(num)) return '';
-  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-
 // Generate year options (current year + 1 down to 20 years ago)
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 21 }, (_, i) => (currentYear + 1 - i).toString());
@@ -70,6 +63,8 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const [payoffAmount, setPayoffAmount] = useState<string>('');
   const [monthlyPayment, setMonthlyPayment] = useState<string>('');
   const [financedWith, setFinancedWith] = useState<string>('');
+  // Track which currency field is focused (show raw value while editing)
+  const [focusedField, setFocusedField] = useState<string | null>(null);
   const [tradeVehicle, setTradeVehicle] = useState<TradeVehicleInfo>({
     year: '',
     make: '',
@@ -195,16 +190,49 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     setColorChoices(prev => ({ ...prev, [choice]: value }));
   };
 
-  // Fixed: Allow decimals in currency input
+  // Fixed: Allow decimals in currency input - store raw value
   const handlePayoffAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    // Allow only digits and one decimal point
     const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
     setPayoffAmount(rawValue);
   };
 
-  // Fixed: Allow decimals in currency input
+  // Format payoff on blur
+  const handlePayoffBlur = (): void => {
+    setFocusedField(null);
+    if (payoffAmount) {
+      const num = parseFloat(payoffAmount);
+      if (!isNaN(num)) {
+        setPayoffAmount(num.toFixed(2));
+      }
+    }
+  };
+
+  // Fixed: Allow decimals in currency input - store raw value
   const handleMonthlyPaymentChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    // Allow only digits and one decimal point
     const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
     setMonthlyPayment(rawValue);
+  };
+
+  // Format monthly payment on blur
+  const handleMonthlyPaymentBlur = (): void => {
+    setFocusedField(null);
+    if (monthlyPayment) {
+      const num = parseFloat(monthlyPayment);
+      if (!isNaN(num)) {
+        setMonthlyPayment(num.toFixed(2));
+      }
+    }
+  };
+
+  // Get display value for currency fields (formatted when not focused)
+  const getDisplayValue = (field: string, rawValue: string): string => {
+    if (!rawValue) return '';
+    if (focusedField === field) return rawValue;
+    const num = parseFloat(rawValue);
+    if (isNaN(num)) return rawValue;
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   const handleFinancedWithChange = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -720,9 +748,11 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                       <input
                         type="text"
                         style={styles.textInput}
-                        placeholder="18000"
-                        value={payoffAmount ? formatCurrency(payoffAmount) : ''}
+                        placeholder="18,000.00"
+                        value={getDisplayValue('payoff', payoffAmount)}
                         onChange={handlePayoffAmountChange}
+                        onFocus={() => setFocusedField('payoff')}
+                        onBlur={handlePayoffBlur}
                       />
                     </div>
                   </div>
@@ -734,9 +764,11 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                       <input
                         type="text"
                         style={styles.textInput}
-                        placeholder="450"
-                        value={monthlyPayment ? formatCurrency(monthlyPayment) : ''}
+                        placeholder="450.00"
+                        value={getDisplayValue('monthly', monthlyPayment)}
                         onChange={handleMonthlyPaymentChange}
+                        onFocus={() => setFocusedField('monthly')}
+                        onBlur={handleMonthlyPaymentBlur}
                       />
                     </div>
                   </div>
