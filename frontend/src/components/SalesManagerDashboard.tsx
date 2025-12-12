@@ -1,7 +1,25 @@
+/**
+ * QUIRK AI Kiosk - Sales Manager Dashboard
+ * 
+ * Features:
+ * - Real-time customer session monitoring
+ * - Digital Worksheet with payment scenarios
+ * - Editable deal structure (price, trade, payments)
+ * - Finance vs Lease comparison
+ * - Equity calculator
+ * - Chat transcript viewer
+ * - Quick actions (Print, Send to F&I)
+ * 
+ * @version 2.0.0
+ */
+
 import React, { useState, useEffect, CSSProperties } from 'react';
 import api from './api';
 
+// ============================================================================
 // Types
+// ============================================================================
+
 interface CustomerSession {
   sessionId: string;
   customerName: string | null;
@@ -31,6 +49,7 @@ interface CustomerSession {
     payoffAmount: number | null;
     monthlyPayment: number | null;
     financedWith: string | null;
+    estimatedValue?: number | null;
   };
   selectedVehicle: {
     stockNumber: string | null;
@@ -39,6 +58,7 @@ interface CustomerSession {
     model: string | null;
     trim: string | null;
     price: number | null;
+    msrp?: number | null;
   } | null;
 }
 
@@ -79,10 +99,26 @@ interface SessionDetail {
     model: string;
     trim: string;
     price: number;
+    msrp?: number;
   }>;
   chatHistory?: ChatMessage[];
   actions?: string[];
 }
+
+interface DealOverrides {
+  salePrice: number | null;
+  tradeACV: number | null;
+  downPayment: number | null;
+  financeTerm: number;
+  financeAPR: number;
+  leaseTerm: number;
+  leaseMoneyFactor: number;
+  leaseResidual: number;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
 
 const STEP_LABELS: Record<string, string> = {
   welcome: 'Welcome Screen',
@@ -106,7 +142,71 @@ const STEP_LABELS: Record<string, string> = {
   name_entered: 'Just Started',
 };
 
+const DEFAULT_FINANCE_TERMS = [36, 48, 60, 72, 84];
+const DEFAULT_LEASE_TERMS = [24, 36, 39, 48];
+const DOC_FEE = 599;
+
+// ============================================================================
+// Payment Calculation Functions
+// ============================================================================
+
+const calculateFinancePayment = (
+  principal: number,
+  apr: number,
+  term: number
+): { monthly: number; totalCost: number; totalInterest: number } => {
+  if (principal <= 0) return { monthly: 0, totalCost: 0, totalInterest: 0 };
+  
+  const monthlyRate = apr / 100 / 12;
+  
+  if (monthlyRate === 0) {
+    const monthly = Math.round(principal / term);
+    return { monthly, totalCost: principal, totalInterest: 0 };
+  }
+  
+  const payment = principal * 
+    (monthlyRate * Math.pow(1 + monthlyRate, term)) / 
+    (Math.pow(1 + monthlyRate, term) - 1);
+  
+  const totalCost = payment * term;
+  const totalInterest = totalCost - principal;
+  
+  return {
+    monthly: Math.round(payment),
+    totalCost: Math.round(totalCost),
+    totalInterest: Math.round(totalInterest),
+  };
+};
+
+const calculateLeasePayment = (
+  msrp: number,
+  salePrice: number,
+  downPayment: number,
+  term: number,
+  residualPercent: number,
+  moneyFactor: number
+): { monthly: number; dueAtSigning: number; residualValue: number } => {
+  if (msrp <= 0) return { monthly: 0, dueAtSigning: 0, residualValue: 0 };
+  
+  const capitalizedCost = salePrice - downPayment;
+  const residualValue = msrp * residualPercent;
+  const ACQUISITION_FEE = 895;
+  
+  const depreciation = (capitalizedCost - residualValue) / term;
+  const rentCharge = (capitalizedCost + residualValue) * moneyFactor;
+  const monthly = Math.round(depreciation + rentCharge);
+  
+  const dueAtSigning = downPayment + monthly + ACQUISITION_FEE;
+  
+  return { monthly, dueAtSigning: Math.round(dueAtSigning), residualValue: Math.round(residualValue) };
+};
+
+// ============================================================================
+// Component
+// ============================================================================
+
 const SalesManagerDashboard: React.FC = () => {
+  // Session state
   const [sessions, setSessions] = useState<CustomerSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<CustomerSession | null>(null);
@@ -115,6 +215,24 @@ const SalesManagerDashboard: React.FC = () => {
   const [showChatTranscript, setShowChatTranscript] = useState(false);
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  
+  // Digital Worksheet state
+  const [paymentMode, setPaymentMode] = useState<'finance' | 'lease'>('finance');
+  const [managerNotes, setManagerNotes] = useState('');
+  const [overrides, setOverrides] = useState<DealOverrides>({
+    salePrice: null,
+    tradeACV: null,
+    downPayment: null,
+    financeTerm: 60,
+    financeAPR: 6.9,
+    leaseTerm: 36,
+    leaseMoneyFactor: 0.00125,
+    leaseResidual: 0.55,
+  });
+
+  // ============================================================================
+  // Data Fetching
+  // ============================================================================
 
   const fetchSessions = async () => {
     try {
@@ -158,9 +276,24 @@ const SalesManagerDashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, selectedSession?.sessionId]);
 
+  // ============================================================================
+  // Handlers
+  // ============================================================================
+
   const handleSessionSelect = (session: CustomerSession) => {
     setSelectedSession(session);
     setShowChatTranscript(false);
+    setManagerNotes('');
+    setOverrides({
+      salePrice: null,
+      tradeACV: null,
+      downPayment: null,
+      financeTerm: 60,
+      financeAPR: 6.9,
+      leaseTerm: 36,
+      leaseMoneyFactor: 0.00125,
+      leaseResidual: 0.55,
+    });
     fetchSessionDetail(session.sessionId);
   };
 
@@ -168,7 +301,24 @@ const SalesManagerDashboard: React.FC = () => {
     setSelectedSession(null);
     setSessionDetail(null);
     setShowChatTranscript(false);
+    setManagerNotes('');
   };
+
+  const handleOverrideChange = (field: keyof DealOverrides, value: number | null) => {
+    setOverrides(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleSendToFI = () => {
+    alert('Send to F&I functionality would integrate with your DMS (PBS/Reynolds/CDK)');
+  };
+
+  // ============================================================================
+  // Computed Values
+  // ============================================================================
 
   const getStepLabel = (step: string) => STEP_LABELS[step] || step || 'Browsing';
 
@@ -182,7 +332,7 @@ const SalesManagerDashboard: React.FC = () => {
   };
 
   const formatCurrency = (val: number | null | undefined): string => {
-    if (val == null) return 'Not specified';
+    if (val == null) return '$0';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -190,6 +340,466 @@ const SalesManagerDashboard: React.FC = () => {
       maximumFractionDigits: 0,
     }).format(val);
   };
+
+  const getEffectiveValues = () => {
+    const vehicle = selectedSession?.selectedVehicle;
+    const trade = selectedSession?.tradeIn;
+    
+    const salePrice = overrides.salePrice ?? vehicle?.price ?? 0;
+    const msrp = vehicle?.msrp ?? salePrice * 1.05;
+    const tradeACV = overrides.tradeACV ?? trade?.estimatedValue ?? 0;
+    const payoff = trade?.payoffAmount ?? 0;
+    const equity = tradeACV - payoff;
+    const downPayment = overrides.downPayment ?? 0;
+    
+    return { salePrice, msrp, tradeACV, payoff, equity, downPayment };
+  };
+
+  const calculateDealNumbers = () => {
+    const { salePrice, msrp, equity, downPayment } = getEffectiveValues();
+    
+    const financePrincipal = salePrice - Math.max(0, equity) - downPayment + DOC_FEE;
+    const finance = calculateFinancePayment(
+      financePrincipal,
+      overrides.financeAPR,
+      overrides.financeTerm
+    );
+    
+    const lease = calculateLeasePayment(
+      msrp,
+      salePrice,
+      downPayment + Math.max(0, equity),
+      overrides.leaseTerm,
+      overrides.leaseResidual,
+      overrides.leaseMoneyFactor
+    );
+    
+    return { finance, lease };
+  };
+
+  // ============================================================================
+  // Render Functions
+  // ============================================================================
+
+  const renderSessionList = () => (
+    <div style={styles.sessionList}>
+      <h3 style={styles.sessionListTitle}>Active Sessions ({sessions.length})</h3>
+      
+      {loading ? (
+        <div style={styles.loadingState}>
+          <div style={styles.spinner} />
+          <span>Loading sessions...</span>
+        </div>
+      ) : sessions.length === 0 ? (
+        <div style={styles.emptyState}>
+          <span style={styles.emptyIcon}>📭</span>
+          <span>No active sessions</span>
+        </div>
+      ) : (
+        sessions.map(session => (
+          <div
+            key={session.sessionId}
+            style={{
+              ...styles.sessionCard,
+              ...(selectedSession?.sessionId === session.sessionId ? styles.sessionCardActive : {}),
+            }}
+            onClick={() => handleSessionSelect(session)}
+          >
+            <div style={styles.sessionHeader}>
+              <span style={styles.customerName}>
+                {session.customerName || 'Guest Customer'}
+              </span>
+              <span style={styles.sessionTime}>{getTimeSince(session.lastActivity)}</span>
+            </div>
+            <div style={styles.sessionMeta}>
+              <span style={styles.sessionStep}>{getStepLabel(session.currentStep)}</span>
+              {session.selectedVehicle?.model && (
+                <span style={styles.sessionVehicle}>
+                  🚗 {session.selectedVehicle.year} {session.selectedVehicle.model}
+                </span>
+              )}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const renderChatTranscript = () => {
+    const messages = sessionDetail?.chatHistory || [];
+    
+    return (
+      <div style={styles.chatPanel}>
+        <div style={styles.chatHeader}>
+          <button style={styles.backBtn} onClick={() => setShowChatTranscript(false)}>
+            ← Back to Worksheet
+          </button>
+          <h3 style={styles.chatTitle}>Chat Transcript</h3>
+        </div>
+        <div style={styles.chatMessages}>
+          {messages.length === 0 ? (
+            <div style={styles.noMessages}>No chat history available</div>
+          ) : (
+            messages.map((msg, idx) => (
+              <div
+                key={idx}
+                style={{
+                  ...styles.message,
+                  ...(msg.role === 'user' ? styles.messageUser : styles.messageAssistant),
+                }}
+              >
+                <span style={styles.messageRole}>
+                  {msg.role === 'user' ? 'Customer' : 'Quirk AI'}
+                </span>
+                <p style={styles.messageContent}>{msg.content}</p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDigitalWorksheet = () => {
+    if (!selectedSession) return null;
+    
+    const { salePrice, msrp, tradeACV, payoff, equity, downPayment } = getEffectiveValues();
+    const { finance, lease } = calculateDealNumbers();
+    const vehicle = selectedSession.selectedVehicle;
+    const trade = selectedSession.tradeIn;
+    
+    return (
+      <div style={styles.worksheet}>
+        {/* Worksheet Header */}
+        <div style={styles.worksheetHeader}>
+          <div>
+            <h3 style={styles.worksheetTitle}>Digital Worksheet</h3>
+            <p style={styles.worksheetCustomer}>
+              {selectedSession.customerName || 'Guest Customer'}
+              {selectedSession.phone && ` • ${selectedSession.phone}`}
+            </p>
+          </div>
+          <div style={styles.worksheetActions}>
+            {sessionDetail?.chatHistory && sessionDetail.chatHistory.length > 0 && (
+              <button style={styles.viewChatBtn} onClick={() => setShowChatTranscript(true)}>
+                💬 View Chat
+              </button>
+            )}
+            <button style={styles.actionBtn} onClick={handlePrint}>
+              🖨️ Print
+            </button>
+            <button style={styles.actionBtnPrimary} onClick={handleSendToFI}>
+              📤 Send to F&I
+            </button>
+          </div>
+        </div>
+
+        {/* Main Grid */}
+        <div style={styles.worksheetGrid}>
+          {/* Vehicle Section */}
+          <div style={styles.worksheetSection}>
+            <h4 style={styles.sectionTitle}>
+              <span style={styles.sectionIcon}>🚗</span> Vehicle
+            </h4>
+            {vehicle ? (
+              <div style={styles.sectionContent}>
+                <div style={styles.vehicleTitle}>
+                  {vehicle.year} {vehicle.make} {vehicle.model}
+                </div>
+                <div style={styles.vehicleTrim}>{vehicle.trim}</div>
+                <div style={styles.vehicleStock}>Stock #{vehicle.stockNumber}</div>
+                
+                <div style={styles.priceRow}>
+                  <span>MSRP</span>
+                  <span>{formatCurrency(msrp)}</span>
+                </div>
+                
+                <div style={styles.editableRow}>
+                  <label style={styles.editableLabel}>Sale Price</label>
+                  <input
+                    type="number"
+                    value={overrides.salePrice ?? vehicle.price ?? ''}
+                    onChange={(e) => handleOverrideChange('salePrice', e.target.value ? Number(e.target.value) : null)}
+                    style={styles.editableInput}
+                    placeholder={String(vehicle.price || 0)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div style={styles.pendingValue}>No vehicle selected</div>
+            )}
+          </div>
+
+          {/* Trade-In Section */}
+          <div style={styles.worksheetSection}>
+            <h4 style={styles.sectionTitle}>
+              <span style={styles.sectionIcon}>🔄</span> Trade-In
+            </h4>
+            {trade?.hasTrade ? (
+              <div style={styles.sectionContent}>
+                <div style={styles.tradeVehicle}>
+                  {trade.vehicle?.year} {trade.vehicle?.make} {trade.vehicle?.model}
+                </div>
+                <div style={styles.tradeMileage}>
+                  {trade.vehicle?.mileage?.toLocaleString()} miles
+                </div>
+                
+                <div style={styles.editableRow}>
+                  <label style={styles.editableLabel}>Trade ACV</label>
+                  <input
+                    type="number"
+                    value={overrides.tradeACV ?? trade.estimatedValue ?? ''}
+                    onChange={(e) => handleOverrideChange('tradeACV', e.target.value ? Number(e.target.value) : null)}
+                    style={styles.editableInput}
+                    placeholder="Enter ACV"
+                  />
+                </div>
+                
+                {trade.hasPayoff && (
+                  <>
+                    <div style={styles.priceRow}>
+                      <span>Payoff</span>
+                      <span style={styles.negativeValue}>-{formatCurrency(payoff)}</span>
+                    </div>
+                    <div style={styles.priceRow}>
+                      <span>Lender</span>
+                      <span>{trade.financedWith || 'Unknown'}</span>
+                    </div>
+                  </>
+                )}
+                
+                <div style={styles.equityRow}>
+                  <span>Net Equity</span>
+                  <span style={equity >= 0 ? styles.positiveValue : styles.negativeValue}>
+                    {equity >= 0 ? '+' : ''}{formatCurrency(equity)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div style={styles.pendingValue}>No trade-in</div>
+            )}
+          </div>
+
+          {/* Down Payment Section */}
+          <div style={styles.worksheetSection}>
+            <h4 style={styles.sectionTitle}>
+              <span style={styles.sectionIcon}>💵</span> Cash Down
+            </h4>
+            <div style={styles.sectionContent}>
+              <div style={styles.editableRow}>
+                <label style={styles.editableLabel}>Down Payment</label>
+                <input
+                  type="number"
+                  value={overrides.downPayment ?? ''}
+                  onChange={(e) => handleOverrideChange('downPayment', e.target.value ? Number(e.target.value) : null)}
+                  style={styles.editableInput}
+                  placeholder="0"
+                />
+              </div>
+              
+              {selectedSession.budget?.downPaymentPercent && (
+                <div style={styles.budgetNote}>
+                  Customer indicated {selectedSession.budget.downPaymentPercent}% down
+                </div>
+              )}
+              
+              {selectedSession.budget?.max && (
+                <div style={styles.budgetNote}>
+                  Budget: {formatCurrency(selectedSession.budget.min || 0)} - {formatCurrency(selectedSession.budget.max)}/mo
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Payment Options Section */}
+          <div style={styles.worksheetSection}>
+            <h4 style={styles.sectionTitle}>
+              <span style={styles.sectionIcon}>📊</span> Payment
+            </h4>
+            <div style={styles.sectionContent}>
+              {/* Payment Mode Toggle */}
+              <div style={styles.paymentToggle}>
+                <button
+                  style={{
+                    ...styles.toggleBtn,
+                    ...(paymentMode === 'finance' ? styles.toggleBtnActive : {}),
+                  }}
+                  onClick={() => setPaymentMode('finance')}
+                >
+                  Finance
+                </button>
+                <button
+                  style={{
+                    ...styles.toggleBtn,
+                    ...(paymentMode === 'lease' ? styles.toggleBtnActive : {}),
+                  }}
+                  onClick={() => setPaymentMode('lease')}
+                >
+                  Lease
+                </button>
+              </div>
+
+              {paymentMode === 'finance' ? (
+                <>
+                  <div style={styles.termSelector}>
+                    <label style={styles.editableLabel}>Term</label>
+                    <div style={styles.termButtons}>
+                      {DEFAULT_FINANCE_TERMS.map(t => (
+                        <button
+                          key={t}
+                          style={{
+                            ...styles.termBtn,
+                            ...(overrides.financeTerm === t ? styles.termBtnActive : {}),
+                          }}
+                          onClick={() => handleOverrideChange('financeTerm', t)}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div style={styles.editableRow}>
+                    <label style={styles.editableLabel}>APR %</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={overrides.financeAPR}
+                      onChange={(e) => handleOverrideChange('financeAPR', Number(e.target.value))}
+                      style={styles.editableInput}
+                    />
+                  </div>
+                  
+                  <div style={styles.paymentResult}>
+                    <span style={styles.paymentLabel}>Monthly Payment</span>
+                    <span style={styles.paymentAmount}>{formatCurrency(finance.monthly)}</span>
+                    <span style={styles.paymentTerm}>{overrides.financeTerm} months @ {overrides.financeAPR}%</span>
+                  </div>
+                  
+                  <div style={styles.priceRow}>
+                    <span>Total Interest</span>
+                    <span>{formatCurrency(finance.totalInterest)}</span>
+                  </div>
+                  <div style={styles.priceRow}>
+                    <span>Total Cost</span>
+                    <span>{formatCurrency(finance.totalCost + downPayment)}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={styles.termSelector}>
+                    <label style={styles.editableLabel}>Term</label>
+                    <div style={styles.termButtons}>
+                      {DEFAULT_LEASE_TERMS.map(t => (
+                        <button
+                          key={t}
+                          style={{
+                            ...styles.termBtn,
+                            ...(overrides.leaseTerm === t ? styles.termBtnActive : {}),
+                          }}
+                          onClick={() => handleOverrideChange('leaseTerm', t)}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div style={styles.editableRow}>
+                    <label style={styles.editableLabel}>Residual %</label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={Math.round(overrides.leaseResidual * 100)}
+                      onChange={(e) => handleOverrideChange('leaseResidual', Number(e.target.value) / 100)}
+                      style={styles.editableInput}
+                    />
+                  </div>
+                  
+                  <div style={styles.paymentResult}>
+                    <span style={styles.paymentLabel}>Monthly Payment</span>
+                    <span style={styles.paymentAmount}>{formatCurrency(lease.monthly)}</span>
+                    <span style={styles.paymentTerm}>{overrides.leaseTerm} months</span>
+                  </div>
+                  
+                  <div style={styles.priceRow}>
+                    <span>Due at Signing</span>
+                    <span>{formatCurrency(lease.dueAtSigning)}</span>
+                  </div>
+                  <div style={styles.priceRow}>
+                    <span>Residual Value</span>
+                    <span>{formatCurrency(lease.residualValue)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Deal Summary Bar */}
+        <div style={styles.dealSummary}>
+          <div style={styles.summaryItem}>
+            <span style={styles.summaryLabel}>Sale Price</span>
+            <span style={styles.summaryValue}>{formatCurrency(salePrice)}</span>
+          </div>
+          <div style={styles.summaryDivider}>-</div>
+          <div style={styles.summaryItem}>
+            <span style={styles.summaryLabel}>Trade Equity</span>
+            <span style={styles.summaryValue}>{formatCurrency(Math.max(0, equity))}</span>
+          </div>
+          <div style={styles.summaryDivider}>-</div>
+          <div style={styles.summaryItem}>
+            <span style={styles.summaryLabel}>Down Payment</span>
+            <span style={styles.summaryValue}>{formatCurrency(downPayment)}</span>
+          </div>
+          <div style={styles.summaryDivider}>+</div>
+          <div style={styles.summaryItem}>
+            <span style={styles.summaryLabel}>Fees</span>
+            <span style={styles.summaryValue}>{formatCurrency(DOC_FEE)}</span>
+          </div>
+          <div style={styles.summaryDivider}>=</div>
+          <div style={styles.summaryItem}>
+            <span style={styles.summaryLabel}>Amount Financed</span>
+            <span style={styles.summaryValueLarge}>
+              {formatCurrency(salePrice - Math.max(0, equity) - downPayment + DOC_FEE)}
+            </span>
+          </div>
+        </div>
+
+        {/* Vehicle Interest & Notes */}
+        <div style={styles.bottomRow}>
+          {selectedSession.vehicleInterest?.model && (
+            <div style={styles.interestBox}>
+              <h4 style={styles.boxTitle}>Vehicle Interest</h4>
+              <div style={styles.interestDetails}>
+                <span>Model: {selectedSession.vehicleInterest.model}</span>
+                {selectedSession.vehicleInterest.cab && (
+                  <span>Cab: {selectedSession.vehicleInterest.cab}</span>
+                )}
+                {selectedSession.vehicleInterest.colors?.length > 0 && (
+                  <span>Colors: {selectedSession.vehicleInterest.colors.join(', ')}</span>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <div style={styles.notesBox}>
+            <h4 style={styles.boxTitle}>Manager Notes</h4>
+            <textarea
+              value={managerNotes}
+              onChange={(e) => setManagerNotes(e.target.value)}
+              placeholder="Add notes about this deal..."
+              style={styles.notesTextarea}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================================
+  // Main Render
+  // ============================================================================
 
   return (
     <div style={styles.container}>
@@ -208,246 +818,59 @@ const SalesManagerDashboard: React.FC = () => {
             Auto-refresh
           </label>
           <button style={styles.refreshBtn} onClick={fetchSessions}>
-            Refresh Now
+            Refresh
           </button>
-          <button style={styles.homeBtn} onClick={handleHomeClick}>
-            HOME
-          </button>
+          {selectedSession && (
+            <button style={styles.homeBtn} onClick={handleHomeClick}>
+              ← All Sessions
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Main Content */}
       <div style={styles.mainContent}>
-        {/* Session List */}
-        <div style={styles.sessionList}>
-          <h2 style={styles.sessionListTitle}>
-            ACTIVE KIOSK SESSIONS ({sessions.length})
-          </h2>
-
-          {loading ? (
-            <div style={styles.loadingState}>
-              <div style={styles.spinner} />
-              <span>Loading active sessions...</span>
-            </div>
-          ) : sessions.length === 0 ? (
-            <div style={styles.emptyState}>
-              <span>No active sessions at this time</span>
-            </div>
-          ) : (
-            <div style={styles.sessionCards}>
-              {sessions.map((session) => (
-                <div
-                  key={session.sessionId}
-                  style={{
-                    ...styles.sessionCard,
-                    ...(selectedSession?.sessionId === session.sessionId
-                      ? styles.sessionCardActive
-                      : {}),
-                  }}
-                  onClick={() => handleSessionSelect(session)}
-                >
-                  <div style={styles.sessionHeader}>
-                    <span style={styles.customerName}>
-                      {session.customerName || 'Anonymous'}
-                    </span>
-                    <span style={styles.sessionTime}>
-                      {getTimeSince(session.lastActivity)}
-                    </span>
-                  </div>
-                  <div style={styles.sessionStep}>
-                    {getStepLabel(session.currentStep)}
-                  </div>
-                  {session.phone && (
-                    <div style={styles.sessionPhone}>{session.phone}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Detail Panel */}
+        {renderSessionList()}
+        
         <div style={styles.detailPanel}>
           {!selectedSession ? (
-            <div style={styles.noSelection}>
-              <span>Select a session to view details</span>
+            <div style={styles.placeholder}>
+              <span style={styles.placeholderIcon}>👈</span>
+              <h3 style={styles.placeholderTitle}>Select a Session</h3>
+              <p style={styles.placeholderText}>
+                Choose a customer session from the list to view their Digital Worksheet
+              </p>
             </div>
           ) : loadingDetail ? (
-            <div style={styles.noSelection}>
+            <div style={styles.loadingState}>
               <div style={styles.spinner} />
               <span>Loading session details...</span>
             </div>
-          ) : showChatTranscript && sessionDetail?.chatHistory ? (
-            <div style={styles.chatTranscript}>
-              <div style={styles.transcriptHeader}>
-                <h3>Customer Chat with Quirk AI</h3>
-                <button
-                  style={styles.backBtn}
-                  onClick={() => setShowChatTranscript(false)}
-                >
-                  Back to Worksheet
-                </button>
-              </div>
-              <div style={styles.chatMessages}>
-                {sessionDetail.chatHistory.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      ...styles.chatMessage,
-                      ...(msg.role === 'user'
-                        ? styles.userMessage
-                        : styles.assistantMessage),
-                    }}
-                  >
-                    <span style={styles.messageRole}>
-                      {msg.role === 'user' ? 'Customer' : 'Quirk AI'}
-                    </span>
-                    <p style={styles.messageContent}>{msg.content}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+          ) : showChatTranscript ? (
+            renderChatTranscript()
           ) : (
-            <div style={styles.worksheet}>
-              <div style={styles.worksheetHeader}>
-                <h3 style={styles.worksheetTitle}>
-                  Digital Quote Worksheet - {selectedSession.customerName || 'Customer'}
-                </h3>
-                {sessionDetail?.chatHistory && sessionDetail.chatHistory.length > 0 && (
-                  <button
-                    style={styles.viewChatBtn}
-                    onClick={() => setShowChatTranscript(true)}
-                  >
-                    View Chat Transcript
-                  </button>
-                )}
-              </div>
-
-              {/* 4-Square Grid */}
-              <div style={styles.fourSquareGrid}>
-                {/* Trade-In */}
-                <div style={styles.quadrant}>
-                  <h4 style={styles.quadrantTitle}>TRADE-IN</h4>
-                  <div style={styles.quadrantContent}>
-                    {selectedSession.tradeIn?.hasTrade ? (
-                      <>
-                        <div style={styles.tradeVehicleInfo}>
-                          <span style={styles.tradeModel}>
-                            {selectedSession.tradeIn.vehicle?.year}{' '}
-                            {selectedSession.tradeIn.vehicle?.make}{' '}
-                            {selectedSession.tradeIn.vehicle?.model}
-                          </span>
-                          <span style={styles.tradeMileage}>
-                            {selectedSession.tradeIn.vehicle?.mileage?.toLocaleString()} miles
-                          </span>
-                        </div>
-                        {selectedSession.tradeIn.hasPayoff ? (
-                          <div style={styles.payoffInfo}>
-                            <div style={styles.payoffRow}>
-                              <span>Payoff:</span>
-                              <span>{formatCurrency(selectedSession.tradeIn.payoffAmount)}</span>
-                            </div>
-                            <div style={styles.payoffRow}>
-                              <span>Monthly:</span>
-                              <span>{formatCurrency(selectedSession.tradeIn.monthlyPayment)}</span>
-                            </div>
-                            <div style={styles.payoffRow}>
-                              <span>Lender:</span>
-                              <span>{selectedSession.tradeIn.financedWith || 'Not specified'}</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <span style={styles.paidOff}>✓ Paid Off</span>
-                        )}
-                      </>
-                    ) : (
-                      <span style={styles.noTrade}>No trade-in</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Price */}
-                <div style={styles.quadrant}>
-                  <h4 style={styles.quadrantTitle}>PRICE</h4>
-                  <div style={styles.quadrantContent}>
-                    {selectedSession.selectedVehicle ? (
-                      <>
-                        <span style={styles.bigPrice}>
-                          {formatCurrency(selectedSession.selectedVehicle.price)}
-                        </span>
-                        <span style={styles.subValue}>
-                          {selectedSession.selectedVehicle.year}{' '}
-                          {selectedSession.selectedVehicle.make}{' '}
-                          {selectedSession.selectedVehicle.model}
-                        </span>
-                        <span style={styles.subValue}>
-                          Stock #{selectedSession.selectedVehicle.stockNumber}
-                        </span>
-                      </>
-                    ) : (
-                      <span style={styles.pending}>No vehicle selected</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Down Payment */}
-                <div style={styles.quadrant}>
-                  <h4 style={styles.quadrantTitle}>DOWN PAYMENT</h4>
-                  <div style={styles.quadrantContent}>
-                    {selectedSession.budget?.downPaymentPercent ? (
-                      <span style={styles.bigValue}>
-                        {selectedSession.budget.downPaymentPercent}%
-                      </span>
-                    ) : (
-                      <span style={styles.pending}>Not specified</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Monthly Budget */}
-                <div style={styles.quadrant}>
-                  <h4 style={styles.quadrantTitle}>MONTHLY BUDGET</h4>
-                  <div style={styles.quadrantContent}>
-                    {selectedSession.budget?.min || selectedSession.budget?.max ? (
-                      <span style={styles.budgetRange}>
-                        ${selectedSession.budget.min || 0} - ${selectedSession.budget.max || '∞'}
-                      </span>
-                    ) : (
-                      <span style={styles.pending}>Not specified</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Vehicle Interest */}
-              {selectedSession.vehicleInterest?.model && (
-                <div style={styles.interestSection}>
-                  <h4 style={styles.sectionTitle}>Vehicle Interest</h4>
-                  <div style={styles.interestDetails}>
-                    <span>Model: {selectedSession.vehicleInterest.model}</span>
-                    {selectedSession.vehicleInterest.cab && (
-                      <span>Cab: {selectedSession.vehicleInterest.cab}</span>
-                    )}
-                    {selectedSession.vehicleInterest.colors?.length > 0 && (
-                      <span>Colors: {selectedSession.vehicleInterest.colors.join(', ')}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            renderDigitalWorksheet()
           )}
         </div>
       </div>
 
-      {/* CSS for spinner animation */}
+      {/* CSS for animations */}
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+        @media print {
+          .no-print { display: none !important; }
+        }
       `}</style>
     </div>
   );
 };
+
+// ============================================================================
+// Styles
+// ============================================================================
 
 const styles: Record<string, CSSProperties> = {
   container: {
@@ -458,8 +881,6 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
     fontFamily: '"Montserrat", sans-serif',
   },
-
-  // Header
   header: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -516,17 +937,13 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
   },
-
-  // Main Content
   mainContent: {
     flex: 1,
     display: 'grid',
-    gridTemplateColumns: '300px 1fr',
+    gridTemplateColumns: '320px 1fr',
     gap: '24px',
     padding: '24px 32px',
   },
-
-  // Session List
   sessionList: {
     display: 'flex',
     flexDirection: 'column',
@@ -552,25 +969,21 @@ const styles: Record<string, CSSProperties> = {
   spinner: {
     width: '32px',
     height: '32px',
-    borderWidth: '3px',
-    borderStyle: 'solid',
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderTopColor: '#1B7340',
+    border: '3px solid rgba(255,255,255,0.1)',
+    borderTopColor: '#4ade80',
     borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
+    animation: 'spin 0.8s linear infinite',
   },
   emptyState: {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '40px 20px',
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: '14px',
-  },
-  sessionCards: {
-    display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    alignItems: 'center',
+    padding: '40px 20px',
+    gap: '12px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  emptyIcon: {
+    fontSize: '48px',
   },
   sessionCard: {
     padding: '16px',
@@ -582,7 +995,7 @@ const styles: Record<string, CSSProperties> = {
   },
   sessionCardActive: {
     background: 'rgba(27,115,64,0.15)',
-    border: '1px solid #1B7340',
+    borderColor: 'rgba(27,115,64,0.4)',
   },
   sessionHeader: {
     display: 'flex',
@@ -591,7 +1004,7 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '8px',
   },
   customerName: {
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: 600,
     color: '#fff',
   },
@@ -599,44 +1012,122 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px',
     color: 'rgba(255,255,255,0.5)',
   },
+  sessionMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
   sessionStep: {
-    fontSize: '13px',
-    color: '#4ade80',
-    marginBottom: '4px',
-  },
-  sessionPhone: {
     fontSize: '12px',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.6)',
   },
-
-  // Detail Panel
+  sessionVehicle: {
+    fontSize: '12px',
+    color: '#4ade80',
+  },
   detailPanel: {
-    background: 'rgba(255,255,255,0.02)',
-    borderRadius: '16px',
-    border: '1px solid rgba(255,255,255,0.05)',
-    overflow: 'hidden',
+    minHeight: '600px',
   },
-  noSelection: {
+  placeholder: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '12px',
     height: '100%',
-    minHeight: '400px',
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: '16px',
+    color: 'rgba(255,255,255,0.5)',
   },
-
-  // Worksheet
+  placeholderIcon: {
+    fontSize: '64px',
+    marginBottom: '16px',
+  },
+  placeholderTitle: {
+    fontSize: '20px',
+    fontWeight: 600,
+    color: '#fff',
+    margin: '0 0 8px 0',
+  },
+  placeholderText: {
+    fontSize: '14px',
+    margin: 0,
+  },
+  chatPanel: {
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+  },
+  chatHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '16px 20px',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+  },
+  backBtn: {
+    padding: '8px 12px',
+    background: 'rgba(255,255,255,0.1)',
+    border: 'none',
+    borderRadius: '6px',
+    color: '#fff',
+    fontSize: '13px',
+    cursor: 'pointer',
+  },
+  chatTitle: {
+    fontSize: '16px',
+    fontWeight: 600,
+    margin: 0,
+  },
+  chatMessages: {
+    padding: '20px',
+    maxHeight: '600px',
+    overflowY: 'auto',
+  },
+  noMessages: {
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.5)',
+    padding: '40px',
+  },
+  message: {
+    padding: '12px 16px',
+    borderRadius: '12px',
+    marginBottom: '12px',
+    maxWidth: '80%',
+  },
+  messageUser: {
+    background: 'rgba(27,115,64,0.2)',
+    marginLeft: 'auto',
+  },
+  messageAssistant: {
+    background: 'rgba(255,255,255,0.05)',
+    marginRight: 'auto',
+  },
+  messageRole: {
+    fontSize: '11px',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    display: 'block',
+    marginBottom: '4px',
+  },
+  messageContent: {
+    fontSize: '14px',
+    lineHeight: 1.5,
+    margin: 0,
+    color: '#fff',
+  },
   worksheet: {
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.1)',
     padding: '24px',
   },
   worksheetHeader: {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: '24px',
+    paddingBottom: '16px',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
   },
   worksheetTitle: {
     fontSize: '20px',
@@ -644,184 +1135,297 @@ const styles: Record<string, CSSProperties> = {
     color: '#fff',
     margin: 0,
   },
+  worksheetCustomer: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.6)',
+    margin: '4px 0 0 0',
+  },
+  worksheetActions: {
+    display: 'flex',
+    gap: '8px',
+  },
   viewChatBtn: {
-    padding: '10px 16px',
-    background: 'rgba(96,165,250,0.2)',
-    border: '1px solid rgba(96,165,250,0.4)',
-    borderRadius: '8px',
-    color: '#60a5fa',
+    padding: '8px 14px',
+    background: 'rgba(99, 102, 241, 0.2)',
+    border: '1px solid rgba(99, 102, 241, 0.4)',
+    borderRadius: '6px',
+    color: '#a5b4fc',
     fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
   },
-
-  // 4-Square Grid
-  fourSquareGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '16px',
-    marginBottom: '24px',
-  },
-  quadrant: {
-    padding: '20px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '2px solid rgba(255,255,255,0.1)',
-    borderRadius: '12px',
-    minHeight: '150px',
-  },
-  quadrantTitle: {
-    fontSize: '12px',
-    fontWeight: 700,
-    color: 'rgba(255,255,255,0.5)',
-    textTransform: 'uppercase',
-    marginBottom: '16px',
-    paddingBottom: '8px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-  },
-  quadrantContent: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  tradeVehicleInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
-    marginBottom: '12px',
-  },
-  tradeModel: {
-    fontSize: '18px',
-    fontWeight: 700,
-    color: '#ffffff',
-  },
-  tradeMileage: {
-    fontSize: '13px',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  payoffInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    padding: '12px',
-    background: 'rgba(0,0,0,0.2)',
-    borderRadius: '8px',
-  },
-  payoffRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.8)',
-  },
-  paidOff: {
-    color: '#4ade80',
-    fontWeight: 600,
-  },
-  noTrade: {
-    color: 'rgba(255,255,255,0.4)',
-    fontStyle: 'italic',
-  },
-  pending: {
-    color: 'rgba(255,255,255,0.3)',
-    fontStyle: 'italic',
-  },
-  bigPrice: {
-    fontSize: '32px',
-    fontWeight: 700,
-    color: '#4ade80',
-  },
-  budgetRange: {
-    fontSize: '18px',
-    fontWeight: 600,
-    color: '#60a5fa',
-  },
-  bigValue: {
-    fontSize: '28px',
-    fontWeight: 700,
-    color: '#ffffff',
-  },
-  subValue: {
-    fontSize: '13px',
-    color: 'rgba(255,255,255,0.5)',
-  },
-
-  // Interest Section
-  interestSection: {
-    padding: '16px',
-    background: 'rgba(255,255,255,0.03)',
-    borderRadius: '12px',
-  },
-  sectionTitle: {
-    fontSize: '14px',
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: '12px',
-  },
-  interestDetails: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.8)',
-  },
-
-  // Chat Transcript
-  chatTranscript: {
-    padding: '24px',
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  transcriptHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-  },
-  backBtn: {
-    padding: '8px 16px',
+  actionBtn: {
+    padding: '8px 14px',
     background: 'rgba(255,255,255,0.1)',
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '6px',
     color: '#fff',
     fontSize: '13px',
-    fontWeight: 500,
+    fontWeight: 600,
     cursor: 'pointer',
   },
-  chatMessages: {
-    flex: 1,
+  actionBtnPrimary: {
+    padding: '8px 14px',
+    background: 'rgba(27,115,64,0.3)',
+    border: '1px solid rgba(27,115,64,0.5)',
+    borderRadius: '6px',
+    color: '#4ade80',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  worksheetGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '20px',
+    marginBottom: '24px',
+  },
+  worksheetSection: {
+    background: 'rgba(255,255,255,0.02)',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.08)',
+    padding: '20px',
+  },
+  sectionTitle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '12px',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    margin: '0 0 16px 0',
+  },
+  sectionIcon: {
+    fontSize: '16px',
+  },
+  sectionContent: {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
-    overflowY: 'auto',
   },
-  chatMessage: {
-    padding: '12px 16px',
-    borderRadius: '12px',
-    maxWidth: '80%',
+  vehicleTitle: {
+    fontSize: '18px',
+    fontWeight: 700,
+    color: '#fff',
   },
-  userMessage: {
-    alignSelf: 'flex-end',
-    background: 'rgba(27,115,64,0.2)',
-    border: '1px solid rgba(27,115,64,0.3)',
+  vehicleTrim: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)',
   },
-  assistantMessage: {
-    alignSelf: 'flex-start',
+  vehicleStock: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  tradeVehicle: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#fff',
+  },
+  tradeMileage: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  pendingValue: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.4)',
+    fontStyle: 'italic',
+  },
+  priceRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  editableRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  editableLabel: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  editableInput: {
+    padding: '10px 12px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '8px',
+    color: '#fff',
+    fontSize: '16px',
+    fontWeight: 600,
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  equityRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '15px',
+    fontWeight: 600,
+    paddingTop: '12px',
+    borderTop: '1px solid rgba(255,255,255,0.1)',
+    marginTop: '8px',
+  },
+  positiveValue: {
+    color: '#4ade80',
+  },
+  negativeValue: {
+    color: '#f87171',
+  },
+  budgetNote: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.5)',
+    fontStyle: 'italic',
+  },
+  paymentToggle: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  toggleBtn: {
+    flex: 1,
+    padding: '10px',
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.1)',
-  },
-  messageRole: {
-    fontSize: '11px',
+    borderRadius: '8px',
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: '14px',
     fontWeight: 600,
+    cursor: 'pointer',
+  },
+  toggleBtnActive: {
+    background: 'rgba(27,115,64,0.2)',
+    borderColor: 'rgba(27,115,64,0.5)',
+    color: '#4ade80',
+  },
+  termSelector: {
+    marginBottom: '12px',
+  },
+  termButtons: {
+    display: 'flex',
+    gap: '6px',
+    marginTop: '6px',
+  },
+  termBtn: {
+    flex: 1,
+    padding: '8px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '6px',
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: '13px',
+    cursor: 'pointer',
+  },
+  termBtnActive: {
+    background: 'rgba(27,115,64,0.2)',
+    borderColor: 'rgba(27,115,64,0.5)',
+    color: '#4ade80',
+  },
+  paymentResult: {
+    textAlign: 'center',
+    padding: '16px',
+    background: 'rgba(27,115,64,0.1)',
+    borderRadius: '12px',
+    marginBottom: '12px',
+  },
+  paymentLabel: {
+    display: 'block',
+    fontSize: '12px',
     color: 'rgba(255,255,255,0.5)',
     textTransform: 'uppercase',
-    marginBottom: '4px',
-    display: 'block',
   },
-  messageContent: {
-    fontSize: '14px',
+  paymentAmount: {
+    display: 'block',
+    fontSize: '32px',
+    fontWeight: 700,
+    color: '#4ade80',
+    margin: '4px 0',
+  },
+  paymentTerm: {
+    display: 'block',
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  dealSummary: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    padding: '20px',
+    background: 'rgba(27,115,64,0.08)',
+    borderRadius: '12px',
+    border: '1px solid rgba(27,115,64,0.2)',
+    marginBottom: '24px',
+    flexWrap: 'wrap',
+  },
+  summaryItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    fontSize: '11px',
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+  },
+  summaryValue: {
+    fontSize: '16px',
+    fontWeight: 600,
     color: '#fff',
-    margin: 0,
-    lineHeight: 1.5,
+  },
+  summaryValueLarge: {
+    fontSize: '20px',
+    fontWeight: 700,
+    color: '#4ade80',
+  },
+  summaryDivider: {
+    fontSize: '20px',
+    color: 'rgba(255,255,255,0.3)',
+    fontWeight: 300,
+  },
+  bottomRow: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '20px',
+  },
+  interestBox: {
+    background: 'rgba(255,255,255,0.02)',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.08)',
+    padding: '16px',
+  },
+  boxTitle: {
+    fontSize: '12px',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    margin: '0 0 12px 0',
+  },
+  interestDetails: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  notesBox: {
+    background: 'rgba(255,255,255,0.02)',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.08)',
+    padding: '16px',
+  },
+  notesTextarea: {
+    width: '100%',
+    minHeight: '80px',
+    padding: '12px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    color: '#fff',
+    fontSize: '13px',
+    resize: 'vertical',
+    boxSizing: 'border-box',
   },
 };
 
