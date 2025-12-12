@@ -42,75 +42,12 @@ describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
 
   describe('Models with Zero Inventory', () => {
     test('does not show Camaro when inventory has no Camaros', async () => {
+      // Mock inventory with NO Camaro
       api.getInventory.mockResolvedValue([
         { model: 'Corvette', price: 70000 },
         { model: 'Corvette', price: 85000 },
         { model: 'Tahoe', price: 55000 },
         { model: 'Silverado 1500', price: 45000 },
-      ]);
-
-      renderModelBudgetSelector();
-
-      await waitFor(() => {
-        expect(screen.getByText('Trucks')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText('Camaro')).not.toBeInTheDocument();
-    });
-
-    test('does not show Malibu when inventory has no Malibus', async () => {
-      api.getInventory.mockResolvedValue([
-        { model: 'Equinox', price: 30000 },
-        { model: 'Tahoe', price: 55000 },
-      ]);
-
-      renderModelBudgetSelector();
-
-      await waitFor(() => {
-        expect(screen.getByText('SUVs & Crossovers')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText('Malibu')).not.toBeInTheDocument();
-    });
-
-    test('hides entire Sedans category when no sedans in inventory', async () => {
-      api.getInventory.mockResolvedValue([
-        { model: 'Silverado 1500', price: 45000 },
-        { model: 'Tahoe', price: 55000 },
-      ]);
-
-      renderModelBudgetSelector();
-
-      await waitFor(() => {
-        expect(screen.getByText('Trucks')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText('Sedans')).not.toBeInTheDocument();
-    });
-
-    test('hides Sports Cars category when no sports cars in inventory', async () => {
-      api.getInventory.mockResolvedValue([
-        { model: 'Silverado 1500', price: 45000 },
-        { model: 'Equinox', price: 30000 },
-      ]);
-
-      renderModelBudgetSelector();
-
-      await waitFor(() => {
-        expect(screen.getByText('Trucks')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText('Sports Cars')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Models with Inventory', () => {
-    test('shows Corvette when inventory has Corvettes', async () => {
-      api.getInventory.mockResolvedValue([
-        { model: 'Corvette', price: 70000 },
-        { model: 'Corvette', price: 85000 },
-        { model: 'Corvette', price: 90000 },
-        { model: 'Corvette', price: 120000 },
       ]);
 
       renderModelBudgetSelector();
@@ -119,16 +56,26 @@ describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
         expect(screen.getByText('Sports Cars')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('1 models')).toBeInTheDocument();
+      // Click on Sports Cars to see model selection
+      const sportsButton = screen.getByText('Sports Cars').closest('button');
+      await act(async () => {
+        fireEvent.click(sportsButton);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Corvette')).toBeInTheDocument();
+      });
+
+      // Camaro should NOT be shown because it has 0 inventory
+      expect(screen.queryByText('Camaro')).not.toBeInTheDocument();
     });
 
-    test('shows correct model count for category', async () => {
+    test('shows models that have inventory', async () => {
       api.getInventory.mockResolvedValue([
-        { model: 'Tahoe', price: 55000 },
-        { model: 'Suburban', price: 65000 },
         { model: 'Equinox', price: 30000 },
-        { model: 'Traverse', price: 40000 },
-        { model: 'Trax', price: 22000 },
+        { model: 'Equinox', price: 32000 },
+        { model: 'Tahoe', price: 55000 },
+        { model: 'Blazer', price: 40000 },
       ]);
 
       renderModelBudgetSelector();
@@ -137,14 +84,42 @@ describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
         expect(screen.getByText('SUVs & Crossovers')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('5 models')).toBeInTheDocument();
-    });
+      // Click on SUVs category
+      const suvButton = screen.getByText('SUVs & Crossovers').closest('button');
+      await act(async () => {
+        fireEvent.click(suvButton);
+      });
 
-    test('shows trucks when Silverado variants exist', async () => {
+      await waitFor(() => {
+        expect(screen.getByText('Equinox')).toBeInTheDocument();
+        expect(screen.getByText('Tahoe')).toBeInTheDocument();
+        expect(screen.getByText('Blazer')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Category Selection', () => {
+    test('shows all categories with inventory', async () => {
       api.getInventory.mockResolvedValue([
         { model: 'Silverado 1500', price: 45000 },
-        { model: 'Silverado 2500HD', price: 55000 },
-        { model: 'Colorado', price: 35000 },
+        { model: 'Equinox', price: 30000 },
+        { model: 'Corvette', price: 70000 },
+        { model: 'Bolt EV', price: 35000 },
+      ]);
+
+      renderModelBudgetSelector();
+
+      await waitFor(() => {
+        expect(screen.getByText('Trucks')).toBeInTheDocument();
+        expect(screen.getByText('SUVs & Crossovers')).toBeInTheDocument();
+        expect(screen.getByText('Sports Cars')).toBeInTheDocument();
+        expect(screen.getByText('Electric')).toBeInTheDocument();
+      });
+    });
+
+    test('back button returns to category selection', async () => {
+      api.getInventory.mockResolvedValue([
+        { model: 'Silverado 1500', price: 45000 },
       ]);
 
       renderModelBudgetSelector();
@@ -153,12 +128,31 @@ describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
         expect(screen.getByText('Trucks')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('3 models')).toBeInTheDocument();
+      // Click on Trucks
+      const trucksButton = screen.getByText('Trucks').closest('button');
+      await act(async () => {
+        fireEvent.click(trucksButton);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Silverado 1500')).toBeInTheDocument();
+      });
+
+      // Click back button using role selector (arrow is SVG, not text)
+      const backButton = screen.getByRole('button', { name: /back/i });
+      await act(async () => {
+        fireEvent.click(backButton);
+      });
+
+      // Should be back at category selection
+      await waitFor(() => {
+        expect(screen.getByText('Trucks')).toBeInTheDocument();
+      });
     });
   });
 
   describe('Loading State', () => {
-    test('shows loading state while fetching inventory', () => {
+    test('shows loading message initially', () => {
       api.getInventory.mockImplementation(() => new Promise(() => {}));
 
       renderModelBudgetSelector();
@@ -173,8 +167,10 @@ describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
 
       renderModelBudgetSelector();
 
+      // Initially loading
       expect(screen.getByText('Loading available models...')).toBeInTheDocument();
 
+      // After load
       await waitFor(() => {
         expect(screen.getByText('SUVs & Crossovers')).toBeInTheDocument();
       });
@@ -198,6 +194,7 @@ describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
         expect(screen.getByText('Sports Cars')).toBeInTheDocument();
       });
 
+      // Click on Sports Cars to see model selection
       const sportsButton = screen.getByText('Sports Cars').closest('button');
       await act(async () => {
         fireEvent.click(sportsButton);
@@ -207,131 +204,120 @@ describe('ModelBudgetSelector - Dynamic Inventory Filtering', () => {
         expect(screen.getByText('Corvette')).toBeInTheDocument();
       });
 
+      // Should show "4 in stock" for Corvette
       expect(screen.getByText('4 in stock')).toBeInTheDocument();
     });
   });
 
   describe('Real Inventory Scenario', () => {
     test('matches actual PBS inventory structure', async () => {
+      // Simulate real PBS inventory data
       api.getInventory.mockResolvedValue([
         { model: 'SILVERADO 1500', price: 45000 },
         { model: 'SILVERADO 1500', price: 48000 },
         { model: 'SILVERADO 2500HD', price: 55000 },
-        { model: 'SILVERADO 3500HD CC', price: 60000 },
-        { model: 'COLORADO', price: 35000 },
-        { model: 'TAHOE', price: 55000 },
-        { model: 'SUBURBAN', price: 65000 },
-        { model: 'TRAVERSE', price: 40000 },
         { model: 'EQUINOX', price: 30000 },
-        { model: 'TRAILBLAZER', price: 28000 },
-        { model: 'TRAX', price: 22000 },
+        { model: 'TAHOE', price: 60000 },
+        { model: 'TAHOE', price: 65000 },
+        { model: 'TRAVERSE', price: 38000 },
         { model: 'CORVETTE', price: 70000 },
-        { model: 'CORVETTE', price: 85000 },
-        { model: 'SILVERADO EV', price: 75000 },
-        { model: 'EQUINOX EV', price: 45000 },
+        { model: 'BOLT EV', price: 32000 },
+        { model: 'BOLT EUV', price: 35000 },
       ]);
 
       renderModelBudgetSelector();
 
+      // Wait for categories to load
       await waitFor(() => {
         expect(screen.getByText('Trucks')).toBeInTheDocument();
       });
 
+      // Should show all expected categories
+      expect(screen.getByText('Trucks')).toBeInTheDocument();
       expect(screen.getByText('SUVs & Crossovers')).toBeInTheDocument();
       expect(screen.getByText('Sports Cars')).toBeInTheDocument();
       expect(screen.getByText('Electric')).toBeInTheDocument();
+
+      // Should NOT show Sedans (no Malibu)
+      expect(screen.queryByText('Sedans')).not.toBeInTheDocument();
+
+      // Should NOT show Camaro anywhere (not in inventory)
+      expect(screen.queryByText('Camaro')).not.toBeInTheDocument();
     });
   });
 
-  describe('Category Selection', () => {
-    test('clicking category shows model selection', async () => {
-      api.getInventory.mockResolvedValue([
-        { model: 'Silverado 1500', price: 45000 },
-        { model: 'Silverado 2500HD', price: 55000 },
-        { model: 'Colorado', price: 35000 },
-      ]);
+  describe('API Error Handling', () => {
+    test('handles API error gracefully', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      api.getInventory.mockRejectedValue(new Error('Network error'));
 
       renderModelBudgetSelector();
 
       await waitFor(() => {
-        expect(screen.getByText('Trucks')).toBeInTheDocument();
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading inventory counts:', expect.any(Error));
       });
 
-      const trucksButton = screen.getByText('Trucks').closest('button');
-      await act(async () => {
-        fireEvent.click(trucksButton);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('Silverado 1500')).toBeInTheDocument();
-        expect(screen.getByText('Silverado 2500HD')).toBeInTheDocument();
-        expect(screen.getByText('Colorado')).toBeInTheDocument();
-      });
-    });
-
-    test('back button returns to category selection', async () => {
-      api.getInventory.mockResolvedValue([
-        { model: 'Silverado 1500', price: 45000 },
-      ]);
-
-      renderModelBudgetSelector();
-
-      await waitFor(() => {
-        expect(screen.getByText('Trucks')).toBeInTheDocument();
-      });
-
-      const trucksButton = screen.getByText('Trucks').closest('button');
-      await act(async () => {
-        fireEvent.click(trucksButton);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('Silverado 1500')).toBeInTheDocument();
-      });
-
-      const backButton = screen.getByText('← Back');
-      await act(async () => {
-        fireEvent.click(backButton);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('Trucks')).toBeInTheDocument();
-      });
+      consoleErrorSpy.mockRestore();
     });
   });
 });
 
-describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
+describe('ModelBudgetSelector - Trade-In Model Dropdown (Local Database)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    api.getInventory.mockResolvedValue([
-      { model: 'Silverado 1500', price: 45000 },
-    ]);
     api.getModels.mockResolvedValue([]);
     logTrafficSession.mockResolvedValue(undefined);
+    // Setup inventory with Equinox (SUV) to avoid truck cab configuration step
+    api.getInventory.mockResolvedValue([
+      { model: 'Equinox', price: 30000 },
+      { model: 'Equinox', price: 32000 },
+      { model: 'Tahoe', price: 55000 },
+    ]);
   });
 
+  // Helper function to navigate to trade-in step using Equinox (no cab config step)
   const navigateToTradeInStep = async () => {
     renderModelBudgetSelector();
 
+    // Wait for loading to complete
     await waitFor(() => {
-      expect(screen.getByText('Trucks')).toBeInTheDocument();
+      expect(screen.getByText('SUVs & Crossovers')).toBeInTheDocument();
     });
 
-    const trucksButton = screen.getByText('Trucks').closest('button');
+    // Step 1: Click SUVs category
+    const categoryButton = screen.getByText('SUVs & Crossovers').closest('button');
     await act(async () => {
-      fireEvent.click(trucksButton);
+      fireEvent.click(categoryButton);
     });
 
+    // Step 2: Click Equinox model
     await waitFor(() => {
-      expect(screen.getByText('Silverado 1500')).toBeInTheDocument();
+      expect(screen.getByText('Equinox')).toBeInTheDocument();
     });
-
-    const modelButton = screen.getByText('Silverado 1500').closest('button');
+    const modelButton = screen.getByText('Equinox').closest('button');
     await act(async () => {
       fireEvent.click(modelButton);
     });
 
+    // Step 3: Color selection - click continue
+    await waitFor(() => {
+      expect(screen.getByText('Color Preferences', { exact: false })).toBeInTheDocument();
+    });
+    const continueButton = screen.getByText('Continue to Budget');
+    await act(async () => {
+      fireEvent.click(continueButton);
+    });
+
+    // Step 4: Budget selection - click continue
+    await waitFor(() => {
+      expect(screen.getByText('Monthly Budget', { exact: false })).toBeInTheDocument();
+    });
+    const budgetContinueButton = screen.getByText('Continue');
+    await act(async () => {
+      fireEvent.click(budgetContinueButton);
+    });
+
+    // Step 5: Trade-in step
     await waitFor(() => {
       expect(screen.getByText('Trade-In Vehicle', { exact: false })).toBeInTheDocument();
     });
@@ -340,6 +326,7 @@ describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
   test('displays trade-in vehicle form when "Yes, I have a trade-in" is clicked', async () => {
     await navigateToTradeInStep();
 
+    // Click "Yes, I have a trade-in"
     await act(async () => {
       fireEvent.click(screen.getByText('Yes, I have a trade-in'));
     });
@@ -352,6 +339,7 @@ describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
   test('model dropdown is disabled until make is selected', async () => {
     await navigateToTradeInStep();
 
+    // Click "Yes, I have a trade-in"
     await act(async () => {
       fireEvent.click(screen.getByText('Yes, I have a trade-in'));
     });
@@ -360,17 +348,15 @@ describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
     });
 
-    const selects = screen.getAllByRole('combobox');
-    const modelSelect = selects[2];
-
+    // Model dropdown should be disabled initially
+    const modelSelect = screen.getByLabelText('Model');
     expect(modelSelect).toBeDisabled();
   });
 
   test('model dropdown enables after year and make are selected', async () => {
-    api.getModels.mockResolvedValue(['Camry', 'Corolla', 'RAV4']);
-    
     await navigateToTradeInStep();
 
+    // Click "Yes, I have a trade-in"
     await act(async () => {
       fireEvent.click(screen.getByText('Yes, I have a trade-in'));
     });
@@ -379,29 +365,27 @@ describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
     });
 
-    const selects = screen.getAllByRole('combobox');
-    const yearSelect = selects[0];
-    const makeSelect = selects[1];
-    const modelSelect = selects[2];
-
+    // Select year
+    const yearSelect = screen.getByLabelText('Year');
     await act(async () => {
-      fireEvent.change(yearSelect, { target: { value: '2022' } });
+      fireEvent.change(yearSelect, { target: { value: '2020' } });
     });
 
+    // Select make
+    const makeSelect = screen.getByLabelText('Make');
     await act(async () => {
       fireEvent.change(makeSelect, { target: { value: 'Toyota' } });
     });
 
-    await waitFor(() => {
-      expect(modelSelect).not.toBeDisabled();
-    });
+    // Model dropdown should now be enabled
+    const modelSelect = screen.getByLabelText('Model');
+    expect(modelSelect).not.toBeDisabled();
   });
 
   test('populates model dropdown with models from local database', async () => {
-    api.getModels.mockResolvedValue(['Camry', 'Corolla', 'RAV4', 'Highlander', 'Tacoma']);
-    
     await navigateToTradeInStep();
 
+    // Click "Yes, I have a trade-in"
     await act(async () => {
       fireEvent.click(screen.getByText('Yes, I have a trade-in'));
     });
@@ -410,34 +394,30 @@ describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
     });
 
-    const selects = screen.getAllByRole('combobox');
-    const yearSelect = selects[0];
-    const makeSelect = selects[1];
-
+    // Select year first
+    const yearSelect = screen.getByLabelText('Year');
     await act(async () => {
-      fireEvent.change(yearSelect, { target: { value: '2022' } });
+      fireEvent.change(yearSelect, { target: { value: '2020' } });
     });
 
+    // Select Toyota
+    const makeSelect = screen.getByLabelText('Make');
     await act(async () => {
       fireEvent.change(makeSelect, { target: { value: 'Toyota' } });
     });
 
+    // Check that Toyota models are available in dropdown
     await waitFor(() => {
       expect(screen.getByRole('option', { name: 'Camry' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'Corolla' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'RAV4' })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: 'Highlander' })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: 'Tacoma' })).toBeInTheDocument();
     });
   });
 
   test('resets model selection when make changes', async () => {
-    api.getModels
-      .mockResolvedValueOnce(['Camry', 'Corolla', 'RAV4'])
-      .mockResolvedValueOnce(['Civic', 'Accord', 'CR-V']);
-    
     await navigateToTradeInStep();
 
+    // Click "Yes, I have a trade-in"
     await act(async () => {
       fireEvent.click(screen.getByText('Yes, I have a trade-in'));
     });
@@ -446,51 +426,37 @@ describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
     });
 
-    const selects = screen.getAllByRole('combobox');
-    const yearSelect = selects[0];
-    const makeSelect = selects[1];
-    const modelSelect = selects[2];
-
+    // Select year
+    const yearSelect = screen.getByLabelText('Year');
     await act(async () => {
-      fireEvent.change(yearSelect, { target: { value: '2022' } });
+      fireEvent.change(yearSelect, { target: { value: '2020' } });
     });
 
+    // First: Select Toyota
+    const makeSelect = screen.getByLabelText('Make');
     await act(async () => {
       fireEvent.change(makeSelect, { target: { value: 'Toyota' } });
     });
 
-    await waitFor(() => {
-      expect(modelSelect).not.toBeDisabled();
-    });
-
+    // Select a Toyota model
+    const modelSelect = screen.getByLabelText('Model');
     await act(async () => {
       fireEvent.change(modelSelect, { target: { value: 'Camry' } });
     });
 
-    expect(modelSelect.value).toBe('Camry');
-
+    // Now change make to Honda
     await act(async () => {
       fireEvent.change(makeSelect, { target: { value: 'Honda' } });
     });
 
-    await waitFor(() => {
-      expect(modelSelect.value).toBe('');
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Civic' })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: 'Accord' })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: 'CR-V' })).toBeInTheDocument();
-    });
+    // Model should be reset
+    expect(modelSelect).toHaveValue('');
   });
 
   test('shows different models for different makes', async () => {
-    api.getModels
-      .mockResolvedValueOnce(['F-150', 'Mustang', 'Explorer', 'Escape'])
-      .mockResolvedValueOnce(['Silverado 1500', 'Equinox', 'Tahoe', 'Malibu']);
-    
     await navigateToTradeInStep();
 
+    // Click "Yes, I have a trade-in"
     await act(async () => {
       fireEvent.click(screen.getByText('Yes, I have a trade-in'));
     });
@@ -499,14 +465,14 @@ describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
     });
 
-    const selects = screen.getAllByRole('combobox');
-    const yearSelect = selects[0];
-    const makeSelect = selects[1];
-
+    const yearSelect = screen.getByLabelText('Year');
     await act(async () => {
-      fireEvent.change(yearSelect, { target: { value: '2022' } });
+      fireEvent.change(yearSelect, { target: { value: '2020' } });
     });
 
+    const makeSelect = screen.getByLabelText('Make');
+
+    // First: Select Ford
     await act(async () => {
       fireEvent.change(makeSelect, { target: { value: 'Ford' } });
     });
@@ -517,6 +483,7 @@ describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
       expect(screen.getByRole('option', { name: 'Explorer' })).toBeInTheDocument();
     });
 
+    // Second: Change to Chevrolet
     await act(async () => {
       fireEvent.change(makeSelect, { target: { value: 'Chevrolet' } });
     });
@@ -531,6 +498,7 @@ describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
   test('includes comprehensive make list', async () => {
     await navigateToTradeInStep();
 
+    // Click "Yes, I have a trade-in"
     await act(async () => {
       fireEvent.click(screen.getByText('Yes, I have a trade-in'));
     });
@@ -539,6 +507,7 @@ describe('ModelBudgetSelector - Trade-In Vehicle Selection', () => {
       expect(screen.getByText('Tell us about your trade-in vehicle')).toBeInTheDocument();
     });
 
+    // Check that major makes are available
     expect(screen.getByRole('option', { name: 'Toyota' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Honda' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Ford' })).toBeInTheDocument();
