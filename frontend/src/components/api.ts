@@ -593,10 +593,11 @@ export const getMakes = async (): Promise<string[]> => {
 };
 
 /**
- * Get models for a make
+ * Get models for a make (optionally filtered by year)
  */
-export const getModels = async (make: string): Promise<string[]> => {
-  return apiRequest<string[]>(`/inventory/models/${make}`);
+export const getModels = async (make: string, year?: string): Promise<string[]> => {
+  const params = year ? `?year=${year}` : '';
+  return apiRequest<string[]>(`/inventory/models/${make}${params}`);
 };
 
 /**
