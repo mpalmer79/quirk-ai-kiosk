@@ -496,20 +496,12 @@ const KioskApp: React.FC = () => {
         {/* Right side */}
         <div style={styles.headerRight}>
           {currentScreen === 'welcome' && (
-            <>
-              <button 
-                style={styles.salesDeskLink} 
-                onClick={() => navigateTo('salesDashboard')}
-              >
-                Sales Desk
-              </button>
-              <button 
-                style={styles.adminLink} 
-                onClick={() => navigateTo('trafficLog')}
-              >
-                Admin
-              </button>
-            </>
+            <button 
+              style={styles.salesDeskLink} 
+              onClick={() => navigateTo('trafficLog')}
+            >
+              Sales Desk
+            </button>
           )}
         </div>
       </header>
