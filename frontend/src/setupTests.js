@@ -117,7 +117,8 @@ beforeAll(() => {
       typeof message === 'string' &&
       (message.includes('Warning: An update to') ||
        message.includes('Warning: ReactDOM.render') ||
-       message.includes('act(...)'))
+       message.includes('act(...)') ||
+       message.includes('Removing a style property during rerender'))
     ) {
       return;
     }
