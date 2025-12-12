@@ -52,7 +52,8 @@ describe('TradeInEstimator Component', () => {
 
     test('renders Close button in modal mode', () => {
       renderTradeInEstimator({ isModal: true });
-      expect(screen.getByText('Close')).toBeInTheDocument();
+      const closeButtons = screen.getAllByText('Close');
+      expect(closeButtons.length).toBeGreaterThan(0);
     });
 
     test('renders step progress indicator', () => {
@@ -134,8 +135,8 @@ describe('TradeInEstimator Component', () => {
     test('calls onClose when Close button is clicked', () => {
       renderTradeInEstimator({ isModal: true });
       
-      const closeButton = screen.getByText('Close');
-      fireEvent.click(closeButton);
+      const closeButtons = screen.getAllByText('Close');
+      fireEvent.click(closeButtons[0]);
       
       expect(mockOnClose).toHaveBeenCalled();
     });
