@@ -792,6 +792,17 @@ export const getTTSVoices = async (): Promise<{
 // ============================================
 
 const api = {
+  // Generic HTTP methods
+  post: <T = unknown>(endpoint: string, data?: unknown): Promise<T> => {
+    return apiRequest<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  },
+  get: <T = unknown>(endpoint: string): Promise<T> => {
+    return apiRequest<T>(endpoint);
+  },
+  
   // Inventory
   getInventory,
   getVehicleByStock,
