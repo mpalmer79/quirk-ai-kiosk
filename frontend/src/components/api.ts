@@ -596,7 +596,7 @@ export const getMakes = async (): Promise<string[]> => {
  * Get models for a make
  */
 export const getModels = async (make: string): Promise<string[]> => {
-  return apiRequest<string[]>(`/vehicles/models/${make}`);
+  return apiRequest<string[]>(`/inventory/models/${make}`);
 };
 
 /**
