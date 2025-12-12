@@ -482,6 +482,35 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
   };
 
+  // Format currency input: allows numbers and decimal, formats with commas
+  // User types "40000" → displays "40,000.00"
+  // User types "450" → displays "450.00"
+  const formatCurrencyInput = (value: string): string => {
+    // Remove everything except digits and decimal point
+    let cleaned = value.replace(/[^0-9.]/g, '');
+    
+    // Handle multiple decimal points - keep only the first one
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      cleaned = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    // Split into whole and decimal parts
+    const [whole, decimal] = cleaned.split('.');
+    
+    // Format whole number with commas
+    const formattedWhole = whole ? parseInt(whole, 10).toLocaleString('en-US') : '';
+    
+    // Return formatted value
+    if (decimal !== undefined) {
+      // Limit to 2 decimal places
+      const limitedDecimal = decimal.slice(0, 2);
+      return `${formattedWhole}.${limitedDecimal}`;
+    }
+    
+    return formattedWhole;
+  };
+
   const formatMileage = (value: string) => {
     const num = value.replace(/,/g, '').replace(/\D/g, '');
     return num ? parseInt(num).toLocaleString() : '';
@@ -724,9 +753,9 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
             <input
               type="text"
               style={{ ...styles.input, paddingLeft: '32px' }}
-              placeholder="e.g., 15,000"
+              placeholder="e.g., 15,000.00"
               value={tradeData.payoffAmount}
-              onChange={(e) => handleInputChange('payoffAmount', formatMileage(e.target.value))}
+              onChange={(e) => handleInputChange('payoffAmount', formatCurrencyInput(e.target.value))}
             />
           </div>
           <span style={styles.inputHint}>💡 Check your lender's app or latest statement</span>
@@ -739,9 +768,9 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
             <input
               type="text"
               style={{ ...styles.input, paddingLeft: '32px' }}
-              placeholder="e.g., 450"
+              placeholder="e.g., 450.00"
               value={tradeData.monthlyPayment}
-              onChange={(e) => handleInputChange('monthlyPayment', formatMileage(e.target.value))}
+              onChange={(e) => handleInputChange('monthlyPayment', formatCurrencyInput(e.target.value))}
             />
             <span style={styles.currencySuffix}>/mo</span>
           </div>
