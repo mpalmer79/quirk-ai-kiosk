@@ -17,6 +17,7 @@ import api from './api';
 import type { PhotoAnalysisResponse } from './api';
 import VINScanner from './VINScanner';
 import MarketValueTrends from './MarketValueTrends';
+import InstantCashOffer from './InstantCashOffer';
 
 // ============================================================================
 // Types
@@ -160,6 +161,9 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
   
   // Market Value Trends state
   const [showMarketTrends, setShowMarketTrends] = useState(false);
+  
+  // Instant Cash Offer state
+  const [showInstantOffer, setShowInstantOffer] = useState(false);
 
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
@@ -1061,6 +1065,14 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
             Apply to Payment Calculator
           </button>
 
+          <button style={styles.instantOfferButton} onClick={() => setShowInstantOffer(true)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            💰 Get Instant Cash Offer
+          </button>
+
           <button style={styles.secondaryButton} onClick={handleRequestAppraisal}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -1153,6 +1165,32 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
           onClose={() => setShowMarketTrends(false)}
           isModal={true}
           showComparisons={true}
+        />
+      )}
+      
+      {/* Instant Cash Offer Modal */}
+      {showInstantOffer && estimate && (
+        <InstantCashOffer
+          vehicle={{
+            year: tradeData.year,
+            make: tradeData.make,
+            model: tradeData.model,
+            trim: tradeData.trim,
+            mileage: tradeData.mileage,
+            vin: tradeData.vin,
+            condition: tradeData.condition,
+          }}
+          estimatedValue={estimate.mid}
+          onClose={() => setShowInstantOffer(false)}
+          onAccept={(offer) => {
+            console.log('Offer accepted:', offer);
+            updateCustomerData({
+              cashOffer: offer,
+            });
+          }}
+          onDecline={() => setShowInstantOffer(false)}
+          customerName={customerData?.customerName}
+          customerPhone={customerData?.phone}
         />
       )}
       
@@ -1795,6 +1833,20 @@ const styles: { [key: string]: CSSProperties } = {
     color: '#a78bfa',
     fontSize: '15px',
     fontWeight: 600,
+    cursor: 'pointer',
+  },
+  instantOfferButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    padding: '16px 24px',
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.2) 100%)',
+    border: '2px solid rgba(245, 158, 11, 0.5)',
+    borderRadius: '12px',
+    color: '#fbbf24',
+    fontSize: '16px',
+    fontWeight: 700,
     cursor: 'pointer',
   },
   startOverLink: {
