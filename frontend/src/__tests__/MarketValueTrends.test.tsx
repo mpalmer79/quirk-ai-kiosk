@@ -35,7 +35,7 @@ interface VehicleInfo {
   model: string;
   trim?: string;
   mileage?: number;
-  currentValue?: number;
+  price?: number;
 }
 
 const mockVehicle: VehicleInfo = {
@@ -44,7 +44,7 @@ const mockVehicle: VehicleInfo = {
   model: 'Equinox',
   trim: 'LT AWD',
   mileage: 45000,
-  currentValue: 22000,
+  price: 22000,
 };
 
 const mockOnClose = jest.fn();
@@ -189,7 +189,7 @@ describe('MarketValueTrends Component', () => {
         year: 2021,
         make: 'Chevrolet',
         model: 'Equinox',
-        currentValue: 22000,
+        price: 22000,
       };
       renderMarketValueTrends({ vehicle: vehicleWithoutMileage });
       expect(screen.getByText(/Market Value Trends/i)).toBeInTheDocument();
