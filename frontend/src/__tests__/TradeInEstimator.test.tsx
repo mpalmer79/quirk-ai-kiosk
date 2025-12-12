@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, RenderResult } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import TradeInEstimator from '../components/TradeInEstimator';
+import TradeInEstimator from '../components/TradeInestimator';
 import api from '../components/api';
 
 // Mock the API module
