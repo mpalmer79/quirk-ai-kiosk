@@ -4,17 +4,26 @@ import '@testing-library/jest-dom';
 import MarketValueTrends from '../components/MarketValueTrends';
 
 // Mock Recharts to avoid canvas rendering issues in tests
-jest.mock('recharts', () => {
-  const OriginalModule = jest.requireActual('recharts');
-  return {
-    ...OriginalModule,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid="responsive-container" style={{ width: 500, height: 300 }}>
-        {children}
-      </div>
-    ),
-  };
-});
+jest.mock('recharts', () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="responsive-container" style={{ width: 500, height: 300 }}>
+      {children}
+    </div>
+  ),
+  AreaChart: ({ children }: { children: React.ReactNode }) => <div data-testid="area-chart">{children}</div>,
+  LineChart: ({ children }: { children: React.ReactNode }) => <div data-testid="line-chart">{children}</div>,
+  BarChart: ({ children }: { children: React.ReactNode }) => <div data-testid="bar-chart">{children}</div>,
+  Area: () => <div data-testid="area" />,
+  Line: () => <div data-testid="line" />,
+  Bar: () => <div data-testid="bar" />,
+  XAxis: () => <div data-testid="x-axis" />,
+  YAxis: () => <div data-testid="y-axis" />,
+  CartesianGrid: () => <div data-testid="cartesian-grid" />,
+  Tooltip: () => <div data-testid="tooltip" />,
+  Legend: () => <div data-testid="legend" />,
+  ReferenceLine: () => <div data-testid="reference-line" />,
+  Cell: () => <div data-testid="cell" />,
+}));
 
 interface VehicleInfo {
   year: number;
