@@ -118,6 +118,36 @@ const FALLBACK_MAKES = [
   'Tesla', 'Toyota', 'Volkswagen', 'Volvo'
 ];
 
+// Comprehensive models database for trade-in dropdown
+const MODELS_BY_MAKE: Record<string, string[]> = {
+  'Acura': ['ILX', 'TLX', 'RLX', 'MDX', 'RDX', 'NSX', 'Integra'],
+  'Audi': ['A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'Q3', 'Q5', 'Q7', 'Q8', 'e-tron', 'RS3', 'RS5', 'RS6', 'RS7', 'S3', 'S4', 'S5', 'TT', 'R8'],
+  'BMW': ['2 Series', '3 Series', '4 Series', '5 Series', '7 Series', '8 Series', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'Z4', 'i3', 'i4', 'i7', 'iX', 'M2', 'M3', 'M4', 'M5', 'M8'],
+  'Buick': ['Enclave', 'Encore', 'Encore GX', 'Envision', 'LaCrosse', 'Regal', 'Verano'],
+  'Cadillac': ['CT4', 'CT5', 'CT6', 'Escalade', 'Escalade ESV', 'XT4', 'XT5', 'XT6', 'Lyriq', 'ATS', 'CTS', 'XTS', 'SRX'],
+  'Chevrolet': ['Blazer', 'Bolt EUV', 'Bolt EV', 'Camaro', 'Colorado', 'Corvette', 'Equinox', 'Express', 'Malibu', 'Silverado 1500', 'Silverado 2500HD', 'Silverado 3500HD', 'Spark', 'Suburban', 'Tahoe', 'Trailblazer', 'Traverse', 'Trax', 'Cruze', 'Impala'],
+  'Chrysler': ['300', 'Pacifica', 'Voyager'],
+  'Dodge': ['Challenger', 'Charger', 'Durango', 'Grand Caravan', 'Journey', 'Hornet'],
+  'Ford': ['Bronco', 'Bronco Sport', 'EcoSport', 'Edge', 'Escape', 'Expedition', 'Explorer', 'F-150', 'F-250', 'F-350', 'Maverick', 'Mustang', 'Mustang Mach-E', 'Ranger', 'Transit', 'Transit Connect', 'Fusion', 'Focus', 'Taurus', 'Flex'],
+  'GMC': ['Acadia', 'Canyon', 'Hummer EV', 'Sierra 1500', 'Sierra 2500HD', 'Sierra 3500HD', 'Terrain', 'Yukon', 'Yukon XL', 'Savana'],
+  'Honda': ['Accord', 'Civic', 'CR-V', 'CR-Z', 'Fit', 'HR-V', 'Insight', 'Odyssey', 'Passport', 'Pilot', 'Ridgeline', 'Clarity', 'Element', 'Crosstour'],
+  'Hyundai': ['Accent', 'Elantra', 'Ioniq', 'Ioniq 5', 'Ioniq 6', 'Kona', 'Kona Electric', 'Nexo', 'Palisade', 'Santa Cruz', 'Santa Fe', 'Sonata', 'Tucson', 'Veloster', 'Venue', 'Genesis Coupe'],
+  'Infiniti': ['Q50', 'Q60', 'Q70', 'QX50', 'QX55', 'QX60', 'QX80', 'G35', 'G37', 'M35', 'M37', 'FX35', 'FX50', 'JX35'],
+  'Jeep': ['Cherokee', 'Compass', 'Gladiator', 'Grand Cherokee', 'Grand Cherokee L', 'Grand Wagoneer', 'Renegade', 'Wagoneer', 'Wrangler', 'Wrangler Unlimited', 'Liberty', 'Patriot', 'Commander'],
+  'Kia': ['Carnival', 'EV6', 'Forte', 'K5', 'Niro', 'Niro EV', 'Rio', 'Seltos', 'Sorento', 'Soul', 'Sportage', 'Stinger', 'Telluride', 'Optima', 'Cadenza'],
+  'Lexus': ['CT', 'ES', 'GS', 'GX', 'IS', 'LC', 'LFA', 'LS', 'LX', 'NX', 'RC', 'RX', 'RZ', 'TX', 'UX', 'ES 350', 'GS 350', 'IS 300', 'IS 350', 'LS 500', 'NX 250', 'NX 350', 'RX 350', 'RX 450h', 'GX 460', 'LX 570', 'LX 600'],
+  'Lincoln': ['Aviator', 'Continental', 'Corsair', 'MKC', 'MKS', 'MKT', 'MKX', 'MKZ', 'Nautilus', 'Navigator', 'Navigator L'],
+  'Mazda': ['CX-3', 'CX-30', 'CX-5', 'CX-50', 'CX-9', 'CX-90', 'Mazda3', 'Mazda6', 'MX-5 Miata', 'MX-30'],
+  'Mercedes-Benz': ['A-Class', 'C-Class', 'CLA', 'CLS', 'E-Class', 'EQB', 'EQE', 'EQS', 'G-Class', 'GLA', 'GLB', 'GLC', 'GLE', 'GLS', 'S-Class', 'SL', 'AMG GT', 'Maybach', 'Metris', 'Sprinter'],
+  'Nissan': ['370Z', 'Altima', 'Armada', 'Frontier', 'GT-R', 'Kicks', 'Leaf', 'Maxima', 'Murano', 'Pathfinder', 'Rogue', 'Rogue Sport', 'Sentra', 'Titan', 'Titan XD', 'Versa', 'Z', 'Juke', 'Quest'],
+  'Ram': ['1500', '1500 Classic', '2500', '3500', 'ProMaster', 'ProMaster City'],
+  'Subaru': ['Ascent', 'BRZ', 'Crosstrek', 'Forester', 'Impreza', 'Legacy', 'Outback', 'Solterra', 'WRX', 'XV Crosstrek'],
+  'Tesla': ['Model 3', 'Model S', 'Model X', 'Model Y', 'Cybertruck', 'Roadster'],
+  'Toyota': ['4Runner', '86', 'Avalon', 'bZ4X', 'C-HR', 'Camry', 'Corolla', 'Corolla Cross', 'Crown', 'GR86', 'GR Corolla', 'GR Supra', 'Highlander', 'Land Cruiser', 'Mirai', 'Prius', 'Prius Prime', 'RAV4', 'RAV4 Prime', 'Sequoia', 'Sienna', 'Tacoma', 'Tundra', 'Venza', 'Yaris', 'Matrix', 'FJ Cruiser'],
+  'Volkswagen': ['Arteon', 'Atlas', 'Atlas Cross Sport', 'Golf', 'Golf GTI', 'Golf R', 'ID.4', 'Jetta', 'Jetta GLI', 'Passat', 'Taos', 'Tiguan', 'Beetle', 'CC', 'Touareg', 'e-Golf'],
+  'Volvo': ['C40 Recharge', 'S60', 'S90', 'V60', 'V90', 'XC40', 'XC40 Recharge', 'XC60', 'XC90', 'V60 Cross Country', 'V90 Cross Country']
+};
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -198,10 +228,18 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
       }
       try {
         const result = await api.getModels(tradeData.make);
-        setModels(result || []);
+        if (result && result.length > 0) {
+          setModels(result);
+        } else {
+          // Use fallback models database
+          const fallbackModels = MODELS_BY_MAKE[tradeData.make] || [];
+          setModels(fallbackModels);
+        }
       } catch (err) {
         console.error('Failed to fetch models:', err);
-        setModels([]);
+        // Use fallback models database on error
+        const fallbackModels = MODELS_BY_MAKE[tradeData.make] || [];
+        setModels(fallbackModels);
       }
     };
     fetchModels();
