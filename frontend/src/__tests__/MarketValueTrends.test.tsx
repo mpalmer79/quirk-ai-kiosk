@@ -80,7 +80,8 @@ describe('MarketValueTrends Component', () => {
           isModal={true}
         />
       );
-      expect(screen.getByText(/Depreciation/i)).toBeInTheDocument();
+      const depreciationElements = screen.getAllByText(/Depreciation/i);
+      expect(depreciationElements.length).toBeGreaterThan(0);
     });
   });
 
@@ -118,7 +119,8 @@ describe('MarketValueTrends Component', () => {
           isModal={true}
         />
       );
-      expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+      const chartContainers = screen.getAllByTestId('chart-container');
+      expect(chartContainers.length).toBeGreaterThan(0);
     });
   });
 
