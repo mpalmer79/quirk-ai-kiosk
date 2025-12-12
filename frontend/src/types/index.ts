@@ -168,6 +168,8 @@ export interface CustomerData {
     timestamp: string;
     vehicles?: Array<{ stockNumber?: string; model?: string; price?: number }>;
   }>;
+  // Session ID for navigation from Traffic Log to Sales Dashboard
+  selectedSessionId?: string;
 }
 
 // Protection Package Types
