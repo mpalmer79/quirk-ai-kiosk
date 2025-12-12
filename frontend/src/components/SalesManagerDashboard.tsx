@@ -501,7 +501,7 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
   const renderDigitalWorksheet = () => {
     if (!selectedSession) return null;
     
-    const { salePrice, msrp, tradeACV, payoff, equity, downPayment } = getEffectiveValues();
+    const { salePrice, msrp, tradeACV: _tradeACV, payoff, equity, downPayment } = getEffectiveValues();
     const { finance, lease } = calculateDealNumbers();
     const vehicle = selectedSession.selectedVehicle;
     const trade = selectedSession.tradeIn;
