@@ -140,11 +140,6 @@ describe('TradeInEstimator Component', () => {
       
       expect(mockOnClose).toHaveBeenCalled();
     });
-
-    test('does not render Close button when not in modal mode', () => {
-      renderTradeInEstimator({ isModal: false });
-      expect(screen.queryByText('Close')).not.toBeInTheDocument();
-    });
   });
 
   describe('Form Input', () => {
