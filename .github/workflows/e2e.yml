@@ -22,7 +22,7 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
 
   test('can enter name and see personalized greeting', async ({ page }) => {
     await page.locator('input[placeholder*="first name" i]').fill('TestUser');
-    await page.getByRole('button', { name: /continue/i }).click();
+    await page.getByRole('button', { name: 'Continue' }).click();
     
     await expect(page.getByText(/Nice to meet you, TestUser/i)).toBeVisible();
   });
@@ -61,16 +61,13 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
     await page.getByText('I Know What I Want').click();
     await expect(page).toHaveURL(/#modelBudget/);
     
-    // Click back button
-    await page.getByRole('button', { name: /back/i }).click();
+    await page.getByRole('button', { name: 'Back' }).click();
     
-    // Should return to path selection (welcome screen after name entry)
     await expect(page.getByText('How can I help you today?')).toBeVisible();
   });
 
   test('sales desk link navigates to traffic log', async ({ page }) => {
-    // Sales Desk button is visible on welcome screen before skipping
-    await page.getByRole('button', { name: /sales desk/i }).click();
+    await page.getByRole('button', { name: 'Sales Desk' }).click();
     
     await expect(page).toHaveURL(/#trafficLog/);
   });
@@ -80,10 +77,8 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
     await page.getByText('Chat with Quirk AI').click();
     await expect(page).toHaveURL(/#aiAssistant/);
     
-    // Click the QUIRK logo in header using first() to avoid strict mode
     await page.getByText('QUIRK', { exact: true }).first().click();
     
-    // Should show name capture (initial welcome)
     await expect(page.locator('input[placeholder*="first name" i]')).toBeVisible();
   });
 
@@ -92,7 +87,7 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
 test.describe('Quirk AI Kiosk - Error Resilience', () => {
 
   test('app handles missing API gracefully', async ({ page }) => {
-    await page.route('**/api/**', route => route.abort());
+    await page.route('**/api/**', (route) => route.abort());
     
     await page.goto('/');
     
