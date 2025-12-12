@@ -16,6 +16,7 @@ import React, { useState, useEffect, useRef, CSSProperties } from 'react';
 import api from './api';
 import type { PhotoAnalysisResponse } from './api';
 import VINScanner from './VINScanner';
+import MarketValueTrends from './MarketValueTrends';
 
 // ============================================================================
 // Types
@@ -156,6 +157,9 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
   
   // VIN Scanner state
   const [showVinScanner, setShowVinScanner] = useState(false);
+  
+  // Market Value Trends state
+  const [showMarketTrends, setShowMarketTrends] = useState(false);
 
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
@@ -1065,6 +1069,14 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
             </svg>
             Request In-Person Appraisal
           </button>
+          
+          <button style={styles.marketTrendsButton} onClick={() => setShowMarketTrends(true)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 3v18h18"/>
+              <path d="M18 9l-5 5-4-4-3 3"/>
+            </svg>
+            View Market Trends
+          </button>
         </div>
 
         <button style={styles.startOverLink} onClick={() => { setStep(1); setEstimate(null); }}>
@@ -1126,6 +1138,23 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
         onClose={() => setShowVinScanner(false)}
         onScan={handleVinScanned}
       />
+      
+      {/* Market Value Trends Modal */}
+      {showMarketTrends && (
+        <MarketValueTrends
+          vehicle={{
+            year: parseInt(tradeData.year) || new Date().getFullYear(),
+            make: tradeData.make || 'Chevrolet',
+            model: tradeData.model || 'Equinox',
+            trim: tradeData.trim,
+            mileage: parseInt(tradeData.mileage.replace(/,/g, '')) || undefined,
+            currentValue: estimate?.mid,
+          }}
+          onClose={() => setShowMarketTrends(false)}
+          isModal={true}
+          showComparisons={true}
+        />
+      )}
       
       {/* Back to Vehicle Button */}
       <button style={styles.backButton} onClick={() => navigateTo('vehicleDetail')}>
@@ -1750,6 +1779,20 @@ const styles: { [key: string]: CSSProperties } = {
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '12px',
     color: '#ffffff',
+    fontSize: '15px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  marketTrendsButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    padding: '14px 24px',
+    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
+    border: '1px solid rgba(139, 92, 246, 0.4)',
+    borderRadius: '12px',
+    color: '#a78bfa',
     fontSize: '15px',
     fontWeight: 600,
     cursor: 'pointer',
