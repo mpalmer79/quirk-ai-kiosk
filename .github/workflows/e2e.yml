@@ -22,7 +22,7 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
 
   test('can enter name and see personalized greeting', async ({ page }) => {
     await page.locator('input[placeholder*="first name" i]').fill('TestUser');
-    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByText('Continue').click();
     
     await expect(page.getByText(/Nice to meet you, TestUser/i)).toBeVisible();
   });
@@ -61,13 +61,13 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
     await page.getByText('I Know What I Want').click();
     await expect(page).toHaveURL(/#modelBudget/);
     
-    await page.getByRole('button', { name: 'Back' }).click();
+    await page.getByText('Back').click();
     
     await expect(page.getByText('How can I help you today?')).toBeVisible();
   });
 
   test('sales desk link navigates to traffic log', async ({ page }) => {
-    await page.getByRole('button', { name: 'Sales Desk' }).click();
+    await page.getByText('Sales Desk').click();
     
     await expect(page).toHaveURL(/#trafficLog/);
   });
