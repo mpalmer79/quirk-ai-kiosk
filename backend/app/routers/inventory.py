@@ -8,6 +8,7 @@ from pydantic import BaseModel
 import pandas as pd
 import os
 import re
+import httpx
 
 router = APIRouter()
 
@@ -680,6 +681,44 @@ async def get_available_models():
         models[model]["maxPrice"] = max(models[model]["maxPrice"], v["price"])
     
     return {"models": models, "total": len(models)}
+
+
+@router.get("/models/{make}")
+async def get_models_by_make(make: str):
+    """
+    Get available models for a specific make using NHTSA VPIC API.
+    Used for trade-in vehicle selection.
+    """
+    if not make or len(make) < 2:
+        raise HTTPException(status_code=400, detail="Make must be at least 2 characters")
+    
+    # NHTSA VPIC API endpoint for models by make
+    nhtsa_url = f"https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMake/{make}?format=json"
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(nhtsa_url)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Extract model names from NHTSA response
+            results = data.get("Results", [])
+            models = sorted(set(
+                item.get("Model_Name", "").strip()
+                for item in results
+                if item.get("Model_Name")
+            ))
+            
+            return models
+            
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="NHTSA API timeout")
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"NHTSA API error: {e.response.status_code}")
+    except Exception as e:
+        # Fallback: return empty list rather than failing completely
+        print(f"Error fetching models for {make}: {e}")
+        return []
 
 
 @router.get("/stats")
