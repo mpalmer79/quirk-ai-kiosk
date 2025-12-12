@@ -47,7 +47,7 @@ const renderVehicleCard = (vehicle = createMockVehicle(), onClick = mockOnClick)
 describe('VehicleCard Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    getVehicleImageUrl.mockReturnValue(null);
+    (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
   });
 
   describe('Basic Rendering', () => {
@@ -86,7 +86,7 @@ describe('VehicleCard Component', () => {
 
   describe('Gradient Fallback', () => {
     test('shows model name in fallback when no image', () => {
-      getVehicleImageUrl.mockReturnValue(null);
+      (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
       renderVehicleCard();
       // Model name appears multiple times - in header and card content
       const silveradoTexts = screen.getAllByText(/Silverado 1500/i);
@@ -94,7 +94,7 @@ describe('VehicleCard Component', () => {
     });
 
     test('shows year and trim in fallback', () => {
-      getVehicleImageUrl.mockReturnValue(null);
+      (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
       renderVehicleCard();
       expect(screen.getByText(/2025.*LT Crew Cab/i)).toBeInTheDocument();
     });
@@ -102,14 +102,14 @@ describe('VehicleCard Component', () => {
 
   describe('Image Display', () => {
     test('shows image when URL is available', () => {
-      getVehicleImageUrl.mockReturnValue('/images/vehicles/silverado-white.jpg');
+      (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/vehicles/silverado-white.jpg');
       renderVehicleCard();
       const img = screen.getByRole('img');
       expect(img).toHaveAttribute('src', '/images/vehicles/silverado-white.jpg');
     });
 
     test('image has alt text', () => {
-      getVehicleImageUrl.mockReturnValue('/images/vehicles/silverado-white.jpg');
+      (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/vehicles/silverado-white.jpg');
       renderVehicleCard();
       const img = screen.getByRole('img');
       expect(img).toHaveAttribute('alt');
@@ -117,7 +117,7 @@ describe('VehicleCard Component', () => {
     });
 
     test('handles image load error', () => {
-      getVehicleImageUrl.mockReturnValue('/images/vehicles/nonexistent.jpg');
+      (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/vehicles/nonexistent.jpg');
       renderVehicleCard();
       const img = screen.getByRole('img');
       fireEvent.error(img);
@@ -251,7 +251,7 @@ describe('VehicleCard Component', () => {
         exterior_color: 'Torch Red',
         price: 85000,
       });
-      getVehicleImageUrl.mockReturnValue(null);
+      (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
       renderVehicleCard(vehicle);
       // Model name may appear multiple times (title + fallback)
       const corvetteMatches = screen.getAllByText(/Corvette/i);
@@ -320,7 +320,7 @@ describe('VehicleCard Component', () => {
     });
 
     test('image has alt text when shown', () => {
-      getVehicleImageUrl.mockReturnValue('/images/test.jpg');
+      (getVehicleImageUrl as jest.Mock).mockReturnValue('/images/test.jpg');
       renderVehicleCard();
       const img = screen.getByRole('img');
       expect(img).toHaveAttribute('alt');
@@ -332,7 +332,7 @@ describe('VehicleCard Component', () => {
 describe('VehicleCard Snake Case Fields', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    getVehicleImageUrl.mockReturnValue(null);
+    (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
   });
 
   test('handles snake_case exterior_color', () => {
