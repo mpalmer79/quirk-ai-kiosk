@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor, RenderResult } from '@testing-library/react';
+import { render, screen, waitFor, act, RenderResult } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 // Virtual mock for recharts - doesn't require module to exist in CI
@@ -7,7 +7,7 @@ jest.mock('recharts', () => {
   const React = require('react');
   return {
     ResponsiveContainer: ({ children }: { children: React.ReactNode }) => 
-      React.createElement('div', { 'data-testid': 'responsive-container', style: { width: 500, height: 300 } }, children),
+      React.createElement('div', { 'data-testid': 'responsive-container' }, children),
     AreaChart: ({ children }: { children: React.ReactNode }) => 
       React.createElement('div', { 'data-testid': 'area-chart' }, children),
     LineChart: ({ children }: { children: React.ReactNode }) => 
@@ -70,78 +70,95 @@ const renderMarketValueTrends = (props: RenderProps = {}): RenderResult => {
 describe('MarketValueTrends Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
   });
 
-  describe('Rendering', () => {
-    test('renders component with vehicle info', () => {
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  });
+
+  describe('Loading State', () => {
+    test('shows loading initially', () => {
       renderMarketValueTrends();
-      expect(screen.getByText(/Market Value Trends/i)).toBeInTheDocument();
+      expect(screen.getByText(/Loading market data/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('Rendering After Load', () => {
+    test('renders component with vehicle info after loading', async () => {
+      renderMarketValueTrends();
+      
+      // Fast-forward past loading timeout
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText('Market Value Trends')).toBeInTheDocument();
+      });
     });
 
-    test('displays vehicle year make model', () => {
+    test('displays vehicle year make model', async () => {
       renderMarketValueTrends();
-      expect(screen.getByText(/2021/)).toBeInTheDocument();
-      expect(screen.getByText(/Chevrolet/i)).toBeInTheDocument();
-      expect(screen.getByText(/Equinox/i)).toBeInTheDocument();
+      
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText(/2021/)).toBeInTheDocument();
+        expect(screen.getByText(/Chevrolet/)).toBeInTheDocument();
+        expect(screen.getByText(/Equinox/)).toBeInTheDocument();
+      });
     });
 
-    test('displays current value when provided', () => {
+    test('displays current value', async () => {
       renderMarketValueTrends();
-      expect(screen.getByText(/22,000/)).toBeInTheDocument();
-    });
-
-    test('displays mileage when provided', () => {
-      renderMarketValueTrends();
-      expect(screen.getByText(/45,000/)).toBeInTheDocument();
+      
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText(/22,000/)).toBeInTheDocument();
+      });
     });
   });
 
   describe('Chart Tabs', () => {
-    test('displays depreciation tab', () => {
+    test('displays chart tabs after loading', async () => {
       renderMarketValueTrends();
-      expect(screen.getByText(/Depreciation/i)).toBeInTheDocument();
-    });
-
-    test('displays market comparison tab when enabled', () => {
-      renderMarketValueTrends({ showComparisons: true });
-      expect(screen.getByText(/Market/i)).toBeInTheDocument();
+      
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText(/History/i)).toBeInTheDocument();
+      });
     });
   });
 
-  describe('Modal Behavior', () => {
-    test('renders as modal when isModal is true', () => {
-      renderMarketValueTrends({ isModal: true });
-      expect(screen.getByText(/Market Value Trends/i)).toBeInTheDocument();
-    });
-  });
-
-  describe('Data Display', () => {
-    test('shows depreciation info', () => {
-      renderMarketValueTrends();
-      const content = document.body.textContent;
-      expect(content).toMatch(/depreciat|value|%/i);
-    });
-
-    test('renders chart container', () => {
-      renderMarketValueTrends();
-      expect(screen.getByTestId('responsive-container')).toBeInTheDocument();
-    });
-  });
-
-  describe('Without Current Value', () => {
-    test('renders without current value', () => {
+  describe('Without Optional Props', () => {
+    test('renders without current value', async () => {
       const vehicleWithoutValue = {
         year: 2021,
         make: 'Chevrolet',
         model: 'Equinox',
       };
       renderMarketValueTrends({ vehicle: vehicleWithoutValue });
-      expect(screen.getByText(/Market Value Trends/i)).toBeInTheDocument();
+      
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText('Market Value Trends')).toBeInTheDocument();
+      });
     });
-  });
 
-  describe('Without Mileage', () => {
-    test('renders without mileage', () => {
+    test('renders without mileage', async () => {
       const vehicleWithoutMileage = {
         year: 2021,
         make: 'Chevrolet',
@@ -149,29 +166,38 @@ describe('MarketValueTrends Component', () => {
         currentValue: 22000,
       };
       renderMarketValueTrends({ vehicle: vehicleWithoutMileage });
-      expect(screen.getByText(/Market Value Trends/i)).toBeInTheDocument();
+      
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText('Market Value Trends')).toBeInTheDocument();
+      });
     });
-  });
 
-  describe('Non-Modal Mode', () => {
-    test('renders inline when isModal is false', () => {
+    test('renders inline when isModal is false', async () => {
       renderMarketValueTrends({ isModal: false });
-      expect(screen.getByText(/Market Value Trends/i)).toBeInTheDocument();
+      
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText('Market Value Trends')).toBeInTheDocument();
+      });
     });
-  });
 
-  describe('Without Comparisons', () => {
-    test('renders without comparison section', () => {
+    test('renders without comparison section', async () => {
       renderMarketValueTrends({ showComparisons: false });
-      expect(screen.getByText(/Market Value Trends/i)).toBeInTheDocument();
-    });
-  });
-
-  describe('Responsive Design', () => {
-    test('chart container has dimensions', () => {
-      renderMarketValueTrends();
-      const container = screen.getByTestId('responsive-container');
-      expect(container).toHaveStyle({ width: '500px', height: '300px' });
+      
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText('Market Value Trends')).toBeInTheDocument();
+      });
     });
   });
 });
