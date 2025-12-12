@@ -205,7 +205,13 @@ const calculateLeasePayment = (
 // Component
 // ============================================================================
 
-const SalesManagerDashboard: React.FC = () => {
+interface SalesManagerDashboardProps {
+  customerData?: { selectedSessionId?: string };
+  updateCustomerData?: (data: { selectedSessionId?: string }) => void;
+  navigateTo?: (page: string) => void;
+}
+
+const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerData, updateCustomerData }) => {
   // Session state
   const [sessions, setSessions] = useState<CustomerSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -215,6 +221,7 @@ const SalesManagerDashboard: React.FC = () => {
   const [showChatTranscript, setShowChatTranscript] = useState(false);
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [initialSessionChecked, setInitialSessionChecked] = useState(false);
   
   // Digital Worksheet state
   const [paymentMode, setPaymentMode] = useState<'finance' | 'lease'>('finance');
@@ -267,6 +274,35 @@ const SalesManagerDashboard: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [autoRefresh]);
+
+  // Auto-select session if navigated from Traffic Log with selectedSessionId
+  useEffect(() => {
+    if (!initialSessionChecked && sessions.length > 0 && customerData?.selectedSessionId) {
+      const targetSession = sessions.find(s => s.sessionId === customerData.selectedSessionId);
+      if (targetSession) {
+        // Inline session selection logic
+        setSelectedSession(targetSession);
+        setShowChatTranscript(false);
+        setManagerNotes('');
+        setOverrides({
+          salePrice: null,
+          tradeACV: null,
+          downPayment: null,
+          adminFee: 499,
+          financeTerm: 60,
+          financeAPR: 6.9,
+          leaseTerm: 36,
+          leaseMoneyFactor: 0.00125,
+          leaseResidual: 0.55,
+        });
+        fetchSessionDetail(targetSession.sessionId);
+        // Clear the selectedSessionId from customerData after selecting
+        updateCustomerData?.({ selectedSessionId: undefined });
+      }
+      setInitialSessionChecked(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions, customerData?.selectedSessionId, initialSessionChecked]);
 
   useEffect(() => {
     if (selectedSession) {
