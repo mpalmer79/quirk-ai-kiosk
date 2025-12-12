@@ -6,6 +6,38 @@ An interactive in-store kiosk system that enables customers to browse inventory,
 
 [![Backend CI](https://github.com/mpalmer79/quirk-ai-kiosk/actions/workflows/ci-backend.yml/badge.svg)](https://github.com/mpalmer79/quirk-ai-kiosk/actions/workflows/ci-backend.yml)
 [![Frontend CI](https://github.com/mpalmer79/quirk-ai-kiosk/actions/workflows/ci-frontend.yml/badge.svg)](https://github.com/mpalmer79/quirk-ai-kiosk/actions/workflows/ci-frontend.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Node 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
+
+---
+
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/mpalmer79/quirk-ai-kiosk.git
+cd quirk-ai-kiosk
+
+# Option 1: Docker (Recommended)
+docker-compose up --build
+
+# Option 2: Manual Setup
+# Terminal 1 - Backend
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2 - Frontend
+cd frontend
+npm install
+npm start
+```
+
+**Access Points:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
 ---
 
@@ -50,12 +82,13 @@ The QUIRK AI Kiosk is a production-ready monorepo powering Quirk Auto Dealers' i
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-| Service | Tech Stack | Deployment | URL |
-|---------|------------|------------|-----|
-| **Frontend** | React 18, TypeScript, Tailwind | Railway | `quirk-frontend-production.up.railway.app` |
-| **Backend** | FastAPI 0.100+, Python 3.11 | Railway | `quirk-backend-production.up.railway.app` |
-| **AI Service** | Anthropic Claude API | Integrated | Via Backend |
-| **Database** | PostgreSQL (prod) / JSON (fallback) | Railway | Managed |
+| Service | Tech Stack | Deployment |
+|---------|------------|------------|
+| **Frontend** | React 18, TypeScript | Railway / Vercel / Netlify |
+| **Backend** | FastAPI, Python 3.11, slowapi | Railway |
+| **AI Service** | Anthropic Claude API | Integrated via Backend |
+| **Database** | PostgreSQL (prod) / JSON (fallback) | Railway Managed |
+| **TTS** | ElevenLabs API (optional) | Via Backend |
 
 ---
 
@@ -72,7 +105,7 @@ quirk-ai-kiosk/
 │   │   │   ├── Vehicledetail.tsx       # Individual vehicle view
 │   │   │   ├── VehicleCard.tsx         # Reusable vehicle display card
 │   │   │   ├── ModelBudgetSelector.tsx # Model/cab/color/budget flow
-│   │   │   ├── TradeInestimator.tsx    # 5-step trade-in with photo upload
+│   │   │   ├── TradeInEstimator.tsx    # 5-step trade-in with photo upload
 │   │   │   ├── Paymentcalculator.js    # Finance/lease calculator
 │   │   │   ├── Protectionpackages.tsx  # F&I product presentation
 │   │   │   ├── SalesManagerDashboard.tsx # Admin 4-square worksheet
@@ -83,22 +116,27 @@ quirk-ai-kiosk/
 │   │   │   ├── Customerhandoff.js      # Sales team notification
 │   │   │   ├── LeadForm.js             # Customer info capture
 │   │   │   └── api.ts                  # Typed API client layer
-│   │   ├── __tests__/                  # Jest test suite
+│   │   ├── __tests__/                  # Jest + React Testing Library
 │   │   ├── types/                      # TypeScript definitions
 │   │   ├── hooks/                      # Custom React hooks
 │   │   ├── data/                       # Quiz questions, payment options
 │   │   └── utils/                      # Vehicle helpers
 │   ├── public/images/vehicles/         # Color-specific vehicle images
+│   ├── e2e/                            # Playwright E2E tests
 │   ├── Dockerfile
 │   └── package.json
 │
 ├── backend/                     # FastAPI Backend Service
 │   ├── app/
-│   │   ├── main.py                     # FastAPI v2.2.0 entry point
+│   │   ├── main.py                     # FastAPI entry point (v2.3.0)
 │   │   ├── database.py                 # PostgreSQL + JSON fallback
 │   │   ├── config.py                   # Environment configuration
 │   │   ├── core/
-│   │   │   └── recommendation_engine.py # Weighted similarity scoring
+│   │   │   ├── recommendation_engine.py # Weighted similarity scoring
+│   │   │   ├── security.py             # API key management, sanitization
+│   │   │   ├── cache.py                # Response caching
+│   │   │   ├── exceptions.py           # Custom exception classes
+│   │   │   └── logging.py              # Structured logging
 │   │   ├── routers/
 │   │   │   ├── inventory.py            # /api/v1/inventory
 │   │   │   ├── ai.py                   # /api/v1/ai (Claude chat)
@@ -108,7 +146,10 @@ quirk-ai-kiosk/
 │   │   │   ├── smart_recommendations.py # /api/v3/smart (AI-enhanced)
 │   │   │   ├── leads.py                # Lead submission & handoff
 │   │   │   ├── analytics.py            # Analytics endpoints
-│   │   │   └── traffic.py              # Session tracking & dashboard
+│   │   │   ├── traffic.py              # Session tracking & dashboard
+│   │   │   ├── trade_in.py             # VIN decode, valuation
+│   │   │   ├── photo_analysis.py       # Trade-in photo processing
+│   │   │   └── tts.py                  # ElevenLabs TTS integration
 │   │   ├── services/
 │   │   │   ├── entity_extraction.py    # NLP entity extraction
 │   │   │   ├── inventory_enrichment.py # Derive missing vehicle fields
@@ -129,15 +170,40 @@ quirk-ai-kiosk/
 ├── ai_service/                  # Standalone AI Service (Optional)
 │   ├── predictor/
 │   │   └── server.py
+│   ├── models/
 │   └── Dockerfile
 │
 ├── .github/workflows/           # CI/CD pipelines
 │   ├── ci-backend.yml
 │   ├── ci-frontend.yml
-│   └── ci-ai-service.yml
+│   ├── ci-ai-service.yml
+│   └── e2e.yml
 │
 ├── docker-compose.yml
+├── LICENSE
 └── README.md
+```
+
+---
+
+## Security Features
+
+The application implements production-grade security measures:
+
+| Feature | Implementation |
+|---------|----------------|
+| **API Key Protection** | `SecretValue` wrapper prevents accidental logging of secrets |
+| **Rate Limiting** | slowapi with configurable limits per endpoint |
+| **Input Sanitization** | XSS prevention, control character removal, length limits |
+| **CORS Configuration** | Environment-based origin allowlists (strict in production) |
+| **Request Tracking** | Unique request IDs for audit trails |
+| **Health Checks** | Kubernetes-ready `/live` and `/ready` endpoints |
+
+```python
+# Example: Secrets are never logged in plain text
+>>> api_key = SecretValue("sk-ant-abc123...")
+>>> print(api_key)
+SecretValue(hash=7f3a2b1c...)
 ```
 
 ---
@@ -161,6 +227,8 @@ quirk-ai-kiosk/
 | `/api/v1/traffic/log` | GET | Get session history (admin) |
 | `/api/v1/traffic/stats` | GET | Traffic statistics |
 | `/api/v1/traffic/active` | GET | Active sessions for dashboard |
+| `/api/v1/trade-in/decode/{vin}` | GET | Decode VIN via NHTSA |
+| `/api/v1/tts/speak` | POST | Text-to-speech (ElevenLabs) |
 
 ### V2 Endpoints (Enhanced)
 
@@ -178,6 +246,14 @@ quirk-ai-kiosk/
 | `/api/v3/smart/similar/{stock_number}` | POST | AI-enhanced similar vehicles |
 | `/api/v3/smart/extract-entities` | POST | Extract budget, preferences from text |
 
+### Health & Monitoring
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Comprehensive health check |
+| `/api/health/live` | GET | Kubernetes liveness probe |
+| `/api/health/ready` | GET | Kubernetes readiness probe |
+
 ### Interactive Documentation
 
 - **Swagger UI**: `https://quirk-backend-production.up.railway.app/docs`
@@ -190,14 +266,15 @@ quirk-ai-kiosk/
 ### AI Assistant (AIAssistant.tsx)
 
 - Claude-powered natural language conversation
-- **Text-to-Speech**: Audio responses for accessibility
-- **Voice Input**: Speech recognition for hands-free interaction
+- **Text-to-Speech**: ElevenLabs audio responses for accessibility
+- **Voice Input**: Web Speech API for hands-free interaction
 - **Smart Inventory Search**: Color + model keyword extraction (e.g., "blue Equinox")
 - **Entity Extraction**: Automatically captures budget, preferences, trade-in details
+- **Objection Handling**: Pre-built responses for common customer concerns
 - **Suggested Prompts**: Pre-built conversation starters
 - **Vehicle Cards**: Inline vehicle recommendations with direct navigation
 
-### Trade-In Estimator (TradeInestimator.tsx)
+### Trade-In Estimator (TradeInEstimator.tsx)
 
 5-step guided flow:
 1. **Vehicle Info**: Year, make, model, trim, mileage, VIN decode
@@ -256,11 +333,13 @@ Structured data automatically extracted from conversations:
 | **Budget** | "under 50k", "$600/month" | max_price, monthly_payment |
 | **Trade-In** | "trading my 2019 F-150" | year, make, model |
 | **Payoff** | "$15k left on my loan" | payoff_amount, has_payoff |
+| **Lender** | "financed through Chase" | lender |
 | **Vehicle Type** | "need a truck for towing" | body_style, use_case |
 | **Family Size** | "I have 3 kids" | min_seating |
 | **Urgency** | "need something today" | urgency: ready_to_buy |
 | **Features** | "must have leather seats" | must_have_features |
 | **Fuel Preference** | "want electric" | fuel_preference |
+| **Drivetrain** | "need AWD for winter" | drivetrain_preference |
 
 ### Smart Recommendations
 
@@ -273,7 +352,9 @@ Recommendations use weighted scoring across multiple factors:
 | Fuel Type | 1.5x | Gas, Electric, Hybrid match |
 | Drivetrain | 1.0x | AWD, 4WD, FWD preference |
 | Feature Overlap | 1.0x | Must-have features present |
-| Performance/Luxury | 0.75x | Trim level alignment |
+| Performance | 0.75x | Sport/performance alignment |
+| Year | 0.5x | Model year proximity |
+| Luxury | 0.5x | Trim level alignment |
 
 ---
 
@@ -308,34 +389,57 @@ Backend runs at `http://localhost:8000`
 ### Environment Variables
 
 **Frontend** (`frontend/.env.development`):
-```
-REACT_APP_API_URL=http://localhost:8000/api/v1
+```env
+REACT_APP_API_URL=http://localhost:8000/api
+REACT_APP_KIOSK_ID=DEV-KIOSK-001
+REACT_APP_DEALERSHIP=Quirk Chevrolet
 ```
 
 **Backend** (`backend/.env.development`):
-```
-ANTHROPIC_API_KEY=your-claude-api-key
+```env
 ENVIRONMENT=development
-LOG_LEVEL=info
-DATABASE_URL=postgresql://user:pass@host/db  # Optional
+HOST=0.0.0.0
+PORT=8000
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+ELEVENLABS_API_KEY=your-elevenlabs-key        # Optional - for TTS
+DATABASE_URL=postgresql://user:pass@host/db   # Optional - uses JSON fallback if not set
+PBS_API_KEY=your-pbs-key                      # Optional - for live inventory
+CRM_API_KEY=your-crm-key                      # Optional - for lead submission
+CORS_ORIGINS=http://localhost:3000            # Comma-separated for multiple
 ```
 
 ### Running Tests
 
 ```bash
-# Backend
+# Backend unit tests
 cd backend
 pytest -v
 
-# Frontend
+# Backend with coverage
+pytest --cov=app --cov-report=html
+
+# Frontend unit tests
 cd frontend
 npm test
+
+# Frontend E2E tests (Playwright)
+npm run test:e2e
 ```
 
 ### Docker Compose
 
 ```bash
+# Start all services
 docker-compose up --build
+
+# Start specific service
+docker-compose up backend
+
+# View logs
+docker-compose logs -f backend
+
+# Stop all services
+docker-compose down
 ```
 
 ---
@@ -351,13 +455,39 @@ The project is deployed on Railway with automatic deployments from the `main` br
 | Backend | `quirk-backend-production.up.railway.app` |
 | Frontend | `quirk-frontend-production.up.railway.app` |
 
+### Alternative Deployment Options
+
+**Vercel (Frontend)**
+```bash
+cd frontend
+vercel --prod
+```
+
+**Netlify (Frontend)**
+```bash
+cd frontend
+netlify deploy --prod
+```
+
+**Docker (Any Platform)**
+```bash
+# Build images
+docker build -t quirk-backend ./backend
+docker build -t quirk-frontend ./frontend
+
+# Run containers
+docker run -p 8000:8000 -e ANTHROPIC_API_KEY=xxx quirk-backend
+docker run -p 3000:3000 quirk-frontend
+```
+
 ### CI/CD
 
 GitHub Actions workflows handle:
 
-- **Backend**: Lint, type check, pytest, Docker build, Railway deploy
-- **Frontend**: Lint, Jest tests, build, Railway/Vercel deploy
-- **AI Service**: Build and push container
+- **Backend** (`ci-backend.yml`): Python lint, pytest, Docker build
+- **Frontend** (`ci-frontend.yml`): ESLint, Jest tests, build verification
+- **AI Service** (`ci-ai-service.yml`): Build and push container
+- **E2E** (`e2e.yml`): Playwright end-to-end tests
 
 ---
 
@@ -367,16 +497,16 @@ The system loads vehicle inventory from `backend/data/inventory.xlsx` (PBS expor
 
 ### Supported Fields
 
-| Field | Description |
-|-------|-------------|
-| Stock Number | Unique identifier (e.g., M37410) |
-| Year | Model year |
-| Make | Manufacturer (Chevrolet) |
-| Model | Vehicle model |
-| Trim | Trim level |
-| MSRP | Price |
-| Body | Body description with drivetrain |
-| Body Type | Category code (PKUP, APURP, VAN) |
+| Field | Description | Example |
+|-------|-------------|---------|
+| Stock Number | Unique identifier | M37410 |
+| Year | Model year | 2025 |
+| Make | Manufacturer | Chevrolet |
+| Model | Vehicle model | Silverado 1500 |
+| Trim | Trim level | LT |
+| MSRP | Price | 52000 |
+| Body | Body description with drivetrain | 4WD Crew Cab 147" |
+| Body Type | Category code | PKUP, APURP, VAN |
 
 ### Automatic Enrichment
 
@@ -409,12 +539,137 @@ Session data structure includes:
 
 ---
 
+## Troubleshooting
+
+### Common Issues
+
+**Backend won't start**
+```bash
+# Check if port is in use
+lsof -i :8000
+
+# Verify Python version
+python --version  # Should be 3.11+
+
+# Check dependencies
+pip install -r requirements.txt --upgrade
+```
+
+**Frontend API errors**
+```bash
+# Verify backend is running
+curl http://localhost:8000/api/health
+
+# Check CORS settings in backend/.env
+CORS_ORIGINS=http://localhost:3000
+```
+
+**AI responses failing**
+```bash
+# Verify API key is set
+echo $ANTHROPIC_API_KEY
+
+# Check backend logs for errors
+docker-compose logs backend | grep -i anthropic
+```
+
+**Database connection issues**
+```bash
+# Test PostgreSQL connection
+psql $DATABASE_URL -c "SELECT 1"
+
+# Fall back to JSON storage (remove DATABASE_URL)
+unset DATABASE_URL
+```
+
+### Health Check Endpoints
+
+```bash
+# Full health check
+curl http://localhost:8000/api/health
+
+# Liveness (is the service running?)
+curl http://localhost:8000/api/health/live
+
+# Readiness (is the service ready for traffic?)
+curl http://localhost:8000/api/health/ready
+```
+
+---
+
+## Known Limitations & Roadmap
+
+### Current Limitations
+
+| Area | Limitation |
+|------|------------|
+| **Field Naming** | Dual naming convention (camelCase + snake_case) requires defensive coding |
+| **TypeScript** | Some components still in JavaScript |
+| **State Management** | Prop drilling - no global state (Context/Redux) |
+| **Styling** | Inline styles only - no CSS framework |
+
+### Future Improvements
+
+- [ ] Complete TypeScript migration
+- [ ] Add Redux Toolkit for state management
+- [ ] Migrate to Tailwind CSS or styled-components
+- [ ] Add WebSocket for real-time dashboard updates
+- [ ] Implement offline mode with service workers
+- [ ] Add multi-language support (i18n)
+- [ ] PBS real-time inventory sync
+- [ ] CRM integration (VinSolutions, DealerSocket)
+
+---
+
+## Performance
+
+### Backend Optimizations
+
+- Response caching for inventory queries
+- Connection pooling for PostgreSQL
+- Async/await throughout for non-blocking I/O
+- Rate limiting to prevent abuse
+
+### Frontend Optimizations
+
+- React.memo for expensive components
+- Lazy loading for route components
+- Image optimization for vehicle photos
+- Session storage for client-side state
+
+### Recommended Specs
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| Backend Server | 512MB RAM, 1 vCPU | 1GB RAM, 2 vCPU |
+| Frontend Build | 1GB RAM | 2GB RAM |
+| Database | 256MB RAM | 512MB RAM |
+
+---
+
 ## Contributing
 
-1. Create a feature branch from `main`
-2. Make changes with appropriate tests
-3. Ensure CI passes (lint, type check, tests)
-4. Submit pull request
+1. **Fork** the repository
+2. **Create** a feature branch from `main`
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+3. **Make** changes with appropriate tests
+4. **Ensure** CI passes
+   ```bash
+   # Backend
+   cd backend && pytest -v
+   
+   # Frontend
+   cd frontend && npm test
+   ```
+5. **Submit** a pull request
+
+### Code Style
+
+- **Python**: Follow PEP 8, use type hints
+- **TypeScript/JavaScript**: ESLint + Prettier
+- **Commits**: Use conventional commits (`feat:`, `fix:`, `docs:`)
 
 ---
 
@@ -426,4 +681,10 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-For issues or questions, contact the Quirk Auto Dealers IT team.
+For issues or questions:
+- **GitHub Issues**: [Create an issue](https://github.com/mpalmer79/quirk-ai-kiosk/issues)
+- **Quirk IT Team**: Contact internal IT support
+
+---
+
+*Built with ❤️ for Quirk Auto Dealers - New England's #1 Dealer*
