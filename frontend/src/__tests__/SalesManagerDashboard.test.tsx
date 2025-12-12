@@ -190,7 +190,7 @@ describe('SalesManagerDashboard Component', () => {
       });
     });
 
-    test('clicking session shows 4-square worksheet', async () => {
+    test('clicking session shows Digital Worksheet', async () => {
       await renderDashboard();
 
       await waitFor(() => {
@@ -202,12 +202,12 @@ describe('SalesManagerDashboard Component', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText(/Digital Quote Worksheet/)).toBeInTheDocument();
+        expect(screen.getByText(/Digital Worksheet/)).toBeInTheDocument();
       });
     });
   });
 
-  describe('Four Square Worksheet', () => {
+  describe('Digital Worksheet', () => {
     test('displays trade-in section', async () => {
       await renderDashboard();
 
@@ -360,7 +360,7 @@ describe('SalesManagerDashboard Component', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText(/Digital Quote Worksheet/)).toBeInTheDocument();
+        expect(screen.getByText(/Digital Worksheet/)).toBeInTheDocument();
       });
 
       // Click HOME
