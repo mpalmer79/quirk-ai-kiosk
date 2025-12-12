@@ -45,6 +45,9 @@ from app.routers import smart_recommendations
 # Import photo analysis router
 from app.routers import photo_analysis
 
+# Import trade-in router (VIN decode, etc.)
+from app.routers import trade_in
+
 # Import TTS router (ElevenLabs integration)
 from app.routers import tts
 
@@ -404,6 +407,9 @@ app.include_router(smart_recommendations.router, prefix="/api/v3/smart", tags=["
 
 # Photo analysis router
 app.include_router(photo_analysis.router, prefix="/api/v1/trade-in-photos", tags=["photo-analysis"])
+
+# Trade-in router (VIN decode, valuation)
+app.include_router(trade_in.router, prefix="/api/v1/trade-in", tags=["trade-in"])
 
 # TTS Router (ElevenLabs)
 app.include_router(tts.router, prefix="/api/v1/tts", tags=["tts"])
