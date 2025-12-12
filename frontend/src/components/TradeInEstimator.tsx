@@ -14,8 +14,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import api from './api';
+import type { KioskComponentProps } from '../types';
 
-type TradeInEstimatorProps = {
+type TradeInEstimatorProps = KioskComponentProps & {
   isModal?: boolean;
   onClose?: () => void;
   vehicle?: {
@@ -82,18 +83,37 @@ const safeNumber = (v: string) => {
 
 const isTestEnv = process.env.NODE_ENV === 'test';
 
-const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({ isModal = true, onClose, vehicle }) => {
+const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({ 
+  isModal = true, 
+  onClose, 
+  vehicle,
+  navigateTo,
+  customerData,
+  updateCustomerData,
+  resetJourney,
+}) => {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<TradeForm>(() => {
     const initial = { ...DEFAULT_FORM };
-    if (vehicle?.year) initial.year = String(vehicle.year);
-    if (vehicle?.make) initial.make = vehicle.make;
-    if (vehicle?.model) initial.model = vehicle.model;
-    if (vehicle?.trim) initial.trim = vehicle.trim;
-    if (vehicle?.mileage) initial.mileage = String(vehicle.mileage);
-    if (vehicle?.vin) initial.vin = vehicle.vin;
+    // Use vehicle prop or fall back to customerData.selectedVehicle
+    const v = vehicle || customerData?.selectedVehicle;
+    if (v?.year) initial.year = String(v.year);
+    if (v?.make) initial.make = v.make;
+    if (v?.model) initial.model = v.model;
+    if (v?.trim) initial.trim = v.trim;
+    if (v?.mileage) initial.mileage = String(v.mileage);
+    if (v?.vin) initial.vin = v.vin;
     return initial;
   });
+
+  // Handle close - use onClose if provided, otherwise navigate back
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else if (navigateTo) {
+      navigateTo('vehicleDetail');
+    }
+  };
 
   const [isLoading, setIsLoading] = useState(false);
   const [valuation, setValuation] = useState<ValuationResult | null>(null);
@@ -499,7 +519,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({ isModal = true, onC
           style={buttonSecondaryStyle}
           onClick={() => {
             if (step === 1) {
-              if (onClose) onClose();
+              handleClose();
               return;
             }
             setStep((prev) => Math.max(1, prev - 1));
@@ -526,7 +546,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({ isModal = true, onC
           <button
             style={buttonStyle}
             onClick={() => {
-              if (onClose) onClose();
+              handleClose();
             }}
           >
             Done
@@ -771,7 +791,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({ isModal = true, onC
               <button style={buttonSecondaryStyle} onClick={() => setStep(1)}>
                 Edit Details
               </button>
-              <button style={buttonStyle} onClick={() => onClose && onClose()}>
+              <button style={buttonStyle} onClick={() => handleClose()}>
                 Done
               </button>
             </div>
@@ -885,7 +905,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({ isModal = true, onC
                   }}
                   onClick={() => {
                     // no-op placeholder; kiosk flow can route to sales advisor or ICO screen
-                    if (onClose) onClose();
+                    handleClose();
                   }}
                 >
                   Talk to a Sales Advisor
@@ -913,7 +933,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({ isModal = true, onC
 
           <div style={{ display: 'flex', gap: 10 }}>
             {isModal && (
-              <button style={buttonSecondaryStyle} onClick={() => (onClose ? onClose() : null)}>
+              <button style={buttonSecondaryStyle} onClick={() => (handleClose())}>
                 Close
               </button>
             )}
