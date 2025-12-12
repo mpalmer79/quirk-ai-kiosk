@@ -77,7 +77,7 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
     await page.getByText('Chat with Quirk AI').click();
     await expect(page).toHaveURL(/#aiAssistant/);
     
-    await page.getByText('QUIRK'), { exact: true }).first().click();
+    await page.locator('header').getByText('QUIRK').click();
     
     await expect(page.locator('input[placeholder*="first name" i]')).toBeVisible();
   });
