@@ -684,16 +684,36 @@ async def get_available_models():
 
 
 @router.get("/models/{make}")
-async def get_models_by_make(make: str):
+async def get_models_by_make(make: str, year: Optional[str] = None):
     """
     Get available models for a specific make using NHTSA VPIC API.
+    If year is provided, returns only models produced in that year.
     Used for trade-in vehicle selection.
     """
     if not make or len(make) < 2:
         raise HTTPException(status_code=400, detail="Make must be at least 2 characters")
     
-    # NHTSA VPIC API endpoint for models by make
-    nhtsa_url = f"https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMake/{make}?format=json"
+    # Use year-filtered endpoint if year provided (more accurate results)
+    if year:
+        nhtsa_url = f"https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/{make}/modelyear/{year}?format=json"
+    else:
+        nhtsa_url = f"https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMake/{make}?format=json"
+    
+    # Commercial/fleet vehicle patterns to filter out
+    commercial_patterns = [
+        r'^W\d',           # W3, W4, W5, W6, W7 (Chevrolet/GMC commercial)
+        r'^W\d+',          # W3500, W4500, W5500
+        r'Cutaway',        # Cutaway vans
+        r'Chassis',        # Chassis cabs
+        r'Stripped',       # Stripped chassis
+        r'^LCF',           # Low Cab Forward trucks
+        r'^NPR',           # Isuzu NPR series
+        r'^NQR',           # Isuzu NQR series
+        r'^NRR',           # Isuzu NRR series
+        r'Conventional',   # V Conventional, etc.
+        r'^C\d{4}',        # C4500, C5500, etc. (commercial)
+        r'^T\d{3}',        # T170, T270, etc. (commercial)
+    ]
     
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -703,13 +723,24 @@ async def get_models_by_make(make: str):
             
             # Extract model names from NHTSA response
             results = data.get("Results", [])
-            models = sorted(set(
-                item.get("Model_Name", "").strip()
-                for item in results
-                if item.get("Model_Name")
-            ))
+            models = []
             
-            return models
+            for item in results:
+                model_name = (item.get("Model_Name") or "").strip()
+                if not model_name:
+                    continue
+                    
+                # Filter out commercial vehicles
+                is_commercial = any(
+                    re.search(pattern, model_name, re.IGNORECASE) 
+                    for pattern in commercial_patterns
+                )
+                
+                if not is_commercial:
+                    models.append(model_name)
+            
+            # Return sorted unique models
+            return sorted(set(models))
             
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="NHTSA API timeout")
