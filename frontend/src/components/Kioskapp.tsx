@@ -10,7 +10,7 @@ import VehicleDetail from './Vehicledetail';
 import VehicleComparison from './VehicleComparison';
 import VirtualTestDrive from './VirtualTestDrive';
 import PaymentCalculator from './Paymentcalculator';
-import TradeInEstimator from './TradeInestimator';
+import TradeInEstimator from './TradeInEstimator';
 import CustomerHandoff from './Customerhandoff';
 import ProtectionPackages from './Protectionpackages';
 import TrafficLog from './Trafficlog';
