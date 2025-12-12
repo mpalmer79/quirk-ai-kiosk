@@ -40,12 +40,15 @@ const formatCurrency = (value: string): string => {
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 21 }, (_, i) => (currentYear + 1 - i).toString());
 
-// Common makes for dropdown
+// Common makes for dropdown - comprehensive list including newer brands
 const COMMON_MAKES = [
-  'Acura', 'Audi', 'BMW', 'Buick', 'Cadillac', 'Chevrolet', 'Chrysler', 'Dodge',
-  'Ford', 'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Jeep', 'Kia', 'Lexus',
-  'Lincoln', 'Mazda', 'Mercedes-Benz', 'Nissan', 'Ram', 'Subaru', 'Tesla',
-  'Toyota', 'Volkswagen', 'Volvo', 'Other'
+  'Acura', 'Alfa Romeo', 'Aston Martin', 'Audi', 'Bentley', 'BMW', 'Buick', 
+  'Cadillac', 'Chevrolet', 'Chrysler', 'Dodge', 'Ferrari', 'Fiat', 'Ford', 
+  'Genesis', 'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Jaguar', 'Jeep', 'Kia', 
+  'Lamborghini', 'Land Rover', 'Lexus', 'Lincoln', 'Lucid', 'Maserati', 'Mazda', 
+  'McLaren', 'Mercedes-Benz', 'Mini', 'Mitsubishi', 'Nissan', 'Polestar', 
+  'Porsche', 'Ram', 'Rivian', 'Rolls-Royce', 'Subaru', 'Tesla', 'Toyota', 
+  'Volkswagen', 'Volvo', 'Other'
 ];
 
 const ModelBudgetSelector: React.FC<KioskComponentProps> = ({ 
@@ -118,7 +121,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
       if (tradeVehicle.year && tradeVehicle.make) {
         setLoadingTradeModels(true);
         try {
-          const models = await api.getModels(tradeVehicle.make);
+          const models = await api.getModels(tradeVehicle.make, tradeVehicle.year);
           setTradeModels(models || []);
         } catch (err) {
           console.error('Error fetching trade models:', err);
