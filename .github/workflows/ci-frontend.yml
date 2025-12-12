@@ -32,7 +32,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # IMPORTANT:
+          # npm caching is DISABLED because this repo does not have
+          # a root-level package-lock.json / yarn.lock
+          cache: 'false'
 
       - name: 📦 Install Dependencies
         run: npm install
