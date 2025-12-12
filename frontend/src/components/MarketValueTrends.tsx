@@ -298,17 +298,25 @@ const MarketValueTrends: React.FC<MarketValueTrendsProps> = ({
           },
         };
 
-        const res = await api.post('/market/value-trends', payload);
+        const res = await api.post<{
+          currentValue?: number;
+          thirtyDay?: Array<{ date: string; value: number }>;
+          twelveMonth?: Array<{ month: string; value: number }>;
+          depreciationPercent?: number;
+          volatility?: string;
+          confidence?: string;
+          similar?: Array<{ name: string; price: number }>;
+        }>('/market/value-trends', payload);
 
-        if (res?.data?.currentValue) {
+        if (res?.currentValue) {
           result = {
-            currentValue: safeNumber(res.data.currentValue) || immediateCurrentValue,
-            thirtyDay: Array.isArray(res.data.thirtyDay) ? res.data.thirtyDay : [],
-            twelveMonth: Array.isArray(res.data.twelveMonth) ? res.data.twelveMonth : [],
-            depreciationPercent: res.data.depreciationPercent,
-            volatility: res.data.volatility,
-            confidence: res.data.confidence ?? 'Medium',
-            similar: Array.isArray(res.data.similar) ? res.data.similar : [],
+            currentValue: safeNumber(res.currentValue) || immediateCurrentValue,
+            thirtyDay: Array.isArray(res.thirtyDay) ? res.thirtyDay : [],
+            twelveMonth: Array.isArray(res.twelveMonth) ? res.twelveMonth : [],
+            depreciationPercent: res.depreciationPercent,
+            volatility: res.volatility,
+            confidence: res.confidence ?? 'Medium',
+            similar: Array.isArray(res.similar) ? res.similar : [],
           };
         }
       } catch {
