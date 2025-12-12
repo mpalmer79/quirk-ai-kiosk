@@ -140,10 +140,10 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   return (
     <div style={s.container}>
       <div style={s.bgImage} /><div style={s.bgOverlay} />
-      <div style={{ ...s.heroSection, opacity: isVisible ? 1 : 0, transform: isVisible ? 'translateY(0)' : 'translateY(20px)' }}>
-        <div style={s.greeting}>
+      <div style={{ ...s.heroSection, opacity: isVisible ? 1 : 0, transform: isVisible ? 'translateY(0)' : 'translateY(20px)' }} className="hero-section">
+        <div style={s.greeting} className="greeting-row">
           <div style={s.aiAvatar}><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="9" cy="10" r="1.5" fill="#fff" stroke="none"/><circle cx="15" cy="10" r="1.5" fill="#fff" stroke="none"/><path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round"/></svg></div>
-          <h1 style={s.heroTitle}>{customerName ? <>Nice to meet you, <span style={s.highlight}>{customerName}</span>!</> : <>Hi, I'm your <span style={s.highlight}>Quirk AI</span> assistant</>}</h1>
+          <h1 style={s.heroTitle} className="hero-title">{customerName ? <>Nice to meet you, <span style={s.highlight}>{customerName}</span>!</> : <>Hi, I'm your <span style={s.highlight}>Quirk AI</span> assistant</>}</h1>
         </div>
         <h2 style={s.heroSubtitle}>How can I help you today?</h2>
         <p style={s.heroText}>Choose an option below to get started</p>
@@ -167,7 +167,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       </div>
 
       {stats && (
-        <div style={s.statsBar}>
+        <div style={s.statsBar} className="stats-bar">
           {[{ key: 'total' as StatType, value: stats.total || 0, label: 'Vehicles In Stock' },
             { key: 'suv' as StatType, value: stats.byBodyStyle?.SUV || 0, label: 'SUVs' },
             { key: 'truck' as StatType, value: stats.byBodyStyle?.Truck || 0, label: 'Trucks' },
