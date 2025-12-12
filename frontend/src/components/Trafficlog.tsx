@@ -6,12 +6,15 @@ interface Stats {
   today?: number; total_sessions?: number; with_vehicle_selected?: number;
   vehicle_requests?: number; completed_handoffs?: number; conversion_rate?: number;
 }
-interface TrafficLogProps { navigateTo: (page: string) => void; }
+interface TrafficLogProps { 
+  navigateTo: (page: string) => void; 
+  updateCustomerData?: (data: { selectedSessionId?: string }) => void;
+}
 
 const PATH_LABELS: Record<string, string> = { stockLookup: 'Stock Lookup', modelBudget: 'Model & Budget', guidedQuiz: 'Guided Quiz', browse: 'Browse All', aiChat: 'AI Chat' };
 const PATH_COLORS: Record<string, string> = { stockLookup: '#1B7340', modelBudget: '#2563eb', guidedQuiz: '#dc2626', browse: '#6b7280', aiChat: '#8b5cf6' };
 
-const TrafficLog: React.FC<TrafficLogProps> = ({ navigateTo }) => {
+const TrafficLog: React.FC<TrafficLogProps> = ({ navigateTo, updateCustomerData }) => {
   const [sessions, setSessions] = useState<any[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -157,7 +160,7 @@ useEffect(() => { loadData(); }, [activeFilter]);
                     {session.chatHistory && session.chatHistory.length > 0 && <span style={s.chatBadge} title="Has AI Chat History">💬 {session.chatHistory.length}</span>}
                   </div>
                 </td>
-                <td style={s.td}><button style={s.viewBtn} onClick={(e) => { e.stopPropagation(); setSelectedSession(session); }}>View</button></td>
+                <td style={s.td}><button style={s.viewBtn} onClick={(e) => { e.stopPropagation(); updateCustomerData?.({ selectedSessionId: session.sessionId }); navigateTo('salesDashboard'); }}>View</button></td>
               </tr>
             ))}
           </tbody>
