@@ -128,8 +128,8 @@ describe('SalesManagerDashboard Component', () => {
       await renderDashboard();
       
       await waitFor(() => {
-        // Header is uppercase and includes count
-        expect(screen.getByText(/ACTIVE KIOSK SESSIONS/)).toBeInTheDocument();
+        // Header shows session count
+        expect(screen.getByText(/Active Sessions/)).toBeInTheDocument();
       });
     });
 
@@ -150,7 +150,7 @@ describe('SalesManagerDashboard Component', () => {
         render(<SalesManagerDashboard />);
       });
 
-      expect(screen.getByText(/Loading active sessions/i)).toBeInTheDocument();
+      expect(screen.getByText(/Loading sessions/i)).toBeInTheDocument();
     });
   });
 
@@ -168,7 +168,7 @@ describe('SalesManagerDashboard Component', () => {
       await renderDashboard();
       
       await waitFor(() => {
-        expect(screen.getByText(/ACTIVE KIOSK SESSIONS \(2\)/)).toBeInTheDocument();
+        expect(screen.getByText(/Active Sessions \(2\)/)).toBeInTheDocument();
       });
     });
   });
