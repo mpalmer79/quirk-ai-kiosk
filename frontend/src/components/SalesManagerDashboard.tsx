@@ -109,6 +109,7 @@ interface DealOverrides {
   salePrice: number | null;
   tradeACV: number | null;
   downPayment: number | null;
+  adminFee: number;
   financeTerm: number;
   financeAPR: number;
   leaseTerm: number;
@@ -144,7 +145,6 @@ const STEP_LABELS: Record<string, string> = {
 
 const DEFAULT_FINANCE_TERMS = [36, 48, 60, 72, 84];
 const DEFAULT_LEASE_TERMS = [24, 36, 39, 48];
-const DOC_FEE = 599;
 
 // ============================================================================
 // Payment Calculation Functions
@@ -223,6 +223,7 @@ const SalesManagerDashboard: React.FC = () => {
     salePrice: null,
     tradeACV: null,
     downPayment: null,
+    adminFee: 499,
     financeTerm: 60,
     financeAPR: 6.9,
     leaseTerm: 36,
@@ -288,6 +289,7 @@ const SalesManagerDashboard: React.FC = () => {
       salePrice: null,
       tradeACV: null,
       downPayment: null,
+      adminFee: 499,
       financeTerm: 60,
       financeAPR: 6.9,
       leaseTerm: 36,
@@ -358,7 +360,7 @@ const SalesManagerDashboard: React.FC = () => {
   const calculateDealNumbers = () => {
     const { salePrice, msrp, equity, downPayment } = getEffectiveValues();
     
-    const financePrincipal = salePrice - Math.max(0, equity) - downPayment + DOC_FEE;
+    const financePrincipal = salePrice - Math.max(0, equity) - downPayment + overrides.adminFee;
     const finance = calculateFinancePayment(
       financePrincipal,
       overrides.financeAPR,
@@ -597,6 +599,17 @@ const SalesManagerDashboard: React.FC = () => {
                 />
               </div>
               
+              <div style={styles.editableRow}>
+                <label style={styles.editableLabel}>Admin Fee</label>
+                <input
+                  type="number"
+                  value={overrides.adminFee}
+                  onChange={(e) => handleOverrideChange('adminFee', Number(e.target.value) || 0)}
+                  style={styles.editableInput}
+                  placeholder="499"
+                />
+              </div>
+              
               {selectedSession.budget?.downPaymentPercent && (
                 <div style={styles.budgetNote}>
                   Customer indicated {selectedSession.budget.downPaymentPercent}% down
@@ -754,14 +767,14 @@ const SalesManagerDashboard: React.FC = () => {
           </div>
           <div style={styles.summaryDivider}>+</div>
           <div style={styles.summaryItem}>
-            <span style={styles.summaryLabel}>Fees</span>
-            <span style={styles.summaryValue}>{formatCurrency(DOC_FEE)}</span>
+            <span style={styles.summaryLabel}>Admin Fee</span>
+            <span style={styles.summaryValue}>{formatCurrency(overrides.adminFee)}</span>
           </div>
           <div style={styles.summaryDivider}>=</div>
           <div style={styles.summaryItem}>
             <span style={styles.summaryLabel}>Amount Financed</span>
             <span style={styles.summaryValueLarge}>
-              {formatCurrency(salePrice - Math.max(0, equity) - downPayment + DOC_FEE)}
+              {formatCurrency(salePrice - Math.max(0, equity) - downPayment + overrides.adminFee)}
             </span>
           </div>
         </div>
