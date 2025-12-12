@@ -1044,7 +1044,7 @@ const styles: Record<string, CSSProperties> = {
   },
   sessionCardActive: {
     background: 'rgba(27,115,64,0.15)',
-    borderColor: 'rgba(27,115,64,0.4)',
+    border: '1px solid rgba(27,115,64,0.4)',
   },
   sessionHeader: {
     display: 'flex',
@@ -1345,7 +1345,7 @@ const styles: Record<string, CSSProperties> = {
   },
   toggleBtnActive: {
     background: 'rgba(27,115,64,0.2)',
-    borderColor: 'rgba(27,115,64,0.5)',
+    border: '1px solid rgba(27,115,64,0.5)',
     color: '#4ade80',
   },
   termSelector: {
@@ -1368,7 +1368,7 @@ const styles: Record<string, CSSProperties> = {
   },
   termBtnActive: {
     background: 'rgba(27,115,64,0.2)',
-    borderColor: 'rgba(27,115,64,0.5)',
+    border: '1px solid rgba(27,115,64,0.5)',
     color: '#4ade80',
   },
   paymentResult: {
