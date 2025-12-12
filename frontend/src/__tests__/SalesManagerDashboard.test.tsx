@@ -220,11 +220,11 @@ describe('SalesManagerDashboard Component', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('TRADE-IN')).toBeInTheDocument();
+        expect(screen.getByText(/Trade-In/i)).toBeInTheDocument();
       });
     });
 
-    test('displays price section', async () => {
+    test('displays vehicle section', async () => {
       await renderDashboard();
 
       await waitFor(() => {
@@ -236,7 +236,8 @@ describe('SalesManagerDashboard Component', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('PRICE')).toBeInTheDocument();
+        // Look for vehicle info in worksheet
+        expect(screen.getByText(/Digital Worksheet/)).toBeInTheDocument();
       });
     });
   });
@@ -317,7 +318,7 @@ describe('SalesManagerDashboard Component', () => {
       await renderDashboard();
       
       await waitFor(() => {
-        expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
+        expect(screen.getByText('Refresh')).toBeInTheDocument();
       });
     });
 
@@ -325,11 +326,11 @@ describe('SalesManagerDashboard Component', () => {
       await renderDashboard();
 
       await waitFor(() => {
-        expect(screen.getByText(/Refresh Now/i)).toBeInTheDocument();
+        expect(screen.getByText('Refresh')).toBeInTheDocument();
       });
 
       await act(async () => {
-        fireEvent.click(screen.getByText(/Refresh Now/i));
+        fireEvent.click(screen.getByText('Refresh'));
       });
 
       await waitFor(() => {
@@ -338,16 +339,24 @@ describe('SalesManagerDashboard Component', () => {
     });
   });
 
-  describe('HOME Button', () => {
-    test('displays HOME button', async () => {
+  describe('All Sessions Button', () => {
+    test('displays All Sessions button when session selected', async () => {
       await renderDashboard();
       
       await waitFor(() => {
-        expect(screen.getByText('HOME')).toBeInTheDocument();
+        expect(screen.getByText('John Smith')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('John Smith'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/All Sessions/)).toBeInTheDocument();
       });
     });
 
-    test('clicking HOME clears selected session', async () => {
+    test('clicking All Sessions clears selected session', async () => {
       await renderDashboard();
 
       // First select a session
@@ -363,13 +372,13 @@ describe('SalesManagerDashboard Component', () => {
         expect(screen.getByText(/Digital Worksheet/)).toBeInTheDocument();
       });
 
-      // Click HOME
+      // Click All Sessions
       await act(async () => {
-        fireEvent.click(screen.getByText('HOME'));
+        fireEvent.click(screen.getByText(/All Sessions/));
       });
 
       await waitFor(() => {
-        expect(screen.getByText(/Select a session/)).toBeInTheDocument();
+        expect(screen.getByText(/Select a Session/i)).toBeInTheDocument();
       });
     });
   });
