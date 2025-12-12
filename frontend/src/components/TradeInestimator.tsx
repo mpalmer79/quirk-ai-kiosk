@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useRef, CSSProperties } from 'react';
 import api from './api';
 import type { PhotoAnalysisResponse } from './api';
+import VINScanner from './VINScanner';
 
 // ============================================================================
 // Types
@@ -152,6 +153,9 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
   const [photoAnalysis, setPhotoAnalysis] = useState<PhotoAnalysisResponse | null>(null);
   const [isAnalyzingPhotos, setIsAnalyzingPhotos] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  
+  // VIN Scanner state
+  const [showVinScanner, setShowVinScanner] = useState(false);
 
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
@@ -226,6 +230,32 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
       }
     } catch (err) {
       console.error('Failed to decode VIN:', err);
+    } finally {
+      setIsDecodingVin(false);
+    }
+  };
+
+  // Handler for VIN scanner
+  const handleVinScanned = async (scannedVin: string) => {
+    setShowVinScanner(false);
+    handleInputChange('vin', scannedVin);
+    
+    // Auto-decode the scanned VIN
+    setIsDecodingVin(true);
+    try {
+      const decoded = await api.decodeTradeInVin(scannedVin);
+      if (decoded) {
+        setTradeData(prev => ({
+          ...prev,
+          vin: scannedVin,
+          year: decoded.year?.toString() || prev.year,
+          make: decoded.make || prev.make,
+          model: decoded.model || prev.model,
+          trim: decoded.trim || prev.trim,
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to decode scanned VIN:', err);
     } finally {
       setIsDecodingVin(false);
     }
@@ -446,15 +476,28 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
             <span style={{ fontSize: '24px' }}>📷</span>
             <div>
               <span style={styles.vinLabel}>Quick VIN Lookup</span>
-              <span style={styles.vinHint}>Auto-fills vehicle info</span>
+              <span style={styles.vinHint}>Scan barcode or enter manually</span>
             </div>
           </div>
         </div>
-        <div style={styles.vinInputWrapper}>
+        
+        {/* Scan VIN Button */}
+        <button
+          style={styles.scanVinButton}
+          onClick={() => setShowVinScanner(true)}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          Scan VIN Barcode
+        </button>
+        
+        <div style={styles.vinInputRow}>
           <input
             type="text"
             style={styles.vinInput}
-            placeholder="Enter 17-character VIN"
+            placeholder="Or enter 17-character VIN"
             value={tradeData.vin}
             onChange={(e) => handleInputChange('vin', e.target.value.toUpperCase())}
             onBlur={handleVinDecode}
@@ -466,6 +509,10 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
             </div>
           )}
         </div>
+        
+        {tradeData.vin.length > 0 && tradeData.vin.length < 17 && (
+          <p style={styles.vinCounter}>{tradeData.vin.length}/17 characters</p>
+        )}
       </div>
 
       <div style={styles.divider}>
@@ -1073,6 +1120,13 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
 
   return (
     <div style={styles.container}>
+      {/* VIN Scanner Modal */}
+      <VINScanner
+        isOpen={showVinScanner}
+        onClose={() => setShowVinScanner(false)}
+        onScan={handleVinScanned}
+      />
+      
       {/* Back to Vehicle Button */}
       <button style={styles.backButton} onClick={() => navigateTo('vehicleDetail')}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1290,6 +1344,32 @@ const styles: { [key: string]: CSSProperties } = {
   },
   vinInputWrapper: {
     position: 'relative',
+  },
+  vinInputRow: {
+    position: 'relative',
+    marginTop: '12px',
+  },
+  scanVinButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    width: '100%',
+    padding: '14px 20px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    borderRadius: '10px',
+    color: '#ffffff',
+    fontSize: '15px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    marginBottom: '12px',
+  },
+  vinCounter: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: '8px',
+    textAlign: 'right',
   },
   vinInput: {
     width: '100%',
