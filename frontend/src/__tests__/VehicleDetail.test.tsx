@@ -2,31 +2,29 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, RenderResult } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import TradeInEstimator from '../components/TradeInEstimator';
-import api from '../components/api';
 
-// Mock the API module
-jest.mock('../components/api', () => ({
-  getMakes: jest.fn(),
-  getModels: jest.fn(),
-  decodeTradeInVin: jest.fn(),
-  getTradeInEstimate: jest.fn(),
-  requestAppraisal: jest.fn(),
-  analyzeTradeInPhotos: jest.fn(),
-}));
-
-const mockNavigateTo = jest.fn();
-const mockUpdateCustomerData = jest.fn();
+const mockOnClose = jest.fn();
 
 interface RenderProps {
-  customerData?: Record<string, unknown>;
+  isModal?: boolean;
+  onClose?: () => void;
+  vehicle?: {
+    year?: number;
+    make?: string;
+    model?: string;
+    trim?: string;
+    mileage?: number;
+    vin?: string;
+    price?: number;
+  };
 }
 
 const renderTradeInEstimator = (props: RenderProps = {}): RenderResult => {
   return render(
     <TradeInEstimator
-      navigateTo={mockNavigateTo}
-      updateCustomerData={mockUpdateCustomerData}
-      customerData={props.customerData || {}}
+      isModal={props.isModal !== undefined ? props.isModal : true}
+      onClose={props.onClose || mockOnClose}
+      vehicle={props.vehicle}
     />
   );
 };
@@ -34,12 +32,6 @@ const renderTradeInEstimator = (props: RenderProps = {}): RenderResult => {
 describe('TradeInEstimator Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (api.getMakes as jest.Mock).mockResolvedValue([
-      'Acura', 'BMW', 'Chevrolet', 'Ford', 'Honda', 'Toyota'
-    ]);
-    (api.getModels as jest.Mock).mockResolvedValue([
-      'Accord', 'Civic', 'CR-V', 'Pilot'
-    ]);
   });
 
   describe('Initial Render', () => {
@@ -50,167 +42,145 @@ describe('TradeInEstimator Component', () => {
 
     test('renders subtitle text', () => {
       renderTradeInEstimator();
-      expect(screen.getByText('Get an instant estimate for your current vehicle')).toBeInTheDocument();
+      expect(screen.getByText('A quick, transparent estimate to help you plan your purchase.')).toBeInTheDocument();
     });
 
     test('renders Step 1 - Vehicle Info by default', () => {
       renderTradeInEstimator();
-      expect(screen.getByText('Tell us about your vehicle')).toBeInTheDocument();
+      expect(screen.getByText('Tell us about your trade')).toBeInTheDocument();
     });
 
-    test('renders Back to Vehicle button', () => {
-      renderTradeInEstimator();
-      expect(screen.getByText('Back to Vehicle')).toBeInTheDocument();
+    test('renders Close button in modal mode', () => {
+      renderTradeInEstimator({ isModal: true });
+      expect(screen.getByText('Close')).toBeInTheDocument();
     });
 
-    test('renders VIN input section', () => {
+    test('renders step progress indicator', () => {
       renderTradeInEstimator();
-      expect(screen.getByText('Quick VIN Lookup')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Enter 17-character VIN')).toBeInTheDocument();
+      expect(screen.getByText('Vehicle')).toBeInTheDocument();
+      expect(screen.getByText('Usage')).toBeInTheDocument();
+      expect(screen.getByText('Loan')).toBeInTheDocument();
+      expect(screen.getByText('Estimate')).toBeInTheDocument();
     });
   });
 
   describe('Step 1 - Vehicle Information', () => {
-    test('renders year dropdown', () => {
+    test('renders year input', () => {
       renderTradeInEstimator();
       expect(screen.getByText('Year *')).toBeInTheDocument();
-      expect(screen.getByText('Select Year')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('2021')).toBeInTheDocument();
     });
 
-    test('renders make dropdown', () => {
+    test('renders make input', () => {
       renderTradeInEstimator();
       expect(screen.getByText('Make *')).toBeInTheDocument();
-      expect(screen.getByText('Select Make')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Chevrolet')).toBeInTheDocument();
     });
 
-    test('renders model dropdown', () => {
+    test('renders model input', () => {
       renderTradeInEstimator();
       expect(screen.getByText('Model *')).toBeInTheDocument();
-      expect(screen.getByText('Select Model')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Equinox')).toBeInTheDocument();
     });
 
     test('renders trim input', () => {
       renderTradeInEstimator();
       expect(screen.getByText('Trim')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('e.g., EX-L, Sport')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('LT / Premier')).toBeInTheDocument();
     });
 
     test('renders mileage input', () => {
       renderTradeInEstimator();
-      expect(screen.getByText('Current Mileage *')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('e.g., 45,000')).toBeInTheDocument();
+      expect(screen.getByText('Mileage *')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('45000')).toBeInTheDocument();
     });
 
-    test('Continue button is disabled when required fields are empty', () => {
+    test('renders VIN input', () => {
       renderTradeInEstimator();
-      const continueButton = screen.getByText('Continue').closest('button') as HTMLButtonElement;
-      expect(continueButton).toHaveStyle({ opacity: '0.5' });
+      expect(screen.getByText('VIN (optional, boosts accuracy)')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('1G...')).toBeInTheDocument();
     });
 
-    test('fetches makes on mount', async () => {
+    test('Next button is present', () => {
       renderTradeInEstimator();
-      await waitFor(() => {
-        expect(api.getMakes).toHaveBeenCalled();
-      });
+      expect(screen.getByText('Next')).toBeInTheDocument();
     });
   });
 
-  describe('VIN Decode', () => {
-    test('calls decodeTradeInVin when valid VIN is entered', async () => {
-      (api.decodeTradeInVin as jest.Mock).mockResolvedValue({
+  describe('Vehicle Pre-fill', () => {
+    test('pre-fills vehicle data when provided', () => {
+      const vehicle = {
         year: 2022,
         make: 'Honda',
         model: 'Accord',
         trim: 'Sport',
-      });
-
-      renderTradeInEstimator();
+        mileage: 25000,
+        vin: '1HGCV1F34NA000001',
+      };
       
-      const vinInput = screen.getByPlaceholderText('Enter 17-character VIN');
-      fireEvent.change(vinInput, { target: { value: '1HGCV1F34NA000001' } });
-      fireEvent.blur(vinInput);
-
-      await waitFor(() => {
-        expect(api.decodeTradeInVin).toHaveBeenCalledWith('1HGCV1F34NA000001');
-      });
-    });
-
-    test('auto-fills fields after successful VIN decode', async () => {
-      (api.decodeTradeInVin as jest.Mock).mockResolvedValue({
-        year: 2022,
-        make: 'Honda',
-        model: 'Accord',
-        trim: 'Sport',
-      });
-
-      renderTradeInEstimator();
+      renderTradeInEstimator({ vehicle });
       
-      const vinInput = screen.getByPlaceholderText('Enter 17-character VIN');
-      fireEvent.change(vinInput, { target: { value: '1HGCV1F34NA000001' } });
-      fireEvent.blur(vinInput);
-
-      await waitFor(() => {
-        expect(api.decodeTradeInVin).toHaveBeenCalled();
-      });
-    });
-
-    test('does not call decode for invalid VIN length', () => {
-      renderTradeInEstimator();
+      const yearInput = screen.getByPlaceholderText('2021') as HTMLInputElement;
+      const makeInput = screen.getByPlaceholderText('Chevrolet') as HTMLInputElement;
+      const modelInput = screen.getByPlaceholderText('Equinox') as HTMLInputElement;
       
-      const vinInput = screen.getByPlaceholderText('Enter 17-character VIN');
-      fireEvent.change(vinInput, { target: { value: '1HGCV1F34' } }); // Too short
-      fireEvent.blur(vinInput);
-
-      expect(api.decodeTradeInVin).not.toHaveBeenCalled();
+      expect(yearInput.value).toBe('2022');
+      expect(makeInput.value).toBe('Honda');
+      expect(modelInput.value).toBe('Accord');
     });
   });
 
-  describe('Step Navigation', () => {
-    test('navigates back to vehicle detail when Back to Vehicle is clicked', () => {
-      renderTradeInEstimator();
+  describe('Modal Behavior', () => {
+    test('calls onClose when Close button is clicked', () => {
+      renderTradeInEstimator({ isModal: true });
       
-      const backButton = screen.getByText('Back to Vehicle');
-      fireEvent.click(backButton);
+      const closeButton = screen.getByText('Close');
+      fireEvent.click(closeButton);
       
-      expect(mockNavigateTo).toHaveBeenCalledWith('vehicleDetail');
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    test('does not render Close button when not in modal mode', () => {
+      renderTradeInEstimator({ isModal: false });
+      expect(screen.queryByText('Close')).not.toBeInTheDocument();
     });
   });
 
-  describe('Make/Model Dropdowns', () => {
-    test('fetches models when make is selected', async () => {
-      renderTradeInEstimator();
-
-      await waitFor(() => {
-        expect(api.getMakes).toHaveBeenCalled();
-      });
-
-      // Find and change make dropdown
-      const makeSelect = screen.getAllByRole('combobox')[1]; // Second dropdown is make
-      fireEvent.change(makeSelect, { target: { value: 'Honda' } });
-
-      await waitFor(() => {
-        expect(api.getModels).toHaveBeenCalledWith('Honda');
-      });
-    });
-  });
-
-  describe('Mileage Formatting', () => {
-    test('formats mileage with commas', () => {
+  describe('Form Input', () => {
+    test('updates year field when typed', () => {
       renderTradeInEstimator();
       
-      const mileageInput = screen.getByPlaceholderText('e.g., 45,000');
-      fireEvent.change(mileageInput, { target: { value: '125000' } });
+      const yearInput = screen.getByPlaceholderText('2021') as HTMLInputElement;
+      fireEvent.change(yearInput, { target: { value: '2023' } });
       
-      expect(mileageInput).toHaveValue('125,000');
+      expect(yearInput.value).toBe('2023');
     });
 
-    test('strips non-numeric characters from mileage', () => {
+    test('updates make field when typed', () => {
       renderTradeInEstimator();
       
-      const mileageInput = screen.getByPlaceholderText('e.g., 45,000');
-      fireEvent.change(mileageInput, { target: { value: 'abc123def' } });
+      const makeInput = screen.getByPlaceholderText('Chevrolet') as HTMLInputElement;
+      fireEvent.change(makeInput, { target: { value: 'Toyota' } });
       
-      expect(mileageInput).toHaveValue('123');
+      expect(makeInput.value).toBe('Toyota');
+    });
+
+    test('updates model field when typed', () => {
+      renderTradeInEstimator();
+      
+      const modelInput = screen.getByPlaceholderText('Equinox') as HTMLInputElement;
+      fireEvent.change(modelInput, { target: { value: 'Camry' } });
+      
+      expect(modelInput.value).toBe('Camry');
+    });
+
+    test('updates mileage field when typed', () => {
+      renderTradeInEstimator();
+      
+      const mileageInput = screen.getByPlaceholderText('45000') as HTMLInputElement;
+      fireEvent.change(mileageInput, { target: { value: '55000' } });
+      
+      expect(mileageInput.value).toBe('55000');
     });
   });
 
@@ -218,9 +188,8 @@ describe('TradeInEstimator Component', () => {
     test('shows step 1 as active initially', () => {
       renderTradeInEstimator();
       
-      // Progress dots should be visible
-      const progressDots = document.querySelectorAll('[style*="border-radius: 50%"]');
-      expect(progressDots.length).toBeGreaterThan(0);
+      // Step 1 "Vehicle" should be visible and rendered
+      expect(screen.getByText('Vehicle')).toBeInTheDocument();
     });
   });
 
@@ -232,116 +201,45 @@ describe('TradeInEstimator Component', () => {
       expect(screen.getByText('Make *')).toBeInTheDocument();
       expect(screen.getByText('Model *')).toBeInTheDocument();
       expect(screen.getByText('Trim')).toBeInTheDocument();
-      expect(screen.getByText('Current Mileage *')).toBeInTheDocument();
-    });
-
-    test('VIN input accepts uppercase characters', () => {
-      renderTradeInEstimator();
-      
-      const vinInput = screen.getByPlaceholderText('Enter 17-character VIN');
-      fireEvent.change(vinInput, { target: { value: 'abcdefgh123456789' } });
-      
-      expect(vinInput).toHaveValue('ABCDEFGH123456789');
-    });
-  });
-
-  describe('API Error Handling', () => {
-    test('uses fallback makes when API fails', async () => {
-      (api.getMakes as jest.Mock).mockRejectedValue(new Error('API Error'));
-      
-      renderTradeInEstimator();
-      
-      await waitFor(() => {
-        expect(api.getMakes).toHaveBeenCalled();
-      });
-      
-      // Component should still render with fallback makes
-      expect(screen.getByText('Trade-In Estimator')).toBeInTheDocument();
-    });
-
-    test('handles VIN decode failure gracefully', async () => {
-      (api.decodeTradeInVin as jest.Mock).mockRejectedValue(new Error('Decode failed'));
-      
-      renderTradeInEstimator();
-      
-      const vinInput = screen.getByPlaceholderText('Enter 17-character VIN');
-      fireEvent.change(vinInput, { target: { value: '1HGCV1F34NA000001' } });
-      fireEvent.blur(vinInput);
-      
-      await waitFor(() => {
-        expect(api.decodeTradeInVin).toHaveBeenCalled();
-      });
-      
-      // Form should still be usable
-      expect(screen.getByText('Tell us about your vehicle')).toBeInTheDocument();
+      expect(screen.getByText('Mileage *')).toBeInTheDocument();
     });
   });
 });
 
-describe('TradeInEstimator Step 2 - Ownership', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (api.getMakes as jest.Mock).mockResolvedValue(['Honda', 'Toyota']);
-    (api.getModels as jest.Mock).mockResolvedValue(['Accord', 'Civic']);
-  });
-
-  // Note: Testing step 2 requires navigating through step 1 first
-  // These tests verify the ownership question functionality
-  
-  test('renders ownership question options text', () => {
-    renderTradeInEstimator();
-    // Step 2 content is rendered but hidden until navigation
-    // Verifying component mounts without error
+describe('TradeInEstimator Step 2 - Usage', () => {
+  test('component mounts without error', () => {
+    render(
+      <TradeInEstimator
+        isModal={true}
+        onClose={jest.fn()}
+      />
+    );
     expect(screen.getByText('Trade-In Estimator')).toBeInTheDocument();
   });
 });
 
-describe('TradeInEstimator Step 4 - Condition', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (api.getMakes as jest.Mock).mockResolvedValue(['Honda', 'Toyota']);
-    (api.getModels as jest.Mock).mockResolvedValue(['Accord', 'Civic']);
-  });
-
-  test('condition options are defined in component', () => {
-    renderTradeInEstimator();
-    // Condition options (Excellent, Good, Fair, Poor) are rendered in step 4
-    // Component should mount successfully
-    expect(screen.getByText('Trade-In Estimator')).toBeInTheDocument();
-  });
-});
-
-describe('TradeInEstimator Photo Upload', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (api.getMakes as jest.Mock).mockResolvedValue(['Honda', 'Toyota']);
-    (api.getModels as jest.Mock).mockResolvedValue(['Accord', 'Civic']);
-  });
-
-  test('photo upload section is configured', () => {
-    renderTradeInEstimator();
-    // Photo spots (Front, Rear, Interior, Odometer, Damage) are configured
-    // Component should mount successfully
+describe('TradeInEstimator Step 3 - Loan', () => {
+  test('component mounts without error', () => {
+    render(
+      <TradeInEstimator
+        isModal={true}
+        onClose={jest.fn()}
+      />
+    );
     expect(screen.getByText('Trade-In Estimator')).toBeInTheDocument();
   });
 });
 
 describe('TradeInEstimator Integration', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (api.getMakes as jest.Mock).mockResolvedValue(['Honda', 'Toyota', 'Ford']);
-    (api.getModels as jest.Mock).mockResolvedValue(['Accord', 'Civic', 'CR-V']);
-    (api.getTradeInEstimate as jest.Mock).mockResolvedValue({
-      estimatedValue: 15000,
-      range: { low: 13500, high: 16500 },
-    });
-  });
-
-  test('complete flow updates customer data', async () => {
-    renderTradeInEstimator();
+  test('complete component renders', () => {
+    render(
+      <TradeInEstimator
+        isModal={true}
+        onClose={jest.fn()}
+      />
+    );
     
-    // Component should be interactive
     expect(screen.getByText('Trade-In Estimator')).toBeInTheDocument();
-    expect(screen.getByText('Continue')).toBeInTheDocument();
+    expect(screen.getByText('Next')).toBeInTheDocument();
   });
 });
