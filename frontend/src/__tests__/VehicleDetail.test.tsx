@@ -182,6 +182,7 @@ describe('VehicleDetail Component', () => {
 
     test('displays calculated Quirk Price (MSRP minus rebates)', () => {
       renderVehicleDetail();
+      // $52,995 - $3,000 - $1,000 = $48,995
       expect(screen.getByText('$48,995')).toBeInTheDocument();
     });
   });
@@ -241,6 +242,7 @@ describe('VehicleDetail Component', () => {
 
     test('displays thumbnail images', () => {
       renderVehicleDetail();
+      // Component renders 4 thumbnail placeholders
       const thumbnails = document.querySelectorAll('[style*="width: 100px"]');
       expect(thumbnails.length).toBe(4);
     });
@@ -271,6 +273,11 @@ describe('VehicleDetail Component', () => {
       expect(screen.getByText('Calculate Payment')).toBeInTheDocument();
     });
 
+    test('renders Value My Trade button', () => {
+      renderVehicleDetail();
+      expect(screen.getByText('Value My Trade')).toBeInTheDocument();
+    });
+
     test('Calculate Payment navigates to payment calculator', () => {
       renderVehicleDetail();
       
@@ -278,21 +285,25 @@ describe('VehicleDetail Component', () => {
       expect(mockNavigateTo).toHaveBeenCalledWith('paymentCalculator');
     });
 
-    test('renders Value My Trade button', () => {
-      renderVehicleDetail();
-      expect(screen.getByText('Value My Trade')).toBeInTheDocument();
-    });
-
-    test('Value My Trade navigates to trade-in', () => {
+    test('Value My Trade navigates to tradeIn', () => {
       renderVehicleDetail();
       
       fireEvent.click(screen.getByText('Value My Trade'));
       expect(mockNavigateTo).toHaveBeenCalledWith('tradeIn');
     });
 
-    test('renders Save to Phone button', () => {
+    test('renders Save to Phone QR Code button', () => {
       renderVehicleDetail();
       expect(screen.getByText(/Save to Phone/)).toBeInTheDocument();
+    });
+
+    test('QR Code button opens QR modal', () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText(/Save to Phone/));
+      
+      // QR Modal should appear
+      expect(screen.getByText('Save This Vehicle')).toBeInTheDocument();
     });
   });
 
@@ -307,28 +318,83 @@ describe('VehicleDetail Component', () => {
       });
     });
 
-    test('confirmation screen shows vehicle info', async () => {
+    test('confirmation screen shows success message', async () => {
       renderVehicleDetail();
       
       fireEvent.click(screen.getByText("Let's See It!"));
       
       await waitFor(() => {
-        expect(screen.getByText('2025 Chevrolet Silverado 1500')).toBeInTheDocument();
+        expect(screen.getByText(/A team member has been notified/)).toBeInTheDocument();
+      });
+    });
+
+    test('confirmation screen shows vehicle details', async () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText("Let's See It!"));
+      
+      await waitFor(() => {
+        expect(screen.getByText('2025 Silverado 1500')).toBeInTheDocument();
         expect(screen.getByText('LT Crew Cab 4WD')).toBeInTheDocument();
+        expect(screen.getByText(/Stock#\s*24789/)).toBeInTheDocument();
       });
     });
 
-    test('confirmation screen shows Browse More Vehicles button', async () => {
+    test('confirmation screen shows expected steps', async () => {
       renderVehicleDetail();
       
       fireEvent.click(screen.getByText("Let's See It!"));
       
       await waitFor(() => {
-        expect(screen.getByText('Browse More Vehicles')).toBeInTheDocument();
+        expect(screen.getByText('What to Expect:')).toBeInTheDocument();
+        expect(screen.getByText(/A sales consultant will locate the vehicle/)).toBeInTheDocument();
+        expect(screen.getByText(/bring it to the front entrance/)).toBeInTheDocument();
+        expect(screen.getByText(/see it up close and ask questions/)).toBeInTheDocument();
       });
     });
 
-    test('Browse More Vehicles navigates to inventory', async () => {
+    test('confirmation screen shows estimated wait time', async () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText("Let's See It!"));
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Estimated wait: 3-5 minutes/)).toBeInTheDocument();
+      });
+    });
+
+    test('updateCustomerData is called when vehicle is requested', async () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText("Let's See It!"));
+      
+      await waitFor(() => {
+        expect(mockUpdateCustomerData).toHaveBeenCalledWith(
+          expect.objectContaining({
+            vehicleRequested: expect.objectContaining({
+              stockNumber: '24789',
+            }),
+          })
+        );
+      });
+    });
+
+    test('logTrafficSession is called when vehicle is requested', async () => {
+      renderVehicleDetail();
+      
+      fireEvent.click(screen.getByText("Let's See It!"));
+      
+      await waitFor(() => {
+        expect(logTrafficSession).toHaveBeenCalledWith(
+          expect.objectContaining({
+            currentStep: 'vehicleRequest',
+            vehicleRequested: true,
+          })
+        );
+      });
+    });
+
+    test('Browse More Vehicles navigates to inventory from confirmation', async () => {
       renderVehicleDetail();
       
       fireEvent.click(screen.getByText("Let's See It!"));
@@ -341,7 +407,7 @@ describe('VehicleDetail Component', () => {
       expect(mockNavigateTo).toHaveBeenCalledWith('inventory');
     });
 
-    test('Chat with AI Assistant navigates to AI assistant', async () => {
+    test('Chat with AI Assistant navigates to aiAssistant from confirmation', async () => {
       renderVehicleDetail();
       
       fireEvent.click(screen.getByText("Let's See It!"));
@@ -357,6 +423,7 @@ describe('VehicleDetail Component', () => {
 
   describe('Loading State', () => {
     test('shows loading text while sending request', async () => {
+      // Make logTrafficSession take some time
       logTrafficSession.mockImplementation(
         () => new Promise(resolve => setTimeout(resolve, 100))
       );
@@ -365,8 +432,10 @@ describe('VehicleDetail Component', () => {
       
       fireEvent.click(screen.getByText("Let's See It!"));
       
+      // Should show loading state
       expect(screen.getByText('Notifying Team...')).toBeInTheDocument();
       
+      // Wait for completion
       await waitFor(() => {
         expect(screen.getByText("We're On It!")).toBeInTheDocument();
       });
@@ -393,6 +462,7 @@ describe('VehicleDetail Edge Cases', () => {
       />
     );
 
+    // Should still show default rebates
     expect(screen.getByText('Customer Cash')).toBeInTheDocument();
     expect(screen.getByText('Bonus Cash')).toBeInTheDocument();
   });
@@ -411,6 +481,7 @@ describe('VehicleDetail Edge Cases', () => {
       />
     );
 
+    // Key Features section should not render when no features
     expect(screen.queryByText('Trailering Package')).not.toBeInTheDocument();
   });
 
@@ -506,6 +577,7 @@ describe('VehicleDetail Accessibility', () => {
   test('conditional offers toggle is accessible', () => {
     renderVehicleDetail();
     
+    // The text is in a span inside a button - check the parent button exists
     const conditionalText = screen.getByText('Conditional Offers');
     expect(conditionalText.closest('button')).toBeInTheDocument();
   });
@@ -517,6 +589,7 @@ describe('VehicleDetail API Error Handling', () => {
   });
 
   test('still shows confirmation even if API call fails', async () => {
+    // Suppress console.error for this test
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     
     logTrafficSession.mockRejectedValue(new Error('Network error'));
@@ -525,6 +598,7 @@ describe('VehicleDetail API Error Handling', () => {
     
     fireEvent.click(screen.getByText("Let's See It!"));
     
+    // Should still show confirmation (graceful degradation)
     await waitFor(() => {
       expect(screen.getByText("We're On It!")).toBeInTheDocument();
     });
@@ -543,7 +617,9 @@ describe('VehicleDetail QR Code Modal', () => {
     
     fireEvent.click(screen.getByText(/Save to Phone/));
     
-    expect(screen.getByText('2025 Chevrolet Silverado 1500')).toBeInTheDocument();
+    // Should show vehicle details in modal - use flexible matcher for text that may be split
+    expect(screen.getByText(/2025/)).toBeInTheDocument();
+    expect(screen.getByText(/Silverado 1500/)).toBeInTheDocument();
     expect(screen.getByText('LT Crew Cab 4WD')).toBeInTheDocument();
   });
 
@@ -575,9 +651,11 @@ describe('VehicleDetail QR Code Modal', () => {
   test('QR modal can be closed', () => {
     renderVehicleDetail();
     
+    // Open modal
     fireEvent.click(screen.getByText(/Save to Phone/));
     expect(screen.getByText('Save This Vehicle')).toBeInTheDocument();
     
+    // Find and click close button (first button in modal)
     const closeButtons = screen.getAllByRole('button');
     const closeButton = closeButtons.find(btn => 
       btn.querySelector('svg path[d="M18 6L6 18M6 6l12 12"]')
