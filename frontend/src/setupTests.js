@@ -46,6 +46,11 @@ window.matchMedia = window.matchMedia || function(query) {
   };
 };
 
+// Mock HTMLMediaElement methods (for video/audio elements in tests)
+window.HTMLMediaElement.prototype.play = jest.fn().mockResolvedValue(undefined);
+window.HTMLMediaElement.prototype.pause = jest.fn();
+window.HTMLMediaElement.prototype.load = jest.fn();
+
 // =============================================================================
 // SPEECH SYNTHESIS MOCK
 // =============================================================================
@@ -118,7 +123,9 @@ beforeAll(() => {
       (message.includes('Warning: An update to') ||
        message.includes('Warning: ReactDOM.render') ||
        message.includes('act(...)') ||
-       message.includes('Removing a style property during rerender'))
+       message.includes('Removing a style property during rerender') ||
+       message.includes('Not implemented: HTMLMediaElement.prototype.play') ||
+       message.includes('Error: API Error'))
     ) {
       return;
     }
