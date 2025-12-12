@@ -318,7 +318,7 @@ const MarketValueTrends: React.FC<MarketValueTrendsProps> = ({
               : [],
             depreciationPercent: res.depreciationPercent,
             volatility: res.volatility,
-            confidence: res.confidence ?? 'Medium',
+            confidence: (res.confidence as 'High' | 'Medium' | 'Low') ?? 'Medium',
             similar: Array.isArray(res.similar) ? res.similar : [],
           };
         }
