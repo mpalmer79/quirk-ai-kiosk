@@ -191,9 +191,9 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
 };
 
 const s: Record<string, CSSProperties> = {
-  container: { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '40px 20px', position: 'relative', overflowX: 'hidden', overflowY: 'auto', fontFamily: "'Montserrat', sans-serif", boxSizing: 'border-box' },
-  bgImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: 'url("/showroom.jpg")', backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 0 },
-  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.85) 100%)', zIndex: 1 },
+  container: { minHeight: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '40px 20px 100px 20px', position: 'relative', fontFamily: "'Montserrat', sans-serif", boxSizing: 'border-box' },
+  bgImage: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: 'url("/showroom.jpg")', backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 0 },
+  bgOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.85) 100%)', zIndex: 1 },
   nameCaptureSection: { position: 'relative', zIndex: 2, textAlign: 'center', maxWidth: '700px', width: '100%', padding: '20px 40px', transition: 'all 0.6s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' },
   titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '8px', whiteSpace: 'nowrap' },
   inlineAvatar: { width: '52px', height: '52px', borderRadius: '50%', background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 16px rgba(27,115,64,0.4)' },
