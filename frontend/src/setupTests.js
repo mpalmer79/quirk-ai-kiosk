@@ -51,6 +51,16 @@ window.HTMLMediaElement.prototype.play = jest.fn().mockResolvedValue(undefined);
 window.HTMLMediaElement.prototype.pause = jest.fn();
 window.HTMLMediaElement.prototype.load = jest.fn();
 
+// Mock navigator.mediaDevices for camera tests
+Object.defineProperty(navigator, 'mediaDevices', {
+  value: {
+    getUserMedia: jest.fn().mockRejectedValue(new Error('Camera not available in test')),
+    enumerateDevices: jest.fn().mockResolvedValue([]),
+  },
+  writable: true,
+  configurable: true,
+});
+
 // =============================================================================
 // SPEECH SYNTHESIS MOCK
 // =============================================================================
@@ -117,7 +127,7 @@ const originalError = console.error;
 beforeAll(() => {
   console.error = (...args) => {
     // Filter out React act() warnings and expected test errors
-    const message = args[0];
+    const message = typeof args[0] === 'string' ? args[0] : JSON.stringify(args[0]);
     if (
       typeof message === 'string' &&
       (message.includes('Warning: An update to') ||
@@ -125,7 +135,10 @@ beforeAll(() => {
        message.includes('act(...)') ||
        message.includes('Removing a style property during rerender') ||
        message.includes('Not implemented: HTMLMediaElement.prototype.play') ||
-       message.includes('Error: API Error'))
+       message.includes('Error: API Error') ||
+       message.includes('Camera error') ||
+       message.includes('NotAllowedError') ||
+       message.includes('NotFoundError'))
     ) {
       return;
     }
