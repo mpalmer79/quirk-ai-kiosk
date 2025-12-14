@@ -54,6 +54,10 @@ class CustomerContext:
     buying_timeline: Optional[str] = None
     previous_vehicle: Optional[str] = None
     sentiment: str = "neutral"  # positive, neutral, frustrated, confused
+    # Decision maker tracking
+    needs_spouse_approval: bool = False
+    spouse_reference: Optional[str] = None  # "wife", "husband", "partner", etc.
+    decision_maker_objection: bool = False
 
 
 @dataclass
@@ -404,6 +408,40 @@ class ConversationEntityExtractor:
             context.sentiment = 'positive'
         else:
             context.sentiment = 'neutral'
+        
+        # Decision maker / spouse detection
+        spouse_patterns = [
+            (r'(?:talk|speak|discuss|check)\s+(?:to|with)\s+(?:my\s+)?(wife|husband|spouse|partner)', 1),
+            (r'(wife|husband|spouse|partner)\s+(?:needs?|wants?|has)\s+to', 1),
+            (r'(?:need|get)\s+(?:her|his)\s+(?:input|approval|opinion|ok)', None),
+            (r'(?:she|he)\s+(?:needs?|has|wants?)\s+to\s+(?:see|approve|agree)', None),
+            (r'can\'?t\s+(?:decide|make.*decision)\s+(?:without|alone)', None),
+            (r'(?:we|both)\s+need\s+to\s+(?:discuss|talk|decide)', None),
+            (r'sleep\s+on\s+it', None),
+            (r'think\s+(?:about\s+it|it\s+over)', None),
+            (r'big\s+decision', None),
+            (r'need\s+to\s+(?:talk|discuss).*(?:wife|husband|spouse|partner|her|him)', None),
+        ]
+        
+        for pattern_tuple in spouse_patterns:
+            pattern = pattern_tuple[0]
+            group_idx = pattern_tuple[1] if len(pattern_tuple) > 1 else None
+            match = re.search(pattern, message_lower)
+            if match:
+                context.needs_spouse_approval = True
+                context.decision_maker_objection = True
+                # Try to capture the specific reference (wife, husband, etc.)
+                if group_idx is not None and match.lastindex and match.lastindex >= group_idx:
+                    context.spouse_reference = match.group(group_idx)
+                elif 'wife' in message_lower:
+                    context.spouse_reference = 'wife'
+                elif 'husband' in message_lower:
+                    context.spouse_reference = 'husband'
+                elif 'spouse' in message_lower:
+                    context.spouse_reference = 'spouse'
+                elif 'partner' in message_lower:
+                    context.spouse_reference = 'partner'
+                break
         
         return context
     
