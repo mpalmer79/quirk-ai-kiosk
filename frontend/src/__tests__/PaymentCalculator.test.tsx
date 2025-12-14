@@ -90,7 +90,7 @@ describe('PaymentCalculator Component', () => {
     test('displays default 39-month term selected', () => {
       renderPaymentCalculator();
       const button39 = screen.getByText('39 mo');
-      expect(button39).toHaveStyle({ background: '#1B7340' });
+      expect(button39).toHaveStyle({ background: '#22c55e' });
     });
 
     test('clicking different term updates selection', () => {
@@ -99,7 +99,7 @@ describe('PaymentCalculator Component', () => {
       const button24 = screen.getByText('24 mo');
       fireEvent.click(button24);
       
-      expect(button24).toHaveStyle({ background: '#1B7340' });
+      expect(button24).toHaveStyle({ background: '#22c55e' });
     });
 
     test('displays mileage options', () => {
@@ -112,7 +112,7 @@ describe('PaymentCalculator Component', () => {
     test('default mileage is 12K', () => {
       renderPaymentCalculator();
       const button12k = screen.getByText('12K');
-      expect(button12k).toHaveStyle({ background: '#1B7340' });
+      expect(button12k).toHaveStyle({ background: '#22c55e' });
     });
 
     test('displays Due at Signing', () => {
@@ -143,7 +143,7 @@ describe('PaymentCalculator Component', () => {
     test('default finance term is 72 months', () => {
       renderPaymentCalculator();
       const button72 = screen.getByText('72 mo');
-      expect(button72).toHaveStyle({ background: '#1B7340' });
+      expect(button72).toHaveStyle({ background: '#22c55e' });
     });
 
     test('displays APR slider', () => {
