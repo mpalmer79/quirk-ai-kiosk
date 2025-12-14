@@ -152,7 +152,7 @@ const styles = {
   leaseChoiceButton: {
     width: '100%',
     padding: '14px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     borderRadius: '10px',
     color: '#ffffff',
