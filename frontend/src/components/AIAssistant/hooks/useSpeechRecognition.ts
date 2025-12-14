@@ -37,8 +37,13 @@ export const useSpeechRecognition = ({ onResult, onError }: UseSpeechRecognition
     }
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
+      // Defensive cleanup - check if abort exists and is a function
+      try {
+        if (recognitionRef.current && typeof recognitionRef.current.abort === 'function') {
+          recognitionRef.current.abort();
+        }
+      } catch (e) {
+        // Ignore cleanup errors in test environment
       }
     };
   }, [onResult, onError]);
@@ -56,7 +61,11 @@ export const useSpeechRecognition = ({ onResult, onError }: UseSpeechRecognition
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Ignore errors
+      }
       setIsListening(false);
     }
   }, [isListening]);
