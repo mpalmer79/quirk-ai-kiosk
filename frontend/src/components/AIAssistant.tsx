@@ -1297,7 +1297,7 @@ const styles: Record<string, CSSProperties> = {
     borderBottomRightRadius: '4px',
   },
   assistantBubble: {
-    background: 'rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.15)',
     borderBottomLeftRadius: '4px',
   },
   aiAvatar: {
@@ -1312,7 +1312,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     color: '#ffffff',
-    border: '2px solid #0a0a0a',
+    border: '2px solid rgba(255,255,255,0.2)',
   },
   messageText: {
     fontSize: '15px',
@@ -1328,7 +1328,7 @@ const styles: Record<string, CSSProperties> = {
     marginTop: '16px',
   },
   vehicleCard: {
-    background: 'rgba(0,0,0,0.3)',
+    background: 'rgba(255,255,255,0.08)',
     border: '1px solid rgba(255,255,255,0.15)',
     borderRadius: '12px',
     padding: '16px',
@@ -1422,7 +1422,7 @@ const styles: Record<string, CSSProperties> = {
   input: {
     flex: 1,
     padding: '16px 20px',
-    background: 'rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.15)',
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '12px',
     color: '#ffffff',
@@ -1446,7 +1446,7 @@ const styles: Record<string, CSSProperties> = {
     width: '56px',
     height: '56px',
     borderRadius: '12px',
-    background: 'rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.15)',
     border: '1px solid rgba(255,255,255,0.2)',
     color: '#ffffff',
     cursor: 'pointer',
@@ -1464,7 +1464,7 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    background: 'rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.15)',
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '8px',
     padding: '12px 24px',
@@ -1559,7 +1559,7 @@ const styles: Record<string, CSSProperties> = {
     width: '100%',
     marginTop: '16px',
     padding: '12px',
-    background: 'rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.15)',
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '8px',
     color: '#ffffff',
