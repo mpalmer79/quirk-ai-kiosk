@@ -948,7 +948,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
           style={{
             ...styles.audioToggle,
             background: audioEnabled ? (ttsAvailable ? 'rgba(139, 92, 246, 0.2)' : 'rgba(74, 222, 128, 0.2)') : 'rgba(255,255,255,0.1)',
-            borderColor: audioEnabled ? (ttsAvailable ? '#8b5cf6' : '#4ade80') : 'rgba(255,255,255,0.2)',
+            borderColor: audioEnabled ? (ttsAvailable ? '#8b5cf6' : '#E8C55A') : 'rgba(255,255,255,0.2)',
           }}
           onClick={toggleAudio}
           title={ttsAvailable ? 'ElevenLabs HD Voice' : 'Browser Speech'}
@@ -1240,11 +1240,12 @@ const styles: Record<string, CSSProperties> = {
     width: '64px',
     height: '64px',
     borderRadius: '16px',
-    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+    background: 'linear-gradient(135deg, #D1AD57 0%, #B8962E 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     color: '#ffffff',
+    boxShadow: '0 8px 24px rgba(209,173,87,0.4)',
   },
   title: {
     fontSize: '24px',
@@ -1254,7 +1255,7 @@ const styles: Record<string, CSSProperties> = {
   },
   subtitle: {
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.6)',
+    color: '#D1AD57',
     margin: '4px 0 0 0',
   },
   audioToggle: {
@@ -1293,7 +1294,7 @@ const styles: Record<string, CSSProperties> = {
     position: 'relative',
   },
   userBubble: {
-    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+    background: 'linear-gradient(135deg, #D1AD57 0%, #B8962E 100%)',
     borderBottomRightRadius: '4px',
   },
   assistantBubble: {
@@ -1307,7 +1308,7 @@ const styles: Record<string, CSSProperties> = {
     width: '32px',
     height: '32px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+    background: 'linear-gradient(135deg, #D1AD57 0%, #B8962E 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1346,7 +1347,7 @@ const styles: Record<string, CSSProperties> = {
   },
   vehicleYear: {
     fontSize: '12px',
-    color: '#4ade80',
+    color: '#E8C55A',
     fontWeight: '600',
   },
   vehicleModel: {
@@ -1371,7 +1372,7 @@ const styles: Record<string, CSSProperties> = {
   vehiclePrice: {
     fontSize: '16px',
     fontWeight: '700',
-    color: '#4ade80',
+    color: '#E8C55A',
   },
   viewButton: {
     fontSize: '13px',
@@ -1386,7 +1387,7 @@ const styles: Record<string, CSSProperties> = {
   },
   dot: {
     fontSize: '12px',
-    color: '#4ade80',
+    color: '#E8C55A',
     animation: 'pulse 1s infinite',
   },
   suggestionsContainer: {
@@ -1395,8 +1396,9 @@ const styles: Record<string, CSSProperties> = {
   },
   suggestionsLabel: {
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
+    color: '#D1AD57',
     margin: '0 0 12px 0',
+    fontWeight: '600',
   },
   suggestionsGrid: {
     display: 'flex',
@@ -1404,11 +1406,11 @@ const styles: Record<string, CSSProperties> = {
     gap: '8px',
   },
   suggestionButton: {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.15)',
+    background: 'rgba(209,173,87,0.1)',
+    border: '1px solid rgba(209,173,87,0.3)',
     borderRadius: '20px',
     padding: '10px 16px',
-    color: 'rgba(255,255,255,0.8)',
+    color: '#fff',
     fontSize: '13px',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
@@ -1433,7 +1435,7 @@ const styles: Record<string, CSSProperties> = {
     width: '56px',
     height: '56px',
     borderRadius: '12px',
-    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+    background: 'linear-gradient(135deg, #D1AD57 0%, #B8962E 100%)',
     border: 'none',
     color: '#ffffff',
     cursor: 'pointer',
@@ -1441,6 +1443,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s ease',
+    boxShadow: '0 4px 16px rgba(209,173,87,0.4)',
   },
   micButton: {
     width: '56px',
@@ -1464,11 +1467,11 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    background: 'rgba(255,255,255,0.15)',
-    border: '1px solid rgba(255,255,255,0.2)',
+    background: 'rgba(209,173,87,0.1)',
+    border: '1px solid rgba(209,173,87,0.4)',
     borderRadius: '8px',
     padding: '12px 24px',
-    color: '#ffffff',
+    color: '#D1AD57',
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
@@ -1579,7 +1582,7 @@ const styles: Record<string, CSSProperties> = {
   followupLabel: {
     fontSize: '12px',
     fontWeight: '600',
-    color: '#4ade80',
+    color: '#E8C55A',
     marginBottom: '10px',
     display: 'block',
   },
@@ -1593,7 +1596,7 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid rgba(74, 222, 128, 0.3)',
     borderRadius: '8px',
     padding: '8px 12px',
-    color: '#4ade80',
+    color: '#E8C55A',
     fontSize: '12px',
     fontWeight: '500',
     cursor: 'pointer',
