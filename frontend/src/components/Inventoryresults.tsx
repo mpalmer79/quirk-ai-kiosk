@@ -125,7 +125,9 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
           params.model = customerData.selectedModel;
         }
         
-        if (customerData?.budgetRange) {
+        // Only apply budget filter if user went through model/budget selection flow
+        // NOT when browsing all inventory (path === 'browse' or no selectedModel)
+        if (customerData?.budgetRange && customerData?.selectedModel) {
           params.minPrice = customerData.budgetRange.min * 60;
           params.maxPrice = customerData.budgetRange.max * 80;
         }
