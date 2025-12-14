@@ -123,7 +123,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
 
   // Build inventory context for AI
   const buildInventoryContext = useCallback(() => {
-    const models = [...new Set(inventory.map(v => v.model))];
+    const models = Array.from(new Set(inventory.map(v => v.model)));
     const priceRange = inventory.length > 0 
       ? { min: Math.min(...inventory.map(v => v.price || 0)), max: Math.max(...inventory.map(v => v.price || 0)) }
       : { min: 0, max: 0 };
