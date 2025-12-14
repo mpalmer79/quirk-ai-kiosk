@@ -749,7 +749,7 @@ const s: Record<string, CSSProperties> = {
   // Specs Card
   specsCard: {
     padding: '24px',
-    background: 'linear-gradient(145deg, rgba(30,30,35,0.9) 0%, rgba(20,20,25,0.95) 100%)',
+    background: 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.08) 100%)',
     borderRadius: '16px',
     border: '1px solid rgba(255,255,255,0.12)',
     boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
@@ -796,7 +796,7 @@ const s: Record<string, CSSProperties> = {
   // Features Card
   featuresCard: {
     padding: '24px',
-    background: 'linear-gradient(145deg, rgba(30,30,35,0.9) 0%, rgba(20,20,25,0.95) 100%)',
+    background: 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.08) 100%)',
     borderRadius: '16px',
     border: '1px solid rgba(255,255,255,0.12)',
     boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
@@ -867,7 +867,7 @@ const s: Record<string, CSSProperties> = {
     justifyContent: 'center',
     gap: '8px',
     padding: '14px 16px',
-    background: 'rgba(255,255,255,0.05)',
+    background: 'rgba(255,255,255,0.12)',
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '10px',
     color: '#fff',
@@ -922,7 +922,7 @@ const s: Record<string, CSSProperties> = {
     maxWidth: '500px',
     width: '100%',
     padding: '40px',
-    background: 'rgba(255,255,255,0.05)',
+    background: 'rgba(255,255,255,0.12)',
     borderRadius: '24px',
     border: '1px solid rgba(255,255,255,0.1)',
     textAlign: 'center',
@@ -1067,7 +1067,7 @@ const s: Record<string, CSSProperties> = {
     justifyContent: 'center',
     gap: '8px',
     padding: '14px 24px',
-    background: 'rgba(255,255,255,0.05)',
+    background: 'rgba(255,255,255,0.12)',
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '12px',
     color: '#fff',
