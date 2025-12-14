@@ -80,3 +80,98 @@ class TestModelExtraction:
     def test_silverado(self, extractor):
         result = extractor.extract_model_mentions("I want a Silverado")
         assert "Silverado" in result
+
+
+class TestSpouseObjectionExtraction:
+    """Tests for spouse/partner decision maker objection detection"""
+    
+    def test_talk_to_wife(self, extractor):
+        result = extractor.extract_context("I need to talk to my wife first")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+        assert result.spouse_reference == "wife"
+    
+    def test_talk_to_husband(self, extractor):
+        result = extractor.extract_context("I need to discuss this with my husband")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+        assert result.spouse_reference == "husband"
+    
+    def test_talk_to_spouse(self, extractor):
+        result = extractor.extract_context("Let me talk to my spouse about it")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+        assert result.spouse_reference == "spouse"
+    
+    def test_talk_to_partner(self, extractor):
+        result = extractor.extract_context("My partner needs to see this first")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+        assert result.spouse_reference == "partner"
+    
+    def test_cant_decide_alone(self, extractor):
+        result = extractor.extract_context("I can't decide this alone")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+    
+    def test_cant_make_decision_without(self, extractor):
+        result = extractor.extract_context("I can't make this decision without her")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+    
+    def test_we_need_to_discuss(self, extractor):
+        result = extractor.extract_context("We need to discuss this first")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+    
+    def test_both_need_to_decide(self, extractor):
+        result = extractor.extract_context("We both need to decide on this")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+    
+    def test_sleep_on_it(self, extractor):
+        result = extractor.extract_context("I need to sleep on it")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+    
+    def test_think_it_over(self, extractor):
+        result = extractor.extract_context("Let me think it over")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+    
+    def test_think_about_it(self, extractor):
+        result = extractor.extract_context("I need to think about it")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+    
+    def test_big_decision(self, extractor):
+        result = extractor.extract_context("This is a big decision")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+    
+    def test_wife_needs_to_approve(self, extractor):
+        result = extractor.extract_context("My wife needs to approve this")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+        assert result.spouse_reference == "wife"
+    
+    def test_need_her_input(self, extractor):
+        result = extractor.extract_context("I need her input before deciding")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+    
+    def test_she_needs_to_see(self, extractor):
+        result = extractor.extract_context("She needs to see it first")
+        assert result.needs_spouse_approval
+        assert result.decision_maker_objection
+    
+    def test_no_spouse_objection_normal_message(self, extractor):
+        result = extractor.extract_context("I'm looking for a truck")
+        assert not result.needs_spouse_approval
+        assert not result.decision_maker_objection
+        assert result.spouse_reference is None
+    
+    def test_no_spouse_objection_ready_to_buy(self, extractor):
+        result = extractor.extract_context("I want to buy this today")
+        assert not result.needs_spouse_approval
+        assert not result.decision_maker_objection
