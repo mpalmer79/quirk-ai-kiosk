@@ -100,7 +100,7 @@ describe('GuidedQuiz Component', () => {
       const option = screen.getByText('Daily Commute').closest('button') as HTMLButtonElement;
       fireEvent.click(option);
       
-      expect(option).toHaveStyle({ borderColor: '#1B7340' });
+      expect(option).toHaveStyle({ borderColor: '#22c55e' });
     });
   });
 
