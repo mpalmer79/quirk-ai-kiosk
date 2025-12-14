@@ -1,859 +1,1078 @@
-import React, { useState, useEffect, ChangeEvent, CSSProperties, MouseEvent } from 'react';
-import api from './api';
+import React, { useState, CSSProperties } from 'react';
+import { logTrafficSession } from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
+import { getVehicleImageUrl, getColorCategory, getColorGradient } from '../utils/vehicleHelpers';
+import QRCodeModal from './QRCodeModal';
 
-type SortOption = 'recommended' | 'priceLow' | 'priceHigh' | 'newest';
+interface DetailedVehicle extends Vehicle {
+  transmission?: string;
+  fuelEconomy?: string;
+  savings?: number;
+  monthlyLease?: number;
+  monthlyFinance?: number;
+  mileage?: number;
+  gradient?: string;
+  rebates?: Array<{ name: string; amount: number }>;
+}
 
-// Generate gradient based on color
-const getGradient = (color?: string): string => {
-  const colorMap: Record<string, string> = {
-    'white': 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
-    'black': 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
-    'red': 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-    'blue': 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-    'silver': 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
-    'gray': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-    'beige': 'linear-gradient(135deg, #d4b896 0%, #a78b6c 100%)',
-    'cypress': 'linear-gradient(135deg, #4a5568 0%, #2d3748 100%)',
-    'polar': 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)',
+// Default rebates for Chevrolet vehicles
+const DEFAULT_REBATES = [
+  { name: 'Customer Cash', amount: 3000 },
+  { name: 'Bonus Cash', amount: 1000 },
+];
+
+// Conditional offers that may apply
+const CONDITIONAL_OFFERS = [
+  { name: 'Select Market Chevy Loyalty Cash', amount: 2500 },
+  { name: 'Trade Assistance', amount: 1250 },
+  { name: 'GM First Responder Offer', amount: 500 },
+  { name: 'GM Military Offer', amount: 500 },
+  { name: 'Costco Executive Member Incentive', amount: 1250 },
+  { name: 'Costco Gold Star and Business Member Incentive', amount: 1000 },
+];
+
+// Decode VIN for Silverado trucks
+const decodeGMTruckVIN = (vin: string, model: string): { cabType: string; driveType: string } | null => {
+  if (!vin || vin.length !== 17) return null;
+  if (!(model || '').toLowerCase().includes('silverado')) return null;
+  const v = vin.toUpperCase();
+  let cabType = '', driveType = '';
+  switch (v[5]) {
+    case 'A': case 'B': cabType = 'Regular Cab'; break;
+    case 'C': case 'D': cabType = 'Double Cab'; break;
+    case 'K': case 'U': case 'G': cabType = 'Crew Cab'; break;
+  }
+  switch (v[6]) {
+    case 'E': case 'K': case 'G': case 'J': driveType = '4WD'; break;
+    case 'A': case 'D': case 'C': case 'B': driveType = '2WD'; break;
+  }
+  return (cabType || driveType) ? { cabType, driveType } : null;
+};
+
+// Get color hex for swatch
+const getColorHex = (colorDesc: string): string => {
+  const category = getColorCategory(colorDesc);
+  const colorHexMap: Record<string, string> = {
+    'black': '#1a1a1a',
+    'white': '#f5f5f5',
+    'red': '#c41e3a',
+    'blue': '#1e40af',
+    'gray': '#6b7280',
+    'silver': '#c0c0c0',
+    'green': '#15803d',
+    'orange': '#ea580c',
+    'yellow': '#eab308',
+    'brown': '#78350f',
   };
-  const lowerColor = (color || '').toLowerCase();
-  return Object.entries(colorMap).find(([key]) => lowerColor.includes(key))?.[1] 
-    || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
+  return colorHexMap[category] || '#6b7280';
 };
 
-// Format price without decimals
-const formatPrice = (price?: number): string => {
-  return Math.round(price || 0).toLocaleString();
+// Get gradient background for image placeholder (uses imported getColorGradient)
+const getGradient = (color?: string): string => getColorGradient(color);
+
+// Format currency
+const formatCurrency = (amount: number | null | undefined): string => {
+  if (amount == null) return '$0';
+  return `$${Math.round(amount).toLocaleString()}`;
 };
 
-// Map color descriptions to base color categories
-// Handles truncated color names (e.g., "Blu" → "blue", "Whi" → "white")
-const getColorCategory = (colorDesc: string): string => {
-  const c = colorDesc.toLowerCase().trim();
-  
-  // If empty or too short, return empty
-  if (c.length < 2) return '';
-  
-  // Define color mappings with keywords and partial matches
-  const colorMappings: Array<{ category: string; keywords: string[] }> = [
-    { category: 'black', keywords: ['black', 'blac', 'bla', 'mosaic', 'onyx', 'ebony'] },
-    { category: 'white', keywords: ['white', 'whit', 'whi', 'summit', 'arctic', 'polar', 'iridescent', 'pearl'] },
-    { category: 'red', keywords: ['red', 'cherry', 'cajun', 'radiant', 'garnet', 'crimson'] },
-    { category: 'blue', keywords: ['blue', 'blu', 'northsky', 'glacier', 'reef', 'midnight', 'navy'] },
-    { category: 'gray', keywords: ['gray', 'grey', 'gra', 'shadow', 'sterling', 'satin steel', 'graphite'] },
-    { category: 'silver', keywords: ['silver', 'silve', 'silv', 'sil'] },
-    { category: 'green', keywords: ['green', 'gree', 'gre', 'woodland', 'evergreen', 'forest'] },
-    { category: 'orange', keywords: ['orange', 'orang', 'oran', 'ora', 'tangier', 'cayenne'] },
-    { category: 'yellow', keywords: ['yellow', 'yello', 'yell', 'yel', 'accelerate', 'nitro'] },
-    { category: 'brown', keywords: ['brown', 'brow', 'bro', 'harvest', 'auburn', 'bronze'] },
-  ];
-  
-  // Check each color mapping
-  for (const mapping of colorMappings) {
-    for (const keyword of mapping.keywords) {
-      // Check if color contains keyword OR keyword starts with color (for truncated names)
-      if (c.includes(keyword) || (keyword.startsWith(c) && c.length >= 2)) {
-        return mapping.category;
-      }
-    }
-  }
-  
-  return '';
-};
+const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
+  const [vehicleRequested, setVehicleRequested] = useState(false);
+  const [requestSending, setRequestSending] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [imageError, setImageError] = useState(false);
+  const [showConditionalOffers, setShowConditionalOffers] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
 
-// Get vehicle image URL based on model and color rules
-// PRIORITIZE local images over API URLs (API URLs often fail)
-const getVehicleImageUrl = (vehicle: Vehicle): string | null => {
-  const fullModel = (vehicle.model || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const baseModel = fullModel.replace(/-ev$/, '').replace(/-hd$/, '').replace(/\d+$/, '');
-  const exteriorColor = (vehicle.exteriorColor || vehicle.exterior_color || '').toLowerCase();
-  const colorCategory = getColorCategory(exteriorColor);
-  const modelForImage = baseModel || fullModel;
-  
-  // Try local image first (most reliable)
-  if (modelForImage && colorCategory) {
-    return `/images/vehicles/${modelForImage}-${colorCategory}.jpg`;
-  }
-  if (modelForImage) {
-    return `/images/vehicles/${modelForImage}.jpg`;
-  }
-  
-  // Fall back to API URLs only if no local path can be generated
-  if (vehicle.imageUrl) return vehicle.imageUrl;
-  if (vehicle.image_url) return vehicle.image_url;
-  if (vehicle.images && vehicle.images.length > 0) return vehicle.images[0];
-  
-  return null;
-};
-
-const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>((customerData?.sortBy as SortOption) || 'recommended');
-  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-
-  // Handle image load error - mark image as failed so placeholder shows
-  const handleImageError = (vehicleId: string) => {
-    setFailedImages(prev => new Set(prev).add(vehicleId));
-  };
-
-  // Handle vehicle card click - navigate to VehicleDetail page
-  const handleVehicleClick = (vehicle: Vehicle): void => {
-    const enrichedVehicle = {
-      ...vehicle,
-      gradient: getGradient(vehicle.exteriorColor || vehicle.exterior_color),
-      rebates: [
-        { name: 'Customer Cash', amount: 3000 },
-        { name: 'Bonus Cash', amount: 1000 },
-      ],
-    };
-    updateCustomerData({ selectedVehicle: enrichedVehicle });
-    navigateTo('vehicleDetail');
+  // Get vehicle from customerData or use placeholder
+  const vehicle: DetailedVehicle = customerData?.selectedVehicle || {
+    stockNumber: 'M39816',
+    vin: '1GCRKWEK8TZ247247',
+    year: 2026,
+    make: 'Chevrolet',
+    model: 'Silverado 1500',
+    trim: 'RST 4WD',
+    exteriorColor: 'Sterling Gray Metallic',
+    interiorColor: 'Jet Black',
+    msrp: 51605,
+    salePrice: 47605,
+    status: 'In Transit',
+    features: ['Remote Start', 'Apple CarPlay', 'Backup Camera', 'Android Auto'],
+    rebates: DEFAULT_REBATES,
   };
 
-  useEffect(() => {
-    const fetchVehicles = async (): Promise<void> => {
-      setLoading(true);
-      setError(null);
+  const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
+  const vin = vehicle.vin || '';
+  const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
+  const msrp = vehicle.msrp || 0;
+  const rebates = vehicle.rebates || DEFAULT_REBATES;
+  const totalRebates = rebates.reduce((sum, r) => sum + r.amount, 0);
+  const quirkPrice = msrp - totalRebates;
+  const status = vehicle.status || 'In Stock';
+  
+  // Decode VIN for additional info
+  const vinInfo = decodeGMTruckVIN(vin, vehicle.model || '');
+  
+  // Build title
+  const title = `NEW ${vehicle.year} Chevrolet ${vehicle.model} ${vehicle.trim || ''}`.trim();
+  
+  // Get image URL
+  const imageUrl = getVehicleImageUrl(vehicle);
+  const gradient = getGradient(exteriorColor);
+
+  // Handle "Let's See It" button click
+  const handleLetsSeeIt = async () => {
+    setRequestSending(true);
+    
+    try {
+      // Log the vehicle request to traffic session
+      await logTrafficSession({
+        currentStep: 'vehicleRequest',
+        vehicleRequested: true,
+        vehicle: {
+          stockNumber: stockNumber,
+          year: vehicle.year,
+          make: vehicle.make,
+          model: vehicle.model,
+          trim: vehicle.trim,
+          msrp: msrp,
+          salePrice: quirkPrice,
+        },
+        actions: ['lets_see_it_clicked'],
+      });
       
-      try {
-        const params: Record<string, string | number> = {};
-        
-        if (customerData?.selectedModel) {
-          params.model = customerData.selectedModel;
-        }
-        
-        if (customerData?.budgetRange) {
-          params.minPrice = customerData.budgetRange.min * 60;
-          params.maxPrice = customerData.budgetRange.max * 80;
-        }
-        
-        if (customerData?.selectedCab) {
-          params.cabType = customerData.selectedCab;
-        }
-        
-        if (customerData?.preferences?.bodyStyle) {
-          params.bodyType = customerData.preferences.bodyStyle;
-        }
-        
-        // Add bodyStyleFilter to API params if set
-        if (customerData?.bodyStyleFilter) {
-          params.body_style = customerData.bodyStyleFilter;
-        }
-        
-        const data = await api.getInventory(params);
-        
-        let vehicleList: Vehicle[] = Array.isArray(data) ? data : (data as { vehicles?: Vehicle[] })?.vehicles || [];
-        
-        // CLIENT-SIDE EXACT MODEL FILTERING
-        if (customerData?.selectedModel) {
-          const targetModel = customerData.selectedModel.toLowerCase().trim();
-          
-          vehicleList = vehicleList.filter((vehicle: Vehicle) => {
-            const rawModel = vehicle.model || '';
-            const vehicleModel = rawModel.toLowerCase().trim();
-            
-            if (vehicleModel === targetModel) return true;
-            if (vehicleModel.startsWith(targetModel + ' ')) return true;
-            if (vehicleModel.startsWith(targetModel)) {
-              const nextChar = vehicleModel.charAt(targetModel.length);
-              return !nextChar || nextChar === ' ' || !/\d/.test(nextChar);
-            }
-            return false;
-          });
-        }
-        
-        // CLIENT-SIDE BODY STYLE FILTERING (SUV vs Truck)
-        if (customerData?.bodyStyleFilter) {
-          const targetBodyStyle = customerData.bodyStyleFilter.toLowerCase();
-          
-          vehicleList = vehicleList.filter((vehicle: Vehicle) => {
-            const bodyStyle = (vehicle.bodyStyle || vehicle.body_style || '').toLowerCase();
-            const model = (vehicle.model || '').toLowerCase();
-            
-            if (targetBodyStyle === 'truck') {
-              // Trucks: Silverado, Colorado - NEVER Traverse, Tahoe, etc.
-              if (model.includes('silverado') || model.includes('colorado')) {
-                return true;
-              }
-              // Also check bodyStyle field
-              if (bodyStyle === 'truck') {
-                return true;
-              }
-              return false;
-            }
-            
-            if (targetBodyStyle === 'suv') {
-              // SUVs: Traverse, Tahoe, Suburban, Equinox, Trailblazer, Trax, Blazer
-              // NEVER Silverado or Colorado
-              if (model.includes('silverado') || model.includes('colorado')) {
-                return false;
-              }
-              const suvModels = ['traverse', 'tahoe', 'suburban', 'equinox', 'trailblazer', 'trax', 'blazer'];
-              if (suvModels.some(suv => model.includes(suv))) {
-                return true;
-              }
-              // Also check bodyStyle field
-              if (bodyStyle === 'suv') {
-                return true;
-              }
-              return false;
-            }
-            
-            // For other body styles, match directly
-            return bodyStyle === targetBodyStyle;
-          });
-        }
-        
-        // Filter by cab type if specified
-        if (customerData?.selectedCab) {
-          const targetCab = customerData.selectedCab.toLowerCase();
-          vehicleList = vehicleList.filter((vehicle: Vehicle) => {
-            const cab = (
-              (vehicle as Record<string, unknown>).cabStyle ||
-              vehicle.cabType || 
-              vehicle.bodyStyle || 
-              vehicle.body_style || 
-              (vehicle as Record<string, unknown>).body ||
-              (vehicle as Record<string, unknown>).Body ||
-              ''
-            ).toString().toLowerCase(); 
-            
-            const cabMappings: Record<string, string[]> = {
-              'regular': ['regular', 'reg'],
-              'double': ['double', 'dbl'],
-              'crew': ['crew'],
-              'extended': ['extended', 'ext'],
-            };
-            
-            const cabKeyword = targetCab.split(' ')[0];
-            const keywords = cabMappings[cabKeyword] || [cabKeyword];
-            
-            return keywords.some(kw => cab.includes(kw));
-          });
-        }
-        
-        // Sort by color preferences if provided
-        if (customerData?.colorPreferences && customerData.colorPreferences.length > 0) {
-          const colorPrefs = customerData.colorPreferences.map((c: string) => c.toLowerCase());
-          vehicleList = vehicleList.sort((a: Vehicle, b: Vehicle) => {
-            const aColor = (a.exteriorColor || a.exterior_color || '').toLowerCase();
-            const bColor = (b.exteriorColor || b.exterior_color || '').toLowerCase();
-            
-            const getMatchIndex = (color: string): number => {
-              for (let i = 0; i < colorPrefs.length; i++) {
-                const keyword = colorPrefs[i].split(' ')[0];
-                if (color.includes(keyword)) return i;
-              }
-              return 999;
-            };
-            
-            return getMatchIndex(aColor) - getMatchIndex(bColor);
-          });
-        }
-        
-        setVehicles(vehicleList);
-      } catch {
-        setError('Unable to load inventory. Please try again.');
-        setVehicles([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchVehicles();
-  }, [customerData]);
-
-  // Apply additional client-side filtering as a safety net
-  const filteredVehicles = vehicles.filter((vehicle: Vehicle) => {
-    if (!customerData?.selectedModel) return true;
-    
-    const targetModel = customerData.selectedModel.toLowerCase().trim();
-    const vehicleModel = (vehicle.model || '').toLowerCase().trim();
-    
-    return vehicleModel === targetModel || 
-           vehicleModel.startsWith(targetModel + ' ') ||
-           (vehicleModel.startsWith(targetModel) && !/\d/.test(vehicleModel.charAt(targetModel.length)));
-  });
-
-  const sortedVehicles = [...filteredVehicles].sort((a: Vehicle, b: Vehicle) => {
-    switch (sortBy) {
-      case 'priceLow': return (a.price || 0) - (b.price || 0);
-      case 'priceHigh': return (b.price || 0) - (a.price || 0);
-      case 'newest': return (b.year || 0) - (a.year || 0);
-      default: return ((b as Vehicle & { matchScore?: number }).matchScore || 50) - ((a as Vehicle & { matchScore?: number }).matchScore || 50);
+      // Update customer data
+      updateCustomerData({
+        vehicleRequested: {
+          stockNumber,
+          requestedAt: new Date().toISOString(),
+        },
+      });
+      
+      setVehicleRequested(true);
+    } catch (err) {
+      console.error('Error sending vehicle request:', err);
+      // Still show success - the request will be logged when connection resumes
+      setVehicleRequested(true);
+    } finally {
+      setRequestSending(false);
     }
-  });
-
-  // Get the appropriate title based on path and filters
-  const getTitle = (): string => {
-    // Check for body style filter first
-    if (customerData?.bodyStyleFilter) {
-      if (customerData.bodyStyleFilter === 'SUV') return 'SUVs';
-      if (customerData.bodyStyleFilter === 'Truck') return 'Trucks';
-      return `${customerData.bodyStyleFilter} Inventory`;
-    }
-    if (customerData?.path === 'browse') return 'All Inventory';
-    if (customerData?.quizAnswers && Object.keys(customerData.quizAnswers).length > 0) {
-      return 'Recommended For You';
-    }
-    if (customerData?.selectedModel) return `${customerData.selectedModel} Inventory`;
-    return 'All Inventory';
   };
 
-  // Get subtitle based on filter
-  const getSubtitle = (): string => {
-    if (customerData?.bodyStyleFilter) {
-      return `Showing all ${customerData.bodyStyleFilter.toLowerCase()}s in stock`;
-    }
-    if (customerData?.path === 'browse') {
-      return 'Browse our complete inventory';
-    }
-    return 'Sorted by best match based on your preferences';
+  // Handle back button
+  const handleBack = () => {
+    navigateTo('inventory');
   };
 
-  const handleSortChange = (e: ChangeEvent<HTMLSelectElement>): void => {
-    setSortBy(e.target.value as SortOption);
-  };
-
-  if (loading) {
+  // Success confirmation screen
+  if (vehicleRequested) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.loadingSpinner} />
-        <p style={styles.loadingText}>Loading inventory...</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={styles.errorContainer}>
-        <div style={styles.errorIcon}>⚠️</div>
-        <p style={styles.errorText}>{error}</p>
-        <button style={styles.retryButton} onClick={() => window.location.reload()}>
-          Try Again
-        </button>
+      <div style={s.container}>
+        <div style={s.successOverlay}>
+          <div style={s.successCard}>
+            <div style={s.successIcon}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </div>
+            <h1 style={s.successTitle}>We're On It!</h1>
+            <p style={s.successSubtitle}>
+              A team member has been notified and will bring this vehicle to the front for you to see.
+            </p>
+            <div style={s.successVehicleCard}>
+              <div style={{ ...s.successVehicleThumb, background: gradient }}>
+                <span style={s.successVehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
+              </div>
+              <div style={s.successVehicleInfo}>
+                <span style={s.successVehicleName}>{vehicle.year} {vehicle.model}</span>
+                <span style={s.successVehicleTrim}>{vehicle.trim}</span>
+                <span style={s.successVehicleStock}>Stock# {stockNumber}</span>
+              </div>
+            </div>
+            <div style={s.expectSection}>
+              <h4 style={s.expectTitle}>What to Expect:</h4>
+              <div style={s.expectSteps}>
+                <div style={s.expectStep}>
+                  <span style={s.stepNumber}>1</span>
+                  <span style={s.stepText}>A sales consultant will locate the vehicle</span>
+                </div>
+                <div style={s.expectStep}>
+                  <span style={s.stepNumber}>2</span>
+                  <span style={s.stepText}>They'll bring it to the front entrance</span>
+                </div>
+                <div style={s.expectStep}>
+                  <span style={s.stepNumber}>3</span>
+                  <span style={s.stepText}>You'll be able to see it up close and ask questions</span>
+                </div>
+              </div>
+            </div>
+            <div style={s.estimatedTime}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+              <span>Estimated wait: 3-5 minutes</span>
+            </div>
+            <div style={s.successActions}>
+              <button style={s.secondaryBtn} onClick={() => navigateTo('inventory')}>
+                Browse More Vehicles
+              </button>
+              <button style={s.tertiaryBtn} onClick={() => navigateTo('aiAssistant')}>
+                Chat with AI Assistant
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          <h1 style={styles.title}>
-            {getTitle()}
-            <span style={styles.matchCount}> ({filteredVehicles.length})</span>
-          </h1>
-          <p style={styles.subtitle}>{getSubtitle()}</p>
+    <div style={s.container}>
+      {/* Header Bar */}
+      <div style={s.headerBar}>
+        <div style={s.headerLeft}>
+          <h1 style={s.vehicleTitle}>{title}</h1>
+          <div style={s.headerMeta}>
+            <span style={s.vinText}>VIN: {vin}</span>
+            <span style={s.stockText}>STOCK: {stockNumber}</span>
+          </div>
         </div>
-
-        <div style={styles.headerRight}>
-          <button
-            style={styles.compareButton}
-            onClick={() => navigateTo('vehicleComparison')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 9V4.5M9 9H4.5M9 9L3.5 3.5M15 9V4.5M15 9h4.5M15 9l5.5-5.5M9 15v4.5M9 15H4.5M9 15l-5.5 5.5M15 15h4.5M15 15v4.5m0-4.5l5.5 5.5"/>
+        <div style={s.headerRight}>
+          <button style={s.backBtn} onClick={handleBack}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
-            Compare
+            Back to Inventory
           </button>
-          <select 
-            style={styles.sortSelect}
-            value={sortBy}
-            onChange={handleSortChange}
-          >
-            <option value="recommended">Best Match</option>
-            <option value="priceLow">Price: Low to High</option>
-            <option value="priceHigh">Price: High to Low</option>
-            <option value="newest">Newest First</option>
-          </select>
         </div>
       </div>
 
-      {/* Vehicle Grid */}
-      {sortedVehicles.length > 0 ? (
-        <div style={styles.vehicleGrid}>
-          {sortedVehicles.map((vehicle, index) => {
-            const vehicleWithScore = vehicle as Vehicle & { matchScore?: number };
-            const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
-            const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
-            const vehicleId = String(vehicle.id || stockNumber || index);
-            const imageUrl = getVehicleImageUrl(vehicle);
-            const showImage = imageUrl && !failedImages.has(vehicleId);
-            
-            return (
-              <div 
-                key={vehicleId}
-                style={styles.vehicleCard}
-                onClick={() => handleVehicleClick(vehicle)}
-                title="View on QuirkChevyNH.com"
+      {/* Main Content */}
+      <div style={s.mainContent}>
+        {/* Left Column - Images */}
+        <div style={s.leftColumn}>
+          {/* Main Image */}
+          <div style={{ ...s.mainImageContainer, background: gradient }}>
+            {imageUrl && !imageError ? (
+              <img
+                src={imageUrl}
+                alt={title}
+                style={s.mainImage}
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <span style={s.imagePlaceholder}>{(vehicle.model || 'V').charAt(0)}</span>
+            )}
+          </div>
+          
+          {/* Thumbnail Strip */}
+          <div style={s.thumbnailStrip}>
+            {[0, 1, 2, 3].map((idx) => (
+              <div
+                key={idx}
+                style={{
+                  ...s.thumbnail,
+                  background: gradient,
+                  borderColor: selectedImageIndex === idx ? '#1B7340' : 'rgba(255,255,255,0.1)',
+                }}
+                onClick={() => setSelectedImageIndex(idx)}
               >
-                {/* Match Score - only show if from quiz */}
-                {vehicleWithScore.matchScore && customerData?.quizAnswers && (
-                  <div style={styles.matchBadge}>
-                    <span style={styles.matchScore}>{vehicleWithScore.matchScore}%</span>
-                    <span style={styles.matchLabel}>Match</span>
-                  </div>
-                )}
+                <span style={s.thumbnailPlaceholder}>{(vehicle.model || 'V').charAt(0)}</span>
+              </div>
+            ))}
+          </div>
 
-                {/* Vehicle Image */}
-                <div style={{ 
-                  ...styles.vehicleImage, 
-                  background: showImage ? '#1a1a1a' : getGradient(exteriorColor) 
-                }}>
-                  {showImage ? (
-                    <img 
-                      src={imageUrl}
-                      alt={`${vehicle.year} ${vehicle.make || 'Chevrolet'} ${vehicle.model}`}
-                      style={styles.vehicleImg}
-                      onError={() => handleImageError(vehicleId)}
-                    />
-                  ) : (
-                    <span style={styles.vehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
-                  )}
-                  <div style={styles.statusBadge}>
-                    <span style={{
-                      ...styles.statusDot,
-                      background: vehicle.status === 'In Stock' ? '#4ade80' : '#fbbf24',
-                    }} />
-                    {vehicle.status || 'In Stock'}
-                  </div>
-                </div>
+          {/* Photo Count Badge */}
+          <div style={s.photoCountBadge}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
+            <span>(4) Photos</span>
+          </div>
 
-                {/* Vehicle Info */}
-                <div style={styles.vehicleInfo}>
-                  <div style={styles.vehicleHeader}>
-                    <div>
-                      <h3 style={styles.vehicleName}>{vehicle.year} {vehicle.model}</h3>
-                      <p style={styles.vehicleTrim}>{vehicle.trim}</p>
+          {/* Status Badge */}
+          <div style={s.statusBadge}>
+            <span style={{ ...s.statusDot, background: status === 'In Stock' ? '#4ade80' : '#f59e0b' }} />
+            {status}
+          </div>
+        </div>
+
+        {/* Right Column - Pricing */}
+        <div style={s.rightColumn}>
+          {/* Pricing Card */}
+          <div style={s.pricingCard}>
+            {/* Base MSRP */}
+            <div style={s.priceRow}>
+              <span style={s.priceLabel}>MSRP</span>
+              <span style={s.priceValue}>{formatCurrency(msrp)}</span>
+            </div>
+
+            {/* Rebates */}
+            {rebates.map((rebate, idx) => (
+              <div key={idx} style={s.rebateRow}>
+                <span style={s.rebateName}>{rebate.name}</span>
+                <span style={s.rebateAmount}>-{formatCurrency(rebate.amount)}</span>
+              </div>
+            ))}
+
+            {/* Quirk Price */}
+            <div style={s.divider} />
+            <div style={s.quirkPriceRow}>
+              <span style={s.quirkPriceLabel}>Quirk Price</span>
+              <span style={s.quirkPriceValue}>{formatCurrency(quirkPrice)}</span>
+            </div>
+
+            {/* Conditional Offers */}
+            <div style={s.conditionalSection}>
+              <button
+                style={s.conditionalToggle}
+                onClick={() => setShowConditionalOffers(!showConditionalOffers)}
+              >
+                <span>Conditional Offers</span>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  style={{ transform: showConditionalOffers ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              
+              {showConditionalOffers && (
+                <div style={s.conditionalList}>
+                  {CONDITIONAL_OFFERS.map((offer, idx) => (
+                    <div key={idx} style={s.conditionalRow}>
+                      <span style={s.conditionalName}>{offer.name}</span>
+                      <span style={s.conditionalAmount}>-{formatCurrency(offer.amount)}</span>
                     </div>
-                    <span style={styles.stockNumber}>STK# {stockNumber}</span>
-                  </div>
-
-                  <div style={styles.vehicleColor}>
-                    <div style={{ ...styles.colorSwatch, background: getGradient(exteriorColor) }} />
-                    {exteriorColor}
-                  </div>
-
-                  {/* Features */}
-                  {vehicle.features && vehicle.features.length > 0 && (
-                    <div style={styles.featureTags}>
-                      {vehicle.features.slice(0, 3).map((feature, idx) => (
-                        <span key={idx} style={styles.featureTag}>{feature}</span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Pricing */}
-                  <div style={styles.pricingSection}>
-                    <div style={styles.priceColumn}>
-                      <span style={styles.priceLabel}>MSRP</span>
-                      <span style={styles.msrpValue}>${formatPrice(vehicle.msrp || vehicle.price)}</span>
-                    </div>
-                    <div style={styles.paymentColumn}>
-                      <span style={styles.priceLabel}>Your Price</span>
-                      <span style={styles.paymentValue}>
-                        ${formatPrice(vehicle.price)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button 
-                    style={styles.viewDetailsButton}
-                    onClick={(e: MouseEvent<HTMLButtonElement>) => {
-                      e.stopPropagation();
-                      handleVehicleClick(vehicle);
-                    }}
-                  >
-                    View Details
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+                  ))}
+                  <button style={s.detailsLink}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 16v-4M12 8h.01" />
                     </svg>
+                    Details
                   </button>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div style={styles.noResults}>
-          <div style={styles.noResultsIcon}>🔍</div>
-          <h3 style={styles.noResultsTitle}>No vehicles match your criteria</h3>
-          <p style={styles.noResultsText}>Try adjusting your filters or preferences</p>
-        </div>
-      )}
+              )}
+            </div>
+          </div>
 
-      {/* Refine Search */}
-      <div style={styles.refineSection}>
-        <p style={styles.refineText}>Not seeing what you're looking for?</p>
-        <button style={styles.refineButton} onClick={() => navigateTo('welcome')}>
-          Start Over
-        </button>
+          {/* Vehicle Quick Specs */}
+          <div style={s.specsCard}>
+            <h3 style={s.specsTitle}>Basic Info</h3>
+            <div style={s.specsGrid}>
+              <div style={s.specItem}>
+                <span style={s.specLabel}>Exterior</span>
+                <div style={s.specValueWithSwatch}>
+                  <span style={{ ...s.colorSwatch, background: getColorHex(exteriorColor) }} />
+                  <span style={s.specValue}>{exteriorColor || '—'}</span>
+                </div>
+              </div>
+              <div style={s.specItem}>
+                <span style={s.specLabel}>Interior</span>
+                <span style={s.specValue}>{vehicle.interiorColor || vehicle.interior_color || '—'}</span>
+              </div>
+              <div style={s.specItem}>
+                <span style={s.specLabel}>Engine</span>
+                <span style={s.specValue}>{vehicle.engine || '5.3L EcoTec3 V8'}</span>
+              </div>
+              <div style={s.specItem}>
+                <span style={s.specLabel}>Drivetrain</span>
+                <span style={s.specValue}>{vinInfo?.driveType || vehicle.drivetrain || '4WD'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Key Features */}
+          {vehicle.features && vehicle.features.length > 0 && (
+            <div style={s.featuresCard}>
+              <h3 style={s.featuresTitle}>Key Features</h3>
+              <div style={s.featuresTags}>
+                {vehicle.features.slice(0, 6).map((feature, idx) => (
+                  <span key={idx} style={s.featureTag}>{feature}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LET'S SEE IT Button */}
+          <button
+            style={s.letsSeeItBtn}
+            onClick={handleLetsSeeIt}
+            disabled={requestSending}
+          >
+            {requestSending ? (
+              <>
+                <div style={s.spinner} />
+                Notifying Team...
+              </>
+            ) : (
+              <>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                Let's See It!
+              </>
+            )}
+          </button>
+          <p style={s.letsSeeItHint}>
+            Tap to have this vehicle brought to the showroom entrance
+          </p>
+
+          {/* Secondary Actions */}
+          <div style={s.secondaryActions}>
+            <button style={s.actionBtn} onClick={() => navigateTo('paymentCalculator')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <path d="M2 10h20" />
+              </svg>
+              Calculate Payment
+            </button>
+            <button style={s.actionBtn} onClick={() => navigateTo('tradeIn')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+              Value My Trade
+            </button>
+          </div>
+          
+          {/* QR Code Button */}
+          <button style={s.qrCodeBtn} onClick={() => setShowQRModal(true)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+            </svg>
+            Save to Phone (QR Code)
+          </button>
+          
+          {/* Virtual Test Drive Button */}
+          <button style={s.virtualTestDriveBtn} onClick={() => navigateTo('virtualTestDrive')}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <polygon points="10,8 16,12 10,16" fill="currentColor" />
+            </svg>
+            Virtual Experience & Videos
+          </button>
+        </div>
       </div>
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        vehicle={vehicle}
+        isOpen={showQRModal}
+        onClose={() => setShowQRModal(false)}
+      />
     </div>
   );
 };
 
-const styles: Record<string, CSSProperties> = {
+// Styles
+const s: Record<string, CSSProperties> = {
   container: {
     minHeight: '100vh',
-    maxHeight: '100vh',
-    padding: '32px 40px',
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    boxSizing: 'border-box',
+    background: '#0a0a0a',
+    color: '#fff',
   },
-  loadingContainer: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '24px',
-  },
-  loadingSpinner: {
-    width: '48px',
-    height: '48px',
-    border: '4px solid rgba(255,255,255,0.1)',
-    borderTopColor: '#1B7340',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-  },
-  loadingText: {
-    fontSize: '18px',
-    color: 'rgba(255,255,255,0.6)',
-  },
-  errorContainer: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '16px',
-  },
-  errorIcon: {
-    fontSize: '48px',
-  },
-  errorText: {
-    fontSize: '18px',
-    color: 'rgba(255,255,255,0.6)',
-  },
-  retryButton: {
-    padding: '12px 24px',
-    background: '#1B7340',
-    border: 'none',
-    borderRadius: '8px',
-    color: '#ffffff',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  header: {
+  
+  // Header Bar
+  headerBar: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: '32px',
-    flexWrap: 'wrap',
-    gap: '16px',
+    padding: '20px 40px',
+    background: '#1a1a1a',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
   },
-  headerLeft: {},
+  headerLeft: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  vehicleTitle: {
+    fontSize: '24px',
+    fontWeight: 700,
+    color: '#fff',
+    margin: 0,
+  },
+  headerMeta: {
+    display: 'flex',
+    gap: '24px',
+  },
+  vinText: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+    fontFamily: 'monospace',
+  },
+  stockText: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+  },
   headerRight: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
   },
-  title: {
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#ffffff',
-    margin: '0 0 4px 0',
-  },
-  matchCount: {
-    color: '#4ade80',
-    fontWeight: '500',
-  },
-  subtitle: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
-    margin: 0,
-  },
-  sortSelect: {
-    padding: '12px 18px',
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: '12px',
-    color: '#ffffff',
-    fontSize: '14px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  compareButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '12px 20px',
-    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.15) 100%)',
-    border: '1px solid rgba(34, 197, 94, 0.4)',
-    borderRadius: '12px',
-    color: '#4ade80',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.25s ease',
-    boxShadow: '0 2px 12px rgba(34, 197, 94, 0.15)',
-  },
-  vehicleGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-    gap: '24px',
-    marginBottom: '40px',
-  },
-  vehicleCard: {
-    background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)',
-    borderRadius: '20px',
-    border: '1px solid rgba(255,255,255,0.12)',
-    overflow: 'hidden',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-    position: 'relative',
-  },
-  matchBadge: {
-    position: 'absolute',
-    top: '14px',
-    left: '14px',
-    zIndex: 10,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '10px 14px',
-    background: 'linear-gradient(145deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.7) 100%)',
-    borderRadius: '14px',
-    backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(74, 222, 128, 0.3)',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-  },
-  matchScore: {
-    fontSize: '20px',
-    fontWeight: '700',
-    background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text',
-  },
-  matchLabel: {
-    fontSize: '10px',
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.7)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  },
-  vehicleImage: {
-    height: '180px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-    background: 'linear-gradient(135deg, rgba(40,40,50,1) 0%, rgba(25,25,35,1) 100%)',
-  },
-  vehicleImg: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    transition: 'transform 0.4s ease',
-  },
-  vehicleInitial: {
-    fontSize: '72px',
-    fontWeight: '800',
-    background: 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text',
-    textShadow: '0 4px 20px rgba(0,0,0,0.3)',
-  },
-  statusBadge: {
-    position: 'absolute',
-    bottom: '14px',
-    right: '14px',
+  backBtn: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '8px 14px',
-    background: 'rgba(0,0,0,0.75)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: '24px',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#ffffff',
-    border: '1px solid rgba(255,255,255,0.1)',
-  },
-  statusDot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-    boxShadow: '0 0 8px currentColor',
-  },
-  vehicleInfo: {
-    padding: '22px',
-  },
-  vehicleHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '14px',
-  },
-  vehicleName: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: '#ffffff',
-    margin: 0,
-    letterSpacing: '-0.3px',
-  },
-  vehicleTrim: {
-    fontSize: '13px',
-    color: 'rgba(255,255,255,0.5)',
-    margin: '2px 0 0 0',
-  },
-  stockNumber: {
-    fontSize: '11px',
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
-  },
-  vehicleColor: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '13px',
-    color: 'rgba(255,255,255,0.6)',
-    marginBottom: '12px',
-  },
-  colorSwatch: {
-    width: '16px',
-    height: '16px',
-    borderRadius: '50%',
-    border: '2px solid rgba(255,255,255,0.2)',
-  },
-  featureTags: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-    marginBottom: '18px',
-  },
-  featureTag: {
-    padding: '6px 12px',
-    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.15) 100%)',
-    borderRadius: '20px',
-    fontSize: '11px',
-    fontWeight: '600',
-    color: '#4ade80',
-    border: '1px solid rgba(34, 197, 94, 0.25)',
-  },
-  pricingSection: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '14px',
-    background: 'linear-gradient(135deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.2) 100%)',
-    borderRadius: '14px',
-    marginBottom: '18px',
-    border: '1px solid rgba(255,255,255,0.06)',
-  },
-  priceColumn: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  paymentColumn: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-  },
-  priceLabel: {
-    fontSize: '11px',
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
-    textTransform: 'uppercase',
-  },
-  msrpValue: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  paymentValue: {
-    fontSize: '22px',
-    fontWeight: '700',
-    background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text',
-  },
-  viewDetailsButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-    width: '100%',
-    padding: '14px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #22c55e 100%)',
-    border: 'none',
-    borderRadius: '12px',
-    color: '#ffffff',
-    fontSize: '15px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 4px 16px rgba(34, 197, 94, 0.3)',
-    transition: 'all 0.2s ease',
-  },
-  noResults: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '60px 20px',
-    textAlign: 'center',
-  },
-  noResultsIcon: {
-    fontSize: '48px',
-    marginBottom: '16px',
-  },
-  noResultsTitle: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#ffffff',
-    margin: '0 0 8px 0',
-  },
-  noResultsText: {
-    fontSize: '16px',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  refineSection: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '16px',
-    padding: '24px',
-    background: 'rgba(255,255,255,0.03)',
-    borderRadius: '12px',
-  },
-  refineText: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
-    margin: 0,
-  },
-  refineButton: {
     padding: '10px 20px',
     background: 'rgba(255,255,255,0.1)',
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '8px',
-    color: '#ffffff',
+    color: '#fff',
     fontSize: '14px',
-    fontWeight: '600',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+
+  // Main Content
+  mainContent: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 400px',
+    gap: '40px',
+    padding: '40px',
+    maxWidth: '1400px',
+    margin: '0 auto',
+  },
+
+  // Left Column - Images
+  leftColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    position: 'relative',
+  },
+  mainImageContainer: {
+    aspectRatio: '16/10',
+    borderRadius: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  mainImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  imagePlaceholder: {
+    fontSize: '120px',
+    fontWeight: 800,
+    color: 'rgba(255,255,255,0.2)',
+  },
+  thumbnailStrip: {
+    display: 'flex',
+    gap: '12px',
+  },
+  thumbnail: {
+    width: '100px',
+    height: '70px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    border: '2px solid rgba(255,255,255,0.1)',
+    transition: 'border-color 0.2s',
+  },
+  thumbnailPlaceholder: {
+    fontSize: '24px',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  photoCountBadge: {
+    position: 'absolute',
+    bottom: '100px',
+    left: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 14px',
+    background: '#fff',
+    borderRadius: '8px',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#1B7340',
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: '16px',
+    right: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    background: 'rgba(0,0,0,0.7)',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#fff',
+    backdropFilter: 'blur(8px)',
+  },
+  statusDot: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+  },
+
+  // Right Column - Pricing
+  rightColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+  },
+  pricingCard: {
+    padding: '24px',
+    background: '#fff',
+    borderRadius: '12px',
+    color: '#1a1a1a',
+  },
+  priceRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px',
+  },
+  priceLabel: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+  },
+  priceValue: {
+    fontSize: '18px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+  },
+  rebateRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+  },
+  rebateName: {
+    fontSize: '14px',
+    color: '#666',
+  },
+  rebateAmount: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+  },
+  divider: {
+    height: '1px',
+    background: '#e5e5e5',
+    margin: '16px 0',
+  },
+  quirkPriceRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  quirkPriceLabel: {
+    fontSize: '18px',
+    fontWeight: 700,
+    color: '#1a1a1a',
+  },
+  quirkPriceValue: {
+    fontSize: '28px',
+    fontWeight: 700,
+    color: '#1B7340',
+  },
+  conditionalSection: {
+    marginTop: '16px',
+    paddingTop: '16px',
+    borderTop: '1px solid #e5e5e5',
+  },
+  conditionalToggle: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    padding: '0',
+    background: 'none',
+    border: 'none',
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#666',
+    cursor: 'pointer',
+  },
+  conditionalList: {
+    marginTop: '12px',
+    padding: '12px',
+    background: '#f5f5f5',
+    borderRadius: '8px',
+  },
+  conditionalRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+  },
+  conditionalName: {
+    fontSize: '13px',
+    color: '#666',
+  },
+  conditionalAmount: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+  },
+  detailsLink: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    marginTop: '12px',
+    padding: '0',
+    background: 'none',
+    border: 'none',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#1B7340',
+    cursor: 'pointer',
+  },
+
+  // Specs Card
+  specsCard: {
+    padding: '22px',
+    background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.12)',
+  },
+  specsTitle: {
+    fontSize: '17px',
+    fontWeight: 700,
+    color: '#fff',
+    margin: '0 0 18px 0',
+  },
+  specsGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '16px',
+  },
+  specItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  specLabel: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.4)',
+    textTransform: 'uppercase',
+  },
+  specValue: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#fff',
+  },
+  specValueWithSwatch: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  colorSwatch: {
+    width: '16px',
+    height: '16px',
+    borderRadius: '4px',
+    border: '1px solid rgba(255,255,255,0.2)',
+  },
+
+  // Features Card
+  featuresCard: {
+    padding: '22px',
+    background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.12)',
+  },
+  featuresTitle: {
+    fontSize: '17px',
+    fontWeight: 700,
+    color: '#fff',
+    margin: '0 0 14px 0',
+  },
+  featuresTags: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px',
+  },
+  featureTag: {
+    padding: '8px 14px',
+    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.15) 100%)',
+    borderRadius: '20px',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#4ade80',
+    border: '1px solid rgba(34, 197, 94, 0.25)',
+  },
+
+  // Let's See It Button
+  letsSeeItBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '14px',
+    width: '100%',
+    padding: '22px 28px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #22c55e 100%)',
+    border: 'none',
+    borderRadius: '16px',
+    color: '#fff',
+    fontSize: '20px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: '0 8px 32px rgba(34, 197, 94, 0.45)',
+    transition: 'transform 0.2s, box-shadow 0.2s',
+  },
+  letsSeeItHint: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    margin: '8px 0 0 0',
+  },
+  spinner: {
+    width: '20px',
+    height: '20px',
+    border: '3px solid rgba(255,255,255,0.3)',
+    borderTopColor: '#fff',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+
+  // Secondary Actions
+  secondaryActions: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '14px',
+    marginTop: '10px',
+  },
+  actionBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    padding: '16px 18px',
+    background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: '14px',
+    color: '#fff',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  qrCodeBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    width: '100%',
+    padding: '16px 22px',
+    marginTop: '10px',
+    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.18) 0%, rgba(16, 185, 129, 0.12) 100%)',
+    border: '1px solid rgba(34, 197, 94, 0.35)',
+    borderRadius: '14px',
+    color: '#4ade80',
+    fontSize: '15px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 4px 16px rgba(34, 197, 94, 0.15)',
+  },
+  virtualTestDriveBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    width: '100%',
+    padding: '14px 20px',
+    marginTop: '8px',
+    background: 'rgba(239, 68, 68, 0.15)',
+    border: '1px solid rgba(239, 68, 68, 0.3)',
+    borderRadius: '10px',
+    color: '#f87171',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+
+  // Success Screen
+  successOverlay: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    padding: '40px',
+  },
+  successCard: {
+    maxWidth: '500px',
+    width: '100%',
+    padding: '40px',
+    background: 'rgba(255,255,255,0.05)',
+    borderRadius: '24px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    textAlign: 'center',
+  },
+  successIcon: {
+    width: '80px',
+    height: '80px',
+    margin: '0 auto 24px',
+    borderRadius: '50%',
+    background: 'rgba(74,222,128,0.2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#4ade80',
+  },
+  successTitle: {
+    fontSize: '32px',
+    fontWeight: 700,
+    color: '#fff',
+    margin: '0 0 12px 0',
+  },
+  successSubtitle: {
+    fontSize: '16px',
+    color: 'rgba(255,255,255,0.6)',
+    margin: '0 0 24px 0',
+    lineHeight: 1.5,
+  },
+  successVehicleCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '16px',
+    background: 'rgba(0,0,0,0.2)',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    textAlign: 'left',
+  },
+  successVehicleThumb: {
+    width: '70px',
+    height: '50px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  successVehicleInitial: {
+    fontSize: '24px',
+    fontWeight: 800,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  successVehicleInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+  },
+  successVehicleName: {
+    fontSize: '18px',
+    fontWeight: 700,
+    color: '#fff',
+  },
+  successVehicleTrim: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  successVehicleStock: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  expectSection: {
+    padding: '20px',
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    textAlign: 'left',
+  },
+  expectTitle: {
+    fontSize: '14px',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.8)',
+    margin: '0 0 16px 0',
+  },
+  expectSteps: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  expectStep: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  stepNumber: {
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    background: 'rgba(27,115,64,0.3)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#4ade80',
+    flexShrink: 0,
+  },
+  stepText: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  estimatedTime: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: '24px',
+  },
+  successActions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  secondaryBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '16px 24px',
+    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    border: 'none',
+    borderRadius: '12px',
+    color: '#fff',
+    fontSize: '16px',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  tertiaryBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '14px 24px',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '12px',
+    color: '#fff',
+    fontSize: '14px',
+    fontWeight: 600,
     cursor: 'pointer',
   },
 };
 
-export default InventoryResults;
+export default VehicleDetail;
