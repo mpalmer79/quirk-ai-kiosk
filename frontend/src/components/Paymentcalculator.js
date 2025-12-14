@@ -141,8 +141,8 @@ const PaymentCalculator = ({ navigateTo, updateCustomerData, customerData }) => 
                   key={term}
                   style={{
                     ...styles.termButton,
-                    background: leaseTerm === term ? '#1B7340' : 'transparent',
-                    borderColor: leaseTerm === term ? '#1B7340' : 'rgba(255,255,255,0.2)',
+                    background: leaseTerm === term ? '#22c55e' : 'transparent',
+                    borderColor: leaseTerm === term ? '#22c55e' : 'rgba(255,255,255,0.2)',
                   }}
                   onClick={() => setLeaseTerm(term)}
                 >
@@ -161,8 +161,8 @@ const PaymentCalculator = ({ navigateTo, updateCustomerData, customerData }) => 
                   key={miles}
                   style={{
                     ...styles.termButton,
-                    background: leaseMiles === miles ? '#1B7340' : 'transparent',
-                    borderColor: leaseMiles === miles ? '#1B7340' : 'rgba(255,255,255,0.2)',
+                    background: leaseMiles === miles ? '#22c55e' : 'transparent',
+                    borderColor: leaseMiles === miles ? '#22c55e' : 'rgba(255,255,255,0.2)',
                   }}
                   onClick={() => setLeaseMiles(miles)}
                 >
@@ -240,8 +240,8 @@ const PaymentCalculator = ({ navigateTo, updateCustomerData, customerData }) => 
                   key={term}
                   style={{
                     ...styles.termButton,
-                    background: financeTerm === term ? '#1B7340' : 'transparent',
-                    borderColor: financeTerm === term ? '#1B7340' : 'rgba(255,255,255,0.2)',
+                    background: financeTerm === term ? '#22c55e' : 'transparent',
+                    borderColor: financeTerm === term ? '#22c55e' : 'rgba(255,255,255,0.2)',
                   }}
                   onClick={() => setFinanceTerm(term)}
                 >
@@ -356,7 +356,7 @@ const PaymentCalculator = ({ navigateTo, updateCustomerData, customerData }) => 
           -webkit-appearance: none;
           width: 20px;
           height: 20px;
-          background: #1B7340;
+          background: #22c55e;
           border-radius: 50%;
           cursor: pointer;
         }
@@ -556,7 +556,7 @@ const styles = {
   selectButton: {
     width: '100%',
     padding: '14px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     borderRadius: '10px',
     color: '#ffffff',
