@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, KeyboardEvent, ChangeEvent, CSSProperties } from 'react';
 import api from './api';
+import GoogleReviews from './GoogleReviews';
 import type { KioskComponentProps } from '../types';
 
 interface InventoryStats { total?: number; byBodyStyle?: { SUV?: number; Truck?: number; [key: string]: number | undefined; }; priceRange?: { min?: number; max?: number; }; }
@@ -97,39 +98,52 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     </svg>
   );
 
-  // Phase 1: Name Capture
+  // Phase 1: Name Capture with Google Reviews
   if (!nameSubmitted) {
     return (
       <div style={s.container}>
         <div style={s.bgImage} /><div style={s.bgOverlay} />
-        <div style={{ ...s.nameCaptureSection, opacity: isVisible ? 1 : 0, transform: isVisible ? 'translateY(0)' : 'translateY(20px)' }}>
-          <div style={s.titleRow}>
-            <div style={s.inlineAvatar}><AvatarIcon /></div>
-            <h1 style={s.nameTitle}>Hi, I'm your <span style={s.highlight}>Quirk AI</span> assistant</h1>
+        
+        <div style={{ ...s.twoColumnLayout, opacity: isVisible ? 1 : 0, transform: isVisible ? 'translateY(0)' : 'translateY(20px)' }}>
+          
+          {/* Left Column - Google Reviews */}
+          <div style={s.columnCard}>
+            <GoogleReviews rotationInterval={10000} />
           </div>
-          <h2 style={s.nameSubtitle}>Welcome to Quirk Chevrolet!</h2>
-          <p style={s.namePrompt}>What's your first name?</p>
-          <div style={s.inputContainer}>
-            <input ref={nameInputRef} type="text" style={s.nameInput} placeholder="Enter your first name" value={customerName}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setCustomerName(e.target.value)}
-              onKeyPress={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleNameSubmit()} maxLength={20} autoComplete="off" autoCapitalize="words" />
+          
+          {/* Right Column - Name Capture */}
+          <div style={s.columnCard}>
+            <div style={s.nameCaptureInner}>
+              <div style={s.titleRow}>
+                <div style={s.inlineAvatar}><AvatarIcon /></div>
+                <h1 style={s.nameTitle}>Hi, I'm your <span style={s.highlight}>Quirk AI</span> assistant</h1>
+              </div>
+              <h2 style={s.nameSubtitle}>Welcome to Quirk Chevrolet!</h2>
+              <p style={s.namePrompt}>What's your first name?</p>
+              <div style={s.inputContainer}>
+                <input ref={nameInputRef} type="text" style={s.nameInput} placeholder="Enter your first name" value={customerName}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setCustomerName(e.target.value)}
+                  onKeyPress={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleNameSubmit()} maxLength={20} autoComplete="off" autoCapitalize="words" />
+              </div>
+              <p style={s.phonePrompt}>Enter Phone Number</p>
+              <div style={s.inputContainer}>
+                <input type="tel" style={s.phoneInput} placeholder="(Optional) This saves your progress" value={customerPhone}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setCustomerPhone(formatPhoneNumber(e.target.value))} maxLength={14} autoComplete="off" />
+              </div>
+              <div style={s.nameActions}>
+                <button style={{ ...s.continueBtn, opacity: customerName.trim() ? 1 : 0.5 }} onClick={handleNameSubmit} disabled={!customerName.trim()}>Continue</button>
+                <button style={s.skipBtn} onClick={handleSkipName}>Skip for now</button>
+              </div>
+              <p style={s.privacyNote}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Your name is only used to personalize your experience today
+              </p>
+            </div>
           </div>
-          <p style={s.phonePrompt}>Enter Phone Number</p>
-          <div style={s.inputContainer}>
-            <input type="tel" style={s.phoneInput} placeholder="(Optional) This saves your progress" value={customerPhone}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setCustomerPhone(formatPhoneNumber(e.target.value))} maxLength={14} autoComplete="off" />
-          </div>
-          <div style={s.nameActions}>
-            <button style={{ ...s.continueBtn, opacity: customerName.trim() ? 1 : 0.5 }} onClick={handleNameSubmit} disabled={!customerName.trim()}>Continue</button>
-            <button style={s.skipBtn} onClick={handleSkipName}>Skip for now</button>
-          </div>
-          <p style={s.privacyNote}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            Your name is only used to personalize your experience today
-          </p>
         </div>
+        
         <style>{`@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
-          input::placeholder { color: #fff !important; opacity: 1 !important; }
+          input::placeholder { color: rgba(255,255,255,0.7) !important; }
         `}</style>
       </div>
     );
@@ -186,28 +200,32 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
 };
 
 const s: Record<string, CSSProperties> = {
-  container: { minHeight: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '40px 20px 100px 20px', position: 'relative', fontFamily: "'Montserrat', sans-serif", boxSizing: 'border-box' },
+  container: { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', position: 'relative', fontFamily: "'Montserrat', sans-serif", boxSizing: 'border-box' },
   bgImage: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: 'url("/showroom.jpg")', backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 0 },
-  bgOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(15,25,20,0.75) 100%)', zIndex: 1 },
-  nameCaptureSection: { position: 'relative', zIndex: 2, textAlign: 'center', maxWidth: '700px', width: '100%', padding: '20px 40px', transition: 'all 0.6s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '8px', whiteSpace: 'nowrap' },
-  inlineAvatar: { width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 8px 32px rgba(34,197,94,0.5), 0 0 20px rgba(34,197,94,0.3)' },
-  nameTitle: { fontSize: '32px', fontWeight: 700, color: '#fff', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' },
-  nameSubtitle: { fontSize: '26px', fontWeight: 600, color: '#fff', margin: '0 0 28px 0', textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
-  namePrompt: { fontSize: '18px', color: '#fff', margin: '0 0 12px 0', fontWeight: 700 },
-  phonePrompt: { fontSize: '18px', color: '#fff', margin: '0 0 12px 0', fontWeight: 700 },
-  inputContainer: { position: 'relative', width: '100%', maxWidth: '420px', marginBottom: '20px' },
-  nameInput: { width: '100%', padding: '20px 26px', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.3)', borderRadius: '16px', color: '#fff', fontSize: '20px', fontWeight: 600, textAlign: 'center', backdropFilter: 'blur(12px)', boxSizing: 'border-box', transition: 'all 0.2s ease', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' },
-  phoneInput: { width: '100%', padding: '20px 26px', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.3)', borderRadius: '16px', color: '#fff', fontSize: '18px', fontWeight: 500, textAlign: 'center', backdropFilter: 'blur(12px)', boxSizing: 'border-box', transition: 'all 0.2s ease', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' },
-  nameActions: { display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px', width: '100%', maxWidth: '420px' },
-  continueBtn: { width: '100%', padding: '20px 36px', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', border: 'none', borderRadius: '14px', color: '#fff', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 32px rgba(34,197,94,0.4), 0 0 20px rgba(34,197,94,0.2)', transition: 'all 0.2s ease' },
-  skipBtn: { background: 'transparent', border: 'none', color: '#fff', fontSize: '14px', fontWeight: 500, cursor: 'pointer', padding: '12px', transition: 'color 0.2s ease' },
-  privacyNote: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: '#fff', margin: 0 },
-  heroSection: { textAlign: 'center', marginBottom: '52px', marginTop: '24px', transition: 'all 0.6s ease', position: 'relative', zIndex: 2 },
-  greeting: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '16px' },
-  aiAvatar: { width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 8px 32px rgba(34,197,94,0.5)' },
-  heroTitle: { fontSize: '28px', fontWeight: 600, color: '#fff', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
+  bgOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(15,25,20,0.85) 100%)', zIndex: 1 },
+  
+  // Two Column Layout for Phase 1
+  twoColumnLayout: { display: 'flex', gap: '40px', maxWidth: '1100px', width: '100%', alignItems: 'stretch', justifyContent: 'center', position: 'relative', zIndex: 2, transition: 'all 0.6s ease' },
+  columnCard: { flex: '1 1 500px', maxWidth: '520px', minHeight: '480px', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+  nameCaptureInner: { background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.2)', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' },
+  
+  titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '8px', flexWrap: 'wrap' },
+  inlineAvatar: { width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 8px 32px rgba(34,197,94,0.5), 0 0 20px rgba(34,197,94,0.3)' },
+  nameTitle: { fontSize: '24px', fontWeight: 700, color: '#fff', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
+  nameSubtitle: { fontSize: '20px', fontWeight: 600, color: '#fff', margin: '0 0 24px 0', textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
+  namePrompt: { fontSize: '16px', color: '#fff', margin: '0 0 10px 0', fontWeight: 600 },
+  phonePrompt: { fontSize: '16px', color: '#fff', margin: '0 0 10px 0', fontWeight: 600 },
+  inputContainer: { position: 'relative', width: '100%', maxWidth: '380px', marginBottom: '16px' },
+  nameInput: { width: '100%', padding: '16px 20px', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.3)', borderRadius: '12px', color: '#fff', fontSize: '18px', fontWeight: 600, textAlign: 'center', backdropFilter: 'blur(12px)', boxSizing: 'border-box', transition: 'all 0.2s ease', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', outline: 'none' },
+  phoneInput: { width: '100%', padding: '16px 20px', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.3)', borderRadius: '12px', color: '#fff', fontSize: '16px', fontWeight: 500, textAlign: 'center', backdropFilter: 'blur(12px)', boxSizing: 'border-box', transition: 'all 0.2s ease', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', outline: 'none' },
+  nameActions: { display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px', width: '100%', maxWidth: '380px' },
+  continueBtn: { width: '100%', padding: '16px 32px', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '16px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 32px rgba(34,197,94,0.4), 0 0 20px rgba(34,197,94,0.2)', transition: 'all 0.2s ease' },
+  skipBtn: { background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.8)', fontSize: '14px', fontWeight: 500, cursor: 'pointer', padding: '10px', transition: 'color 0.2s ease' },
+  privacyNote: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 },
   highlight: { color: '#4ade80', textShadow: '0 0 20px rgba(74,222,128,0.5)' },
+  
+  // Phase 2 Styles
+  heroSection: { textAlign: 'center', marginBottom: '52px', marginTop: '24px', transition: 'all 0.6s ease', position: 'relative', zIndex: 2 },
   heroSubtitle: { fontSize: '48px', fontWeight: 800, color: '#fff', margin: '0 0 16px 0', letterSpacing: '-1px', textShadow: '0 4px 16px rgba(0,0,0,0.5)' },
   heroText: { fontSize: '20px', color: 'rgba(255,255,255,0.85)', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
   pathsContainer: { display: 'flex', gap: '28px', marginBottom: '44px', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '1200px', position: 'relative', zIndex: 2 },
