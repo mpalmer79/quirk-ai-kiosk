@@ -8,6 +8,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   vehicles?: Vehicle[];
+  showDealerInfo?: boolean;
   timestamp: Date;
 }
 
@@ -796,12 +797,32 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       });
 
       const matchingVehicles = searchInventory(content);
+      
+      // Detect hours-related questions
+      const lowerContent = content.toLowerCase();
+      const isHoursQuery = lowerContent.includes('hour') || 
+        lowerContent.includes('open') || 
+        lowerContent.includes('close') || 
+        lowerContent.includes('closing') ||
+        lowerContent.includes('when do you') ||
+        lowerContent.includes('what time') ||
+        lowerContent.includes('schedule') ||
+        lowerContent.includes('sunday') ||
+        lowerContent.includes('saturday') ||
+        lowerContent.includes('weekend') ||
+        lowerContent.includes('phone number') ||
+        lowerContent.includes('call you') ||
+        lowerContent.includes('contact') ||
+        lowerContent.includes('location') ||
+        lowerContent.includes('address') ||
+        lowerContent.includes('where are you');
 
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: response.message,
         vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
+        showDealerInfo: isHoursQuery,
         timestamp: new Date(),
       };
 
@@ -1080,6 +1101,17 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
                 </div>
               )}
               <p style={styles.messageText}>{message.content}</p>
+              
+              {/* Dealership Info Image for hours/contact queries */}
+              {message.showDealerInfo && (
+                <div style={styles.dealerInfoContainer}>
+                  <img 
+                    src="/images/dealership-info.png" 
+                    alt="Dealership Hours and Contact Information"
+                    style={styles.dealerInfoImage}
+                  />
+                </div>
+              )}
               
               {/* Vehicle Cards */}
               {message.vehicles && message.vehicles.length > 0 && (
@@ -1601,6 +1633,18 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: '500',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+  },
+  dealerInfoContainer: {
+    marginTop: '16px',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    border: '1px solid rgba(209,173,87,0.3)',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+  },
+  dealerInfoImage: {
+    width: '100%',
+    height: 'auto',
+    display: 'block',
   },
 };
 
