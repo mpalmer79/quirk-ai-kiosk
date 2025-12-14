@@ -312,7 +312,7 @@ const GuidedQuiz = ({ navigateTo, updateCustomerData, customerData }) => {
                 key={option.value}
                 style={{
                   ...styles.optionCard,
-                  borderColor: isSelected ? '#1B7340' : 'rgba(255,255,255,0.1)',
+                  borderColor: isSelected ? '#22c55e' : 'rgba(255,255,255,0.1)',
                   background: isSelected 
                     ? 'rgba(27, 115, 64, 0.2)' 
                     : 'rgba(255,255,255,0.05)',
@@ -410,7 +410,7 @@ const styles = {
   },
   progressFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #1B7340 0%, #4ade80 100%)',
+    background: 'linear-gradient(90deg, #22c55e 0%, #4ade80 100%)',
     borderRadius: '4px',
     transition: 'width 0.3s ease',
   },
@@ -481,7 +481,7 @@ const styles = {
     width: '28px',
     height: '28px',
     borderRadius: '50%',
-    background: '#1B7340',
+    background: '#22c55e',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -519,7 +519,7 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     padding: '14px 32px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     borderRadius: '10px',
     color: '#ffffff',
@@ -584,7 +584,7 @@ const styles = {
   leaseChoiceButton: {
     width: '100%',
     padding: '14px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     borderRadius: '10px',
     color: '#ffffff',
