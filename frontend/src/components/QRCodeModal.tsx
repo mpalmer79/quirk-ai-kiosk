@@ -1,591 +1,608 @@
 import React, { useState, CSSProperties } from 'react';
-import type { Vehicle } from '../types';
+import type { Vehicle, KioskComponentProps } from '../types';
 
-interface QRCodeModalProps {
-  vehicle: Vehicle;
-  isOpen: boolean;
-  onClose: () => void;
+// Package selection state
+interface PackageSelections {
+  serviceContract: boolean;
+  deficiencyBalance: boolean;
+  tireWheel: boolean;
 }
 
-// Format price for display
-const formatPrice = (price: number | undefined): string => {
-  if (!price) return 'N/A';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(price);
-};
+// Package definition
+interface ProtectionPackage {
+  id: keyof PackageSelections;
+  name: string;
+  tagline: string;
+  price: number;
+  monthlyEstimate: number;
+  duration?: string;
+  icon: JSX.Element;
+  color: string;
+  highlights: string[];
+  details: string;
+}
 
-const QRCodeModal: React.FC<QRCodeModalProps> = ({ vehicle, isOpen, onClose }) => {
-  const [qrLoaded, setQrLoaded] = useState(false);
-  const [qrError, setQrError] = useState(false);
-  const [copied, setCopied] = useState(false);
+// Packages collection type
+type PackagesMap = Record<keyof PackageSelections, ProtectionPackage>;
 
-  if (!isOpen) return null;
-
-  // Build vehicle URL - this would be your dealership's website URL
-  const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
-  const baseUrl = 'https://quirkchevynh.com/inventory';
-  const vehicleUrl = `${baseUrl}/${stockNumber}`;
+const ProtectionPackages: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
+  const vehicle = customerData?.selectedVehicle as Vehicle | undefined;
+  const customerName = customerData?.customerName;
   
-  // QR Code API URL (using free goqr.me API - no dependencies needed)
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(vehicleUrl)}&bgcolor=ffffff&color=1B7340`;
+  // Protection package selections
+  const [selectedPackages, setSelectedPackages] = useState<PackageSelections>({
+    serviceContract: false,
+    deficiencyBalance: false,
+    tireWheel: false,
+  });
+  
+  // Expanded info sections
+  const [expandedPackage, setExpandedPackage] = useState<keyof PackageSelections | null>(null);
 
-  // Vehicle info for display
-  const year = vehicle.year || '';
-  const make = vehicle.make || 'Chevrolet';
-  const model = vehicle.model || '';
-  const trim = vehicle.trim || '';
-  const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
-  const price = vehicle.price || vehicle.salePrice || vehicle.sale_price || vehicle.msrp || 0;
-
-  // Copy URL to clipboard
-  const handleCopyUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(vehicleUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
+  // Package definitions with pricing
+  const packages: PackagesMap = {
+    serviceContract: {
+      id: 'serviceContract',
+      name: 'Service Contract',
+      tagline: 'Mechanical Breakdown Protection',
+      price: 2295,
+      monthlyEstimate: 38, // Rough estimate over 60 months
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+      ),
+      color: '#22c55e',
+      highlights: [
+        'Covers major mechanical repairs',
+        'Engine, transmission, drivetrain',
+        'Electrical & A/C systems',
+        'Nationwide coverage at any dealer',
+        '24/7 roadside assistance included',
+      ],
+      details: `Protect yourself from unexpected repair costs. Our Service Contract covers mechanical breakdowns beyond your factory warranty, giving you peace of mind for years to come. Coverage includes engine, transmission, drivetrain, electrical systems, air conditioning, and more.`,
+    },
+    deficiencyBalance: {
+      id: 'deficiencyBalance',
+      name: 'Deficiency Balance Protection',
+      tagline: 'Loan/Lease Shortfall Coverage',
+      price: 595,
+      monthlyEstimate: 10,
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+      ),
+      color: '#2563eb',
+      highlights: [
+        'Covers loan balance if vehicle is totaled',
+        'Protects against depreciation gap',
+        'Works with insurance settlement',
+        'Includes up to $1,000 deductible coverage',
+        'Peace of mind for financed vehicles',
+      ],
+      details: `If your vehicle is totaled or stolen, your insurance pays the actual cash value - which may be less than what you owe. Deficiency Balance Protection covers the difference between your insurance payout and your remaining loan or lease balance, so you're not left paying for a vehicle you can no longer drive.`,
+    },
+    tireWheel: {
+      id: 'tireWheel',
+      name: 'Tire & Wheel Protection',
+      tagline: '5 Years of Coverage',
+      price: 795,
+      monthlyEstimate: 13,
+      duration: '5 Years',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="12" cy="12" r="6"/>
+          <circle cx="12" cy="12" r="2"/>
+        </svg>
+      ),
+      color: '#dc2626',
+      highlights: [
+        'Covers tire damage from road hazards',
+        'Wheel repair or replacement',
+        'No deductible on claims',
+        'Includes mounting & balancing',
+        'Full 5-year coverage period',
+      ],
+      details: `Roads are unpredictable. Potholes, nails, debris, and curbs can damage your tires and wheels at any time. Our Tire & Wheel Protection covers the cost of repair or replacement due to road hazard damage for a full 5 years - no deductible required.`,
+    },
   };
 
-  // Print the QR code card
-  const handlePrint = () => {
-    // Modal must be open to print (checked by isOpen above)
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Vehicle QR Code - ${year} ${model}</title>
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { 
-            font-family: 'Montserrat', sans-serif;
-            padding: 40px;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-          }
-          .card {
-            width: 400px;
-            border: 2px solid #1B7340;
-            border-radius: 16px;
-            overflow: hidden;
-          }
-          .header {
-            background: #1B7340;
-            color: white;
-            padding: 16px 20px;
-            text-align: center;
-          }
-          .header h1 {
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            margin: 0;
-          }
-          .content {
-            padding: 24px;
-            text-align: center;
-          }
-          .qr-container {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-          }
-          .qr-container img {
-            width: 180px;
-            height: 180px;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-          }
-          .vehicle-name {
-            font-size: 20px;
-            font-weight: 700;
-            color: #1a1a1a;
-            margin-bottom: 4px;
-          }
-          .vehicle-trim {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 12px;
-          }
-          .vehicle-details {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            color: #666;
-          }
-          .price {
-            font-size: 24px;
-            font-weight: 700;
-            color: #1B7340;
-            margin-bottom: 12px;
-          }
-          .stock {
-            font-size: 12px;
-            color: #999;
-            margin-bottom: 16px;
-          }
-          .cta {
-            background: #f3f4f6;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 12px;
-            color: #666;
-          }
-          .footer {
-            background: #f9fafb;
-            padding: 12px 20px;
-            text-align: center;
-            border-top: 1px solid #e5e7eb;
-          }
-          .footer p {
-            font-size: 11px;
-            color: #999;
-            margin: 0;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="header">
-            <h1>QUIRK CHEVROLET</h1>
-          </div>
-          <div class="content">
-            <div class="qr-container">
-              <img src="${qrCodeUrl}" alt="QR Code" />
-            </div>
-            <div class="vehicle-name">${year} ${make} ${model}</div>
-            <div class="vehicle-trim">${trim}</div>
-            <div class="vehicle-details">
-              <span>${exteriorColor}</span>
-            </div>
-            <div class="price">${formatPrice(price)}</div>
-            <div class="stock">Stock #${stockNumber}</div>
-            <div class="cta">
-              Scan to view full details, photos & availability
-            </div>
-          </div>
-          <div class="footer">
-            <p>Quirk Chevrolet • Manchester, NH • quirkchevynh.com</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.focus();
+  // Calculate totals
+  const calculateTotals = (): { totalPrice: number; totalMonthly: number } => {
+    let totalPrice = 0;
+    let totalMonthly = 0;
     
-    // Wait for QR image to load before printing
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 500);
+    (Object.keys(selectedPackages) as Array<keyof PackageSelections>).forEach(key => {
+      if (selectedPackages[key]) {
+        totalPrice += packages[key].price;
+        totalMonthly += packages[key].monthlyEstimate;
+      }
+    });
+    
+    return { totalPrice, totalMonthly };
   };
 
-  // Handle backdrop click
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
+  const { totalPrice, totalMonthly } = calculateTotals();
+  const selectedCount = Object.values(selectedPackages).filter(Boolean).length;
+
+  const togglePackage = (packageId: keyof PackageSelections): void => {
+    setSelectedPackages(prev => ({
+      ...prev,
+      [packageId]: !prev[packageId],
+    }));
   };
+
+  const toggleExpanded = (packageId: keyof PackageSelections): void => {
+    setExpandedPackage(expandedPackage === packageId ? null : packageId);
+  };
+
+  const handleContinue = (): void => {
+    // Save selected packages to customer data
+    const selectedProtection: Array<{ id: string; name: string; price: number }> = [];
+    (Object.keys(selectedPackages) as Array<keyof PackageSelections>).forEach(key => {
+      if (selectedPackages[key]) {
+        selectedProtection.push({
+          id: key,
+          name: packages[key].name,
+          price: packages[key].price,
+        });
+      }
+    });
+    
+    updateCustomerData({
+      protectionPackages: selectedProtection,
+      protectionTotal: totalPrice,
+    });
+    
+    // Navigate to handoff
+    navigateTo('handoff');
+  };
+
+  const handleSkip = (): void => {
+    updateCustomerData({
+      protectionPackages: [],
+      protectionTotal: 0,
+    });
+    navigateTo('handoff');
+  };
+
+  // Get gradient for vehicle display
+  const vehicleGradient = (vehicle as Vehicle & { gradient?: string })?.gradient || 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
 
   return (
-    <div style={styles.overlay} onClick={handleBackdropClick}>
-      <div style={styles.modal}>
-        {/* Close Button */}
-        <button style={styles.closeBtn} onClick={onClose}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 6L6 18M6 6l12 12" />
+    <div style={styles.container}>
+      {/* Header */}
+      <div style={styles.header}>
+        <button style={styles.backButton} onClick={() => navigateTo('vehicleDetail')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
+          Back
         </button>
-
-        {/* Header */}
-        <div style={styles.header}>
-          <div style={styles.headerIcon}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7" />
-              <rect x="14" y="3" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" />
-            </svg>
-          </div>
-          <h2 style={styles.title}>Save This Vehicle</h2>
+        
+        <div style={styles.headerContent}>
+          <h1 style={styles.title}>
+            {customerName ? `${customerName}, protect your investment` : 'Protect Your Investment'}
+          </h1>
           <p style={styles.subtitle}>
-            Scan the QR code with your phone to save vehicle details
+            Add coverage to your new vehicle for peace of mind
           </p>
-        </div>
-
-        {/* QR Code */}
-        <div style={styles.qrContainer}>
-          {!qrLoaded && !qrError && (
-            <div style={styles.qrPlaceholder}>
-              <div style={styles.spinner} />
-            </div>
-          )}
-          {qrError && (
-            <div style={styles.qrError}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v4M12 16h.01" />
-              </svg>
-              <span>Unable to generate QR code</span>
-            </div>
-          )}
-          <img
-            src={qrCodeUrl}
-            alt="Vehicle QR Code"
-            style={{
-              ...styles.qrImage,
-              display: qrLoaded && !qrError ? 'block' : 'none',
-            }}
-            onLoad={() => setQrLoaded(true)}
-            onError={() => setQrError(true)}
-          />
-        </div>
-
-        {/* Vehicle Summary */}
-        <div style={styles.vehicleSummary}>
-          <h3 style={styles.vehicleName}>{year} {make} {model}</h3>
-          <p style={styles.vehicleTrim}>{trim}</p>
-          <div style={styles.vehicleDetails}>
-            {exteriorColor && (
-              <span style={styles.detailItem}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="12" r="10" />
-                </svg>
-                {exteriorColor}
-              </span>
-            )}
-            <span style={styles.detailItem}>
-              Stock #{stockNumber}
-            </span>
-          </div>
-          <div style={styles.vehiclePrice}>{formatPrice(price)}</div>
-        </div>
-
-        {/* Actions */}
-        <div style={styles.actions}>
-          <button style={styles.copyBtn} onClick={handleCopyUrl}>
-            {copied ? (
-              <>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                Copied!
-              </>
-            ) : (
-              <>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" />
-                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                </svg>
-                Copy Link
-              </>
-            )}
-          </button>
-          <button style={styles.printBtn} onClick={handlePrint}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 9V2h12v7" />
-              <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" />
-              <rect x="6" y="14" width="12" height="8" />
-            </svg>
-            Print QR Card
-          </button>
-        </div>
-
-        {/* URL Display */}
-        <div style={styles.urlContainer}>
-          <span style={styles.urlLabel}>Or visit:</span>
-          <span style={styles.urlText}>{vehicleUrl}</span>
-        </div>
-
-        {/* Instructions */}
-        <div style={styles.instructions}>
-          <div style={styles.instructionItem}>
-            <span style={styles.instructionNumber}>1</span>
-            <span style={styles.instructionText}>Open camera on your phone</span>
-          </div>
-          <div style={styles.instructionItem}>
-            <span style={styles.instructionNumber}>2</span>
-            <span style={styles.instructionText}>Point at QR code</span>
-          </div>
-          <div style={styles.instructionItem}>
-            <span style={styles.instructionNumber}>3</span>
-            <span style={styles.instructionText}>Tap the link that appears</span>
-          </div>
         </div>
       </div>
 
-      {/* CSS for spinner animation */}
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+      {/* Vehicle Context */}
+      {vehicle && (
+        <div style={styles.vehicleContext}>
+          <div style={{ ...styles.vehicleThumb, background: vehicleGradient }}>
+            <span style={styles.vehicleInitial}>{(vehicle.model || 'V').charAt(0)}</span>
+          </div>
+          <div style={styles.vehicleInfo}>
+            <span style={styles.vehicleName}>{vehicle.year} {vehicle.make} {vehicle.model}</span>
+            <span style={styles.vehicleTrim}>{vehicle.trim}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Package Cards */}
+      <div style={styles.packagesGrid}>
+        {Object.values(packages).map((pkg) => (
+          <div 
+            key={pkg.id}
+            style={{
+              ...styles.packageCard,
+              borderColor: selectedPackages[pkg.id] ? pkg.color : 'rgba(255,255,255,0.1)',
+              background: selectedPackages[pkg.id] 
+                ? `linear-gradient(135deg, ${pkg.color}15 0%, ${pkg.color}05 100%)`
+                : 'rgba(255,255,255,0.02)',
+            }}
+          >
+            {/* Card Header */}
+            <div style={styles.cardHeader}>
+              <div style={{ ...styles.packageIcon, background: `${pkg.color}20`, color: pkg.color }}>
+                {pkg.icon}
+              </div>
+              <div style={styles.packageHeaderInfo}>
+                <h3 style={styles.packageName}>{pkg.name}</h3>
+                <p style={styles.packageTagline}>{pkg.tagline}</p>
+              </div>
+              <div style={styles.packagePricing}>
+                <span style={styles.packagePrice}>${pkg.price.toLocaleString()}</span>
+                <span style={styles.packageMonthly}>~${pkg.monthlyEstimate}/mo</span>
+              </div>
+            </div>
+
+            {/* Highlights */}
+            <div style={styles.highlights}>
+              {pkg.highlights.slice(0, 3).map((highlight, idx) => (
+                <div key={idx} style={styles.highlightItem}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={pkg.color} strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  <span>{highlight}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Expanded Details */}
+            {expandedPackage === pkg.id && (
+              <div style={styles.expandedSection}>
+                <p style={styles.expandedText}>{pkg.details}</p>
+                <div style={styles.allHighlights}>
+                  {pkg.highlights.map((highlight, idx) => (
+                    <div key={idx} style={styles.highlightItem}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={pkg.color} strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      <span>{highlight}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Card Actions */}
+            <div style={styles.cardActions}>
+              <button 
+                style={styles.learnMoreButton}
+                onClick={() => toggleExpanded(pkg.id)}
+              >
+                {expandedPackage === pkg.id ? 'Show Less' : 'Learn More'}
+              </button>
+              
+              <button
+                style={{
+                  ...styles.selectButton,
+                  background: selectedPackages[pkg.id] 
+                    ? pkg.color 
+                    : 'transparent',
+                  borderColor: pkg.color,
+                  color: selectedPackages[pkg.id] ? '#ffffff' : pkg.color,
+                }}
+                onClick={() => togglePackage(pkg.id)}
+              >
+                {selectedPackages[pkg.id] ? (
+                  <>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    Added
+                  </>
+                ) : (
+                  <>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    Add Protection
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Summary Footer */}
+      <div style={styles.footer}>
+        <div style={styles.summarySection}>
+          {selectedCount > 0 ? (
+            <>
+              <div style={styles.summaryInfo}>
+                <span style={styles.summaryLabel}>
+                  {selectedCount} protection{selectedCount > 1 ? 's' : ''} selected
+                </span>
+                <span style={styles.summaryTotal}>
+                  ${totalPrice.toLocaleString()} total
+                </span>
+                <span style={styles.summaryMonthly}>
+                  ~${totalMonthly}/mo added to payment
+                </span>
+              </div>
+            </>
+          ) : (
+            <div style={styles.summaryInfo}>
+              <span style={styles.noSelectionText}>
+                No protection packages selected
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div style={styles.footerActions}>
+          <button style={styles.skipButton} onClick={handleSkip}>
+            No Thanks, Continue
+          </button>
+          <button 
+            style={{
+              ...styles.continueButton,
+              opacity: selectedCount > 0 ? 1 : 0.5,
+            }}
+            onClick={handleContinue}
+          >
+            {selectedCount > 0 ? 'Continue with Protection' : 'Continue'}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
 
 const styles: Record<string, CSSProperties> = {
-  overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.8)',
-    backdropFilter: 'blur(8px)',
+  container: {
+    flex: 1,
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '20px',
+    flexDirection: 'column',
+    padding: '24px 40px',
+    overflow: 'auto',
   },
-  modal: {
-    position: 'relative',
-    width: '100%',
-    maxWidth: '440px',
-    maxHeight: '90vh',
-    overflowY: 'auto',
-    background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)',
-    borderRadius: '24px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    padding: '32px',
-  },
-  closeBtn: {
-    position: 'absolute',
-    top: '16px',
-    right: '16px',
-    width: '40px',
-    height: '40px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(255, 255, 255, 0.1)',
-    border: 'none',
-    borderRadius: '50%',
-    color: '#ffffff',
-    cursor: 'pointer',
-    transition: 'background 0.2s ease',
-  },
-  
-  // Header
   header: {
-    textAlign: 'center',
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '24px',
     marginBottom: '24px',
   },
-  headerIcon: {
-    width: '56px',
-    height: '56px',
-    margin: '0 auto 16px',
+  backButton: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(27, 115, 64, 0.2)',
-    borderRadius: '16px',
-    color: '#4ade80',
+    gap: '8px',
+    background: 'none',
+    border: 'none',
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: 0,
+    flexShrink: 0,
+  },
+  headerContent: {
+    flex: 1,
   },
   title: {
-    fontSize: '24px',
-    fontWeight: 700,
+    fontSize: '28px',
+    fontWeight: '700',
     color: '#ffffff',
     margin: '0 0 8px 0',
   },
   subtitle: {
-    fontSize: '14px',
-    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: '16px',
+    color: 'rgba(255,255,255,0.6)',
     margin: 0,
-    lineHeight: 1.5,
   },
-
-  // QR Code
-  qrContainer: {
+  vehicleContext: {
     display: 'flex',
-    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '16px 20px',
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: '12px',
     marginBottom: '24px',
   },
-  qrPlaceholder: {
-    width: '200px',
-    height: '200px',
+  vehicleThumb: {
+    width: '50px',
+    height: '50px',
+    borderRadius: '10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: '16px',
   },
-  spinner: {
-    width: '40px',
-    height: '40px',
-    border: '3px solid rgba(255, 255, 255, 0.1)',
-    borderTopColor: '#1B7340',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
+  vehicleInitial: {
+    fontSize: '24px',
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.3)',
   },
-  qrError: {
-    width: '200px',
-    height: '200px',
+  vehicleInfo: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '12px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: '16px',
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: '13px',
-    textAlign: 'center',
-  },
-  qrImage: {
-    width: '200px',
-    height: '200px',
-    borderRadius: '16px',
-    background: '#ffffff',
-    padding: '12px',
-  },
-
-  // Vehicle Summary
-  vehicleSummary: {
-    textAlign: 'center',
-    marginBottom: '24px',
-    padding: '20px',
-    background: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: '16px',
   },
   vehicleName: {
+    fontSize: '16px',
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  vehicleTrim: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  packagesGrid: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    flex: 1,
+    marginBottom: '24px',
+  },
+  packageCard: {
+    borderRadius: '16px',
+    border: '2px solid rgba(255,255,255,0.1)',
+    padding: '24px',
+    transition: 'all 0.3s ease',
+  },
+  cardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    marginBottom: '16px',
+  },
+  packageIcon: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  packageHeaderInfo: {
+    flex: 1,
+  },
+  packageName: {
     fontSize: '20px',
-    fontWeight: 700,
+    fontWeight: '700',
     color: '#ffffff',
     margin: '0 0 4px 0',
   },
-  vehicleTrim: {
+  packageTagline: {
     fontSize: '14px',
-    color: 'rgba(255, 255, 255, 0.6)',
-    margin: '0 0 12px 0',
+    color: 'rgba(255,255,255,0.5)',
+    margin: 0,
   },
-  vehicleDetails: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '16px',
-    marginBottom: '12px',
+  packagePricing: {
+    textAlign: 'right',
   },
-  detailItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    fontSize: '13px',
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-  vehiclePrice: {
-    fontSize: '28px',
-    fontWeight: 700,
-    color: '#4ade80',
-  },
-
-  // Actions
-  actions: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '12px',
-    marginBottom: '20px',
-  },
-  copyBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    padding: '14px 20px',
-    background: 'rgba(255, 255, 255, 0.1)',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    borderRadius: '12px',
+  packagePrice: {
+    display: 'block',
+    fontSize: '24px',
+    fontWeight: '700',
     color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
   },
-  printBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    padding: '14px 20px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
-    border: 'none',
-    borderRadius: '12px',
-    color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-
-  // URL Display
-  urlContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '12px',
-    background: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: '8px',
-    marginBottom: '20px',
-  },
-  urlLabel: {
-    fontSize: '11px',
-    color: 'rgba(255, 255, 255, 0.4)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  },
-  urlText: {
+  packageMonthly: {
     fontSize: '12px',
-    color: 'rgba(255, 255, 255, 0.7)',
-    wordBreak: 'break-all',
-    textAlign: 'center',
+    color: 'rgba(255,255,255,0.4)',
   },
-
-  // Instructions
-  instructions: {
+  highlights: {
     display: 'flex',
-    justifyContent: 'center',
-    gap: '24px',
+    flexWrap: 'wrap',
+    gap: '8px 16px',
+    marginBottom: '16px',
   },
-  instructionItem: {
+  highlightItem: {
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
     gap: '8px',
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.7)',
   },
-  instructionNumber: {
-    width: '28px',
-    height: '28px',
+  expandedSection: {
+    padding: '16px 0',
+    borderTop: '1px solid rgba(255,255,255,0.1)',
+    marginBottom: '16px',
+  },
+  expandedText: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: '1.6',
+    margin: '0 0 16px 0',
+  },
+  allHighlights: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '8px',
+  },
+  cardActions: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: '16px',
+    borderTop: '1px solid rgba(255,255,255,0.08)',
+  },
+  learnMoreButton: {
+    background: 'none',
+    border: 'none',
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: '8px 0',
+  },
+  selectButton: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(27, 115, 64, 0.2)',
-    borderRadius: '50%',
-    fontSize: '13px',
-    fontWeight: 700,
+    gap: '8px',
+    padding: '12px 24px',
+    borderRadius: '10px',
+    border: '2px solid',
+    fontSize: '14px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  footer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px 24px',
+    background: 'rgba(0,0,0,0.4)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    marginTop: 'auto',
+  },
+  summarySection: {
+    flex: 1,
+  },
+  summaryInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+  summaryLabel: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  summaryTotal: {
+    fontSize: '20px',
+    fontWeight: '700',
     color: '#4ade80',
   },
-  instructionText: {
-    fontSize: '11px',
-    color: 'rgba(255, 255, 255, 0.5)',
-    textAlign: 'center',
-    maxWidth: '80px',
+  summaryMonthly: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  noSelectionText: {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  footerActions: {
+    display: 'flex',
+    gap: '12px',
+  },
+  skipButton: {
+    padding: '14px 24px',
+    background: 'transparent',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '10px',
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  continueButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '14px 28px',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+    border: 'none',
+    borderRadius: '10px',
+    color: '#ffffff',
+    fontSize: '15px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'opacity 0.2s ease',
   },
 };
 
-export default QRCodeModal;
+export default ProtectionPackages;
