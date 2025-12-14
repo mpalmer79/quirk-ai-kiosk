@@ -8,13 +8,13 @@
 // ============================================
 export const colors = {
   // Brand Colors
-  primary: '#1B7340',
-  primaryDark: '#0d4a28',
+  primary: '#22c55e',
+  primaryDark: '#16a34a',
   primaryLight: '#4ade80',
   
   // Gradients
-  primaryGradient: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
-  progressGradient: 'linear-gradient(90deg, #1B7340 0%, #4ade80 100%)',
+  primaryGradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+  progressGradient: 'linear-gradient(90deg, #22c55e 0%, #4ade80 100%)',
   
   // Text Colors
   textPrimary: '#ffffff',
@@ -33,7 +33,7 @@ export const colors = {
   // Border Colors
   border: 'rgba(255,255,255,0.1)',
   borderLight: 'rgba(255,255,255,0.2)',
-  borderFocus: '#1B7340',
+  borderFocus: '#22c55e',
   
   // Status Colors
   success: '#4ade80',
