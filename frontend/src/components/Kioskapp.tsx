@@ -113,7 +113,7 @@ const screenErrorStyles: Record<string, CSSProperties> = {
   },
   primaryBtn: {
     padding: '14px 32px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     borderRadius: '12px',
     color: '#ffffff',
@@ -616,7 +616,7 @@ const styles: Record<string, CSSProperties> = {
   logoAI: {
     fontSize: '20px',
     fontWeight: '700',
-    background: '#1B7340',
+    background: '#22c55e',
     color: '#ffffff',
     padding: '4px 12px',
     borderRadius: '6px',
@@ -685,7 +685,7 @@ const styles: Record<string, CSSProperties> = {
     background: 'rgba(0,0,0,0.3)',
   },
   footerDot: {
-    color: '#1B7340',
+    color: '#22c55e',
   },
   footerTime: {
     fontWeight: '600',
