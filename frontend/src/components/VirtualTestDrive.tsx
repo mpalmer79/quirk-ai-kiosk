@@ -542,7 +542,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '12px 20px',
-    background: 'rgba(255,255,255,0.05)',
+    background: 'rgba(255,255,255,0.12)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: '10px',
     color: 'rgba(255,255,255,0.7)',
@@ -661,7 +661,7 @@ const styles: Record<string, CSSProperties> = {
     padding: '16px 20px',
     background: 'rgba(255,255,255,0.03)',
     borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.12)',
   },
   descriptionIcon: {
     display: 'flex',
@@ -712,7 +712,7 @@ const styles: Record<string, CSSProperties> = {
     padding: '16px',
     background: 'rgba(255,255,255,0.03)',
     borderRadius: '16px',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.12)',
   },
   vehicleImage: {
     height: '140px',
@@ -758,7 +758,7 @@ const styles: Record<string, CSSProperties> = {
     padding: '16px',
     background: 'rgba(255,255,255,0.03)',
     borderRadius: '16px',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.12)',
   },
   quickFactsTitle: {
     fontSize: '12px',
@@ -814,7 +814,7 @@ const styles: Record<string, CSSProperties> = {
     padding: '16px',
     background: 'rgba(255,255,255,0.03)',
     borderRadius: '16px',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.12)',
   },
   suggestedTitle: {
     fontSize: '12px',
@@ -832,7 +832,7 @@ const styles: Record<string, CSSProperties> = {
   searchLink: {
     display: 'block',
     padding: '10px 12px',
-    background: 'rgba(255,255,255,0.05)',
+    background: 'rgba(255,255,255,0.12)',
     borderRadius: '8px',
     color: 'rgba(255,255,255,0.8)',
     fontSize: '13px',
@@ -868,7 +868,7 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'center',
     gap: '10px',
     padding: '14px 20px',
-    background: 'rgba(255,255,255,0.05)',
+    background: 'rgba(255,255,255,0.12)',
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '12px',
     color: '#fff',
@@ -884,7 +884,7 @@ const styles: Record<string, CSSProperties> = {
     gap: '32px',
     padding: '16px 32px',
     background: 'rgba(255,255,255,0.02)',
-    borderTop: '1px solid rgba(255,255,255,0.05)',
+    borderTop: '1px solid rgba(255,255,255,0.12)',
   },
   footerTip: {
     display: 'flex',
