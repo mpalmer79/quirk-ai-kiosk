@@ -274,7 +274,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
                 style={{
                   ...s.thumbnail,
                   background: gradient,
-                  borderColor: selectedImageIndex === idx ? '#1B7340' : 'rgba(255,255,255,0.1)',
+                  borderColor: selectedImageIndex === idx ? '#22c55e' : 'rgba(255,255,255,0.1)',
                 }}
                 onClick={() => setSelectedImageIndex(idx)}
               >
@@ -605,7 +605,7 @@ const s: Record<string, CSSProperties> = {
     borderRadius: '8px',
     fontSize: '13px',
     fontWeight: 600,
-    color: '#1B7340',
+    color: '#22c55e',
   },
   statusBadge: {
     position: 'absolute',
@@ -635,10 +635,11 @@ const s: Record<string, CSSProperties> = {
     gap: '20px',
   },
   pricingCard: {
-    padding: '24px',
-    background: '#fff',
-    borderRadius: '12px',
+    padding: '28px',
+    background: 'linear-gradient(145deg, #ffffff 0%, #f8f8f8 100%)',
+    borderRadius: '16px',
     color: '#1a1a1a',
+    boxShadow: '0 12px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(34,197,94,0.15)',
   },
   priceRow: {
     display: 'flex',
@@ -687,9 +688,10 @@ const s: Record<string, CSSProperties> = {
     color: '#1a1a1a',
   },
   quirkPriceValue: {
-    fontSize: '28px',
+    fontSize: '32px',
     fontWeight: 700,
-    color: '#1B7340',
+    color: '#16a34a',
+    textShadow: '0 0 20px rgba(34,197,94,0.3)',
   },
   conditionalSection: {
     marginTop: '16px',
@@ -740,16 +742,17 @@ const s: Record<string, CSSProperties> = {
     border: 'none',
     fontSize: '13px',
     fontWeight: 600,
-    color: '#1B7340',
+    color: '#22c55e',
     cursor: 'pointer',
   },
 
   // Specs Card
   specsCard: {
-    padding: '20px',
-    background: 'rgba(255,255,255,0.05)',
-    borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.1)',
+    padding: '24px',
+    background: 'linear-gradient(145deg, rgba(30,30,35,0.9) 0%, rgba(20,20,25,0.95) 100%)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.12)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
   },
   specsTitle: {
     fontSize: '16px',
@@ -792,10 +795,11 @@ const s: Record<string, CSSProperties> = {
 
   // Features Card
   featuresCard: {
-    padding: '20px',
-    background: 'rgba(255,255,255,0.05)',
-    borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.1)',
+    padding: '24px',
+    background: 'linear-gradient(145deg, rgba(30,30,35,0.9) 0%, rgba(20,20,25,0.95) 100%)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.12)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
   },
   featuresTitle: {
     fontSize: '16px',
@@ -822,17 +826,17 @@ const s: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '12px',
+    gap: '14px',
     width: '100%',
-    padding: '20px 24px',
-    background: '#1B7340',
+    padding: '22px 28px',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
-    borderRadius: '12px',
+    borderRadius: '16px',
     color: '#fff',
     fontSize: '20px',
     fontWeight: 700,
     cursor: 'pointer',
-    boxShadow: '0 4px 20px rgba(27,115,64,0.4)',
+    boxShadow: '0 8px 32px rgba(34,197,94,0.45), 0 0 20px rgba(34,197,94,0.2)',
     transition: 'transform 0.2s, box-shadow 0.2s',
   },
   letsSeeItHint: {
@@ -1048,13 +1052,14 @@ const s: Record<string, CSSProperties> = {
     justifyContent: 'center',
     gap: '8px',
     padding: '16px 24px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
-    borderRadius: '12px',
+    borderRadius: '14px',
     color: '#fff',
     fontSize: '16px',
     fontWeight: 700,
     cursor: 'pointer',
+    boxShadow: '0 6px 24px rgba(34,197,94,0.4)',
   },
   tertiaryBtn: {
     display: 'flex',
