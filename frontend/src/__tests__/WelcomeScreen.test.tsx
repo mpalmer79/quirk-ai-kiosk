@@ -432,10 +432,12 @@ describe('WelcomeScreen Component', () => {
       
       await waitFor(() => {
         expect(screen.getByText('250')).toBeInTheDocument();
-        // Use getAllByText since "Vehicles In Stock" also appears in path description
-        const vehicleLabels = screen.getAllByText(/Vehicles In Stock/i);
-        // At least one should be the stats bar label
-        expect(vehicleLabels.length).toBeGreaterThanOrEqual(1);
+        // Stats bar label - check within a button element (stat buttons)
+        const statButtons = screen.getAllByRole('button');
+        const hasVehiclesInStockLabel = statButtons.some(btn => 
+          btn.textContent?.toLowerCase().includes('vehicles in stock')
+        );
+        expect(hasVehiclesInStockLabel).toBe(true);
       });
     });
 
@@ -541,8 +543,8 @@ describe('WelcomeScreen Component', () => {
         expect(screen.getByText(/How can I help you today/i)).toBeInTheDocument();
       });
 
-      // Stats bar should not be present when API fails - check for stat value not label
-      // (label text "Vehicles In Stock" also appears in path card description)
+      // Stats bar should not be present when API fails - check stat value not label
+      // (label text appears in path card description too)
       expect(screen.queryByText('250')).not.toBeInTheDocument();
     });
 
