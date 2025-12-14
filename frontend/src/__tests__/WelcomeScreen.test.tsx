@@ -286,9 +286,9 @@ describe('WelcomeScreen Component', () => {
       renderWelcomeScreen({ customerData: { customerName: 'John' } });
       
       await waitFor(() => {
-        expect(screen.getByText(/Hi/i)).toBeInTheDocument();
-        expect(screen.getByText(/John/i)).toBeInTheDocument();
-        expect(screen.getByText(/How can I help you today/i)).toBeInTheDocument();
+        // The greeting is "Hi John, How can I help you today?" in a single h2
+        const heading = screen.getByRole('heading', { level: 2 });
+        expect(heading).toHaveTextContent(/Hi.*John.*How can I help you today/i);
       });
     });
 
