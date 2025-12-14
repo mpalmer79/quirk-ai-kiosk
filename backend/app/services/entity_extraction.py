@@ -415,7 +415,7 @@ class ConversationEntityExtractor:
             (r'(wife|husband|spouse|partner)\s+(?:needs?|wants?|has)\s+to', 1),
             (r'(?:need|get)\s+(?:her|his)\s+(?:input|approval|opinion|ok)', None),
             (r'(?:she|he)\s+(?:needs?|has|wants?)\s+to\s+(?:see|approve|agree)', None),
-            (r'can\'?t\s+(?:decide|make.*decision)\s+(?:without|alone)', None),
+            (r'can\'?t\s+(?:decide|make.*decision).*(?:without|alone)', None),
             (r'(?:we|both)\s+need\s+to\s+(?:discuss|talk|decide)', None),
             (r'sleep\s+on\s+it', None),
             (r'think\s+(?:about\s+it|it\s+over)', None),
