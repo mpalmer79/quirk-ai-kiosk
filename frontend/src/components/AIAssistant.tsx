@@ -117,6 +117,18 @@ const OBJECTION_CATEGORIES: ObjectionCategory[] = [
       "How comfortable is this for long road trips?",
     ],
   },
+  {
+    id: 'spouse',
+    label: 'Need to Discuss',
+    icon: '👫',
+    prompts: [
+      "I need to talk to my wife first",
+      "I need to discuss this with my husband",
+      "My spouse and I need to talk about this",
+      "I can't make this decision alone",
+      "I need to sleep on it and discuss with my partner",
+    ],
+  },
 ];
 
 // Objection detection patterns
@@ -207,6 +219,28 @@ const OBJECTION_PATTERNS: ObjectionPattern[] = [
       "Would you like to test these features yourself?",
       "I can get you real owner feedback on this",
       "Let me show you the detailed specifications",
+    ],
+  },
+  {
+    patterns: [
+      /need\s+to\s+(talk|speak|discuss|check)\s+(to|with)\s+(my\s+)?(wife|husband|spouse|partner|significant\s+other)/i,
+      /(wife|husband|spouse|partner)\s+(needs?\s+to|wants?\s+to|has\s+to|should)\s+(see|know|approve|agree|decide)/i,
+      /can'?t\s+(decide|make\s+(a|this)\s+decision)\s+(without|alone)/i,
+      /(we|both)\s+need\s+to\s+(discuss|talk|decide|agree)/i,
+      /let\s+me\s+(talk|check|discuss)\s+(to|with)\s+(my\s+)?(wife|husband|spouse|partner|her|him)/i,
+      /need\s+(her|his)\s+(input|approval|opinion|ok|okay)/i,
+      /(she|he)\s+(needs?\s+to|has\s+to|wants?\s+to)\s+(see|approve|agree|be\s+here)/i,
+      /sleep\s+on\s+it/i,
+      /think\s+(about\s+it|it\s+over)/i,
+      /not\s+(ready|sure)\s+(to\s+)?(commit|decide|buy)/i,
+      /big\s+decision/i,
+    ],
+    category: 'spouse',
+    suggestedFollowups: [
+      "Would you like to call them right now so I can answer their questions?",
+      "I can prepare a detailed summary to share with them",
+      "Would they like to come see this vehicle in person?",
+      "Can I get the keys so you can take it home to show them?",
     ],
   },
 ];
