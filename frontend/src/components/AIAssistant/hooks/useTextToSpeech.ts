@@ -34,7 +34,7 @@ export const useTextToSpeech = ({ enabled }: UseTextToSpeechProps) => {
     if (ttsAvailable) {
       try {
         setIsSpeaking(true);
-        const audioBlob = await api.textToSpeech(text);
+        const audioBlob = await api.textToSpeech({ text });
         const audioUrl = URL.createObjectURL(audioBlob);
         
         audioRef.current = new Audio(audioUrl);
