@@ -432,12 +432,7 @@ describe('WelcomeScreen Component', () => {
       
       await waitFor(() => {
         expect(screen.getByText('250')).toBeInTheDocument();
-        // Stats bar label - check within a button element (stat buttons)
-        const statButtons = screen.getAllByRole('button');
-        const hasVehiclesInStockLabel = statButtons.some(btn => 
-          btn.textContent?.toLowerCase().includes('vehicles in stock')
-        );
-        expect(hasVehiclesInStockLabel).toBe(true);
+        expect(screen.getByText(/Vehicles In Stock/i)).toBeInTheDocument();
       });
     });
 
@@ -543,9 +538,8 @@ describe('WelcomeScreen Component', () => {
         expect(screen.getByText(/How can I help you today/i)).toBeInTheDocument();
       });
 
-      // Stats bar should not be present when API fails - check stat value not label
-      // (label text appears in path card description too)
-      expect(screen.queryByText('250')).not.toBeInTheDocument();
+      // Stats bar should not be present when API fails
+      expect(screen.queryByText(/Vehicles In Stock/i)).not.toBeInTheDocument();
     });
 
     test('handles traffic log API error gracefully', async () => {
