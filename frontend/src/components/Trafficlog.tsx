@@ -12,7 +12,7 @@ interface TrafficLogProps {
 }
 
 const PATH_LABELS: Record<string, string> = { stockLookup: 'Stock Lookup', modelBudget: 'Model & Budget', guidedQuiz: 'Guided Quiz', browse: 'Browse All', aiChat: 'AI Chat' };
-const PATH_COLORS: Record<string, string> = { stockLookup: '#1B7340', modelBudget: '#2563eb', guidedQuiz: '#dc2626', browse: '#6b7280', aiChat: '#8b5cf6' };
+const PATH_COLORS: Record<string, string> = { stockLookup: '#22c55e', modelBudget: '#2563eb', guidedQuiz: '#dc2626', browse: '#6b7280', aiChat: '#8b5cf6' };
 
 const TrafficLog: React.FC<TrafficLogProps> = ({ navigateTo, updateCustomerData }) => {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -256,10 +256,10 @@ useEffect(() => { loadData(); }, [activeFilter]);
 const s: Record<string, CSSProperties> = {
   container: { flex: 1, padding: '24px 40px', overflow: 'auto', background: '#0a0a0a', color: '#fff', minHeight: '100vh' },
   loadingState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', gap: '16px', color: 'rgba(255,255,255,0.6)' },
-  spinner: { width: '48px', height: '48px', border: '4px solid rgba(255,255,255,0.1)', borderTopColor: '#1B7340', borderRadius: '50%', animation: 'spin 1s linear infinite' },
+  spinner: { width: '48px', height: '48px', border: '4px solid rgba(255,255,255,0.1)', borderTopColor: '#22c55e', borderRadius: '50%', animation: 'spin 1s linear infinite' },
   errorIcon: { fontSize: '48px' },
   errorText: { color: '#ef4444' },
-  retryBtn: { padding: '12px 24px', background: '#1B7340', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' },
+  retryBtn: { padding: '12px 24px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' },
   headerLeft: { display: 'flex', flexDirection: 'column', gap: '8px' },
   headerRight: { display: 'flex', alignItems: 'center', gap: '12px' },
@@ -314,7 +314,7 @@ const s: Record<string, CSSProperties> = {
   chatHistoryContainer: { maxHeight: '300px', overflow: 'auto', background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '12px' },
   chatMessage: { marginBottom: '12px', padding: '12px', borderRadius: '8px' },
   chatMessageUser: { background: 'rgba(37,99,235,0.15)', borderLeft: '3px solid #2563eb' },
-  chatMessageAssistant: { background: 'rgba(27,115,64,0.15)', borderLeft: '3px solid #1B7340' },
+  chatMessageAssistant: { background: 'rgba(27,115,64,0.15)', borderLeft: '3px solid #22c55e' },
   chatMessageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
   chatRole: { fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.7)' },
   chatTimestamp: { fontSize: '11px', color: 'rgba(255,255,255,0.4)' },
