@@ -33,8 +33,8 @@ const FinanceCalculator = ({
               type="button"
               style={{
                 ...styles.termButton,
-                background: term === t ? '#1B7340' : 'transparent',
-                borderColor: term === t ? '#1B7340' : 'rgba(255,255,255,0.2)',
+                background: term === t ? '#22c55e' : 'transparent',
+                borderColor: term === t ? '#22c55e' : 'rgba(255,255,255,0.2)',
               }}
               onClick={() => setTerm(t)}
             >
@@ -221,7 +221,7 @@ const styles = {
   selectButton: {
     width: '100%',
     padding: '14px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     borderRadius: '10px',
     color: '#ffffff',
