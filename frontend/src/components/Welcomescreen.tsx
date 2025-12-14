@@ -7,9 +7,9 @@ type PathId = 'stockLookup' | 'modelBudget' | 'aiAssistant';
 type StatType = 'total' | 'suv' | 'truck' | 'price' | null;
 
 const PATHS: Array<{ id: PathId; title: string; subtitle: string; description: string; gradient: string; iconPath: string }> = [
-  { id: 'stockLookup', title: 'I Have a Stock Number', subtitle: 'Find the exact vehicle', description: 'Enter your stock number to view availability, pricing, and schedule a test drive.', gradient: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)', iconPath: 'M11 11m-8 0a8 8 0 1 0 16 0a8 8 0 1 0 -16 0M21 21l-4.35-4.35M11 8v6M8 11h6' },
-  { id: 'modelBudget', title: 'I Know What I Want', subtitle: 'Browse by model & budget', description: 'Select your preferred model and set your budget to see matching vehicles in stock.', gradient: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)', iconPath: 'M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M5 17h-2v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5' },
-  { id: 'aiAssistant', title: 'Chat with Quirk AI', subtitle: "LET'S HAVE A CONVERSATION", description: "Let's walk through this together and find the right vehicle that fits what you're looking for.", gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', iconPath: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
+  { id: 'stockLookup', title: 'I Have a Stock Number', subtitle: 'Find the exact vehicle', description: 'Enter your stock number to view availability, pricing, and schedule a test drive.', gradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', iconPath: 'M11 11m-8 0a8 8 0 1 0 16 0a8 8 0 1 0 -16 0M21 21l-4.35-4.35M11 8v6M8 11h6' },
+  { id: 'modelBudget', title: 'I Know What I Want', subtitle: 'Browse by model & budget', description: 'Select your preferred model and set your budget to see matching inventory.', gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', iconPath: 'M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M5 17h-2v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5' },
+  { id: 'aiAssistant', title: 'Chat with Quirk AI', subtitle: "LET'S HAVE A CONVERSATION", description: "Let's walk through this together and find the right vehicle that fits what you're looking for.", gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', iconPath: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
 ];
 
 const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
@@ -72,11 +72,8 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     navigateTo('inventory');
   };
 
-  // Updated: Navigate to filtered inventory based on which stat was clicked
   const handleStatClick = (statKey: StatType) => {
     updateCustomerData({ path: 'browse' });
-    
-    // Navigate with filter based on stat type
     switch (statKey) {
       case 'suv':
         updateCustomerData({ bodyStyleFilter: 'SUV' });
@@ -147,9 +144,9 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
 
       <div style={s.pathsContainer}>
         {PATHS.map((path) => (
-          <div key={path.id} style={{ ...s.pathCard, background: hoveredPath === path.id ? path.gradient : 'rgba(0,0,0,0.6)', transform: hoveredPath === path.id ? 'scale(1.02) translateY(-4px)' : 'scale(1)', borderColor: hoveredPath === path.id ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)' }}
+          <div key={path.id} style={{ ...s.pathCard, background: hoveredPath === path.id ? path.gradient : 'rgba(20,20,25,0.8)', transform: hoveredPath === path.id ? 'scale(1.03) translateY(-8px)' : 'scale(1)', borderColor: hoveredPath === path.id ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)', boxShadow: hoveredPath === path.id ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(74,222,128,0.2)' : '0 8px 32px rgba(0,0,0,0.3)' }}
             onMouseEnter={() => setHoveredPath(path.id)} onMouseLeave={() => setHoveredPath(null)} onClick={() => handlePathSelect(path.id)}>
-            <div style={{ ...s.pathIcon, background: hoveredPath === path.id ? 'rgba(255,255,255,0.2)' : path.gradient }}>
+            <div style={{ ...s.pathIcon, background: hoveredPath === path.id ? 'rgba(255,255,255,0.2)' : path.gradient, boxShadow: hoveredPath === path.id ? 'none' : '0 8px 24px rgba(0,0,0,0.3)' }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d={path.iconPath}/></svg>
             </div>
             <h3 style={s.pathTitle}>{path.title}</h3>
@@ -189,43 +186,43 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
 const s: Record<string, CSSProperties> = {
   container: { minHeight: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '40px 20px 100px 20px', position: 'relative', fontFamily: "'Montserrat', sans-serif", boxSizing: 'border-box' },
   bgImage: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: 'url("/showroom.jpg")', backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 0 },
-  bgOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.85) 100%)', zIndex: 1 },
+  bgOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(10,10,15,0.92) 100%)', zIndex: 1 },
   nameCaptureSection: { position: 'relative', zIndex: 2, textAlign: 'center', maxWidth: '700px', width: '100%', padding: '20px 40px', transition: 'all 0.6s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' },
   titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '8px', whiteSpace: 'nowrap' },
-  inlineAvatar: { width: '52px', height: '52px', borderRadius: '50%', background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 16px rgba(27,115,64,0.4)' },
-  nameTitle: { fontSize: '32px', fontWeight: 700, color: '#fff', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' },
-  nameSubtitle: { fontSize: '26px', fontWeight: 600, color: '#fff', margin: '0 0 28px 0', textShadow: '0 2px 4px rgba(0,0,0,0.5)' },
-  namePrompt: { fontSize: '18px', color: 'rgba(255,255,255,0.8)', margin: '0 0 12px 0' },
-  phonePrompt: { fontSize: '18px', color: 'rgba(255,255,255,0.8)', margin: '0 0 12px 0' },
+  inlineAvatar: { width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 8px 32px rgba(34,197,94,0.5), 0 0 20px rgba(34,197,94,0.3)' },
+  nameTitle: { fontSize: '32px', fontWeight: 700, color: '#fff', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' },
+  nameSubtitle: { fontSize: '26px', fontWeight: 600, color: '#fff', margin: '0 0 28px 0', textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
+  namePrompt: { fontSize: '18px', color: 'rgba(255,255,255,0.9)', margin: '0 0 12px 0' },
+  phonePrompt: { fontSize: '18px', color: 'rgba(255,255,255,0.9)', margin: '0 0 12px 0' },
   inputContainer: { position: 'relative', width: '100%', maxWidth: '420px', marginBottom: '20px' },
-  nameInput: { width: '100%', padding: '18px 24px', background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.2)', borderRadius: '16px', color: '#fff', fontSize: '20px', fontWeight: 600, textAlign: 'center', backdropFilter: 'blur(10px)', boxSizing: 'border-box' },
-  phoneInput: { width: '100%', padding: '18px 24px', background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.2)', borderRadius: '16px', color: '#fff', fontSize: '18px', fontWeight: 500, textAlign: 'center', backdropFilter: 'blur(10px)', boxSizing: 'border-box' },
-  nameActions: { display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', width: '100%', maxWidth: '420px' },
-  continueBtn: { width: '100%', padding: '18px 32px', background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 15px rgba(27,115,64,0.3)' },
-  skipBtn: { background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '14px', fontWeight: 500, cursor: 'pointer', padding: '10px' },
+  nameInput: { width: '100%', padding: '20px 26px', background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.2)', borderRadius: '16px', color: '#fff', fontSize: '20px', fontWeight: 600, textAlign: 'center', backdropFilter: 'blur(12px)', boxSizing: 'border-box', transition: 'all 0.2s ease' },
+  phoneInput: { width: '100%', padding: '20px 26px', background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.2)', borderRadius: '16px', color: '#fff', fontSize: '18px', fontWeight: 500, textAlign: 'center', backdropFilter: 'blur(12px)', boxSizing: 'border-box', transition: 'all 0.2s ease' },
+  nameActions: { display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px', width: '100%', maxWidth: '420px' },
+  continueBtn: { width: '100%', padding: '20px 36px', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', border: 'none', borderRadius: '14px', color: '#fff', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 32px rgba(34,197,94,0.4), 0 0 20px rgba(34,197,94,0.2)', transition: 'all 0.2s ease' },
+  skipBtn: { background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '14px', fontWeight: 500, cursor: 'pointer', padding: '12px', transition: 'color 0.2s ease' },
   privacyNote: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0 },
-  heroSection: { textAlign: 'center', marginBottom: '48px', marginTop: '20px', transition: 'all 0.6s ease', position: 'relative', zIndex: 2 },
+  heroSection: { textAlign: 'center', marginBottom: '52px', marginTop: '24px', transition: 'all 0.6s ease', position: 'relative', zIndex: 2 },
   greeting: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '16px' },
-  aiAvatar: { width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' },
-  heroTitle: { fontSize: '28px', fontWeight: 600, color: '#fff', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.5)' },
-  highlight: { color: '#4ade80' },
-  heroSubtitle: { fontSize: '48px', fontWeight: 800, color: '#fff', margin: '0 0 16px 0', letterSpacing: '-1px', textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
-  heroText: { fontSize: '20px', color: 'rgba(255,255,255,0.9)', margin: 0, textShadow: '0 1px 3px rgba(0,0,0,0.5)' },
-  pathsContainer: { display: 'flex', gap: '24px', marginBottom: '40px', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '1200px', position: 'relative', zIndex: 2 },
-  pathCard: { flex: '1 1 320px', maxWidth: '380px', minHeight: '280px', padding: '32px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s ease', position: 'relative', overflow: 'hidden' },
-  pathIcon: { width: '80px', height: '80px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', marginBottom: '20px', transition: 'all 0.3s ease' },
-  pathTitle: { fontSize: '22px', fontWeight: 700, color: '#fff', margin: '0 0 4px 0' },
-  pathSubtitle: { fontSize: '14px', fontWeight: 600, color: '#4ade80', margin: '0 0 12px 0', textTransform: 'uppercase', letterSpacing: '1px' },
-  pathDescription: { fontSize: '14px', color: 'rgba(255,255,255,0.7)', margin: 0, lineHeight: 1.5, flex: 1 },
-  pathArrow: { marginTop: '20px', color: 'rgba(255,255,255,0.5)', transition: 'transform 0.3s ease' },
-  statsBar: { display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 24px', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '24px', position: 'relative', zIndex: 2 },
-  statItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' },
-  statBtn: { background: 'transparent', border: 'none', padding: '12px 24px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease' },
-  statBtnHover: { background: 'rgba(74,222,128,0.15)', transform: 'scale(1.05)' },
-  statNumber: { fontSize: '32px', fontWeight: 700, color: '#4ade80' },
-  statLabel: { fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' },
-  statDivider: { width: '1px', height: '40px', background: 'rgba(255,255,255,0.1)' },
-  browseLink: { background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', fontSize: '16px', fontWeight: 500, cursor: 'pointer', padding: '12px 24px', borderRadius: '8px', position: 'relative', zIndex: 2, backdropFilter: 'blur(5px)' },
+  aiAvatar: { width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 8px 32px rgba(34,197,94,0.5)' },
+  heroTitle: { fontSize: '28px', fontWeight: 600, color: '#fff', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
+  highlight: { color: '#4ade80', textShadow: '0 0 20px rgba(74,222,128,0.5)' },
+  heroSubtitle: { fontSize: '48px', fontWeight: 800, color: '#fff', margin: '0 0 16px 0', letterSpacing: '-1px', textShadow: '0 4px 16px rgba(0,0,0,0.5)' },
+  heroText: { fontSize: '20px', color: 'rgba(255,255,255,0.85)', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
+  pathsContainer: { display: 'flex', gap: '28px', marginBottom: '44px', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '1200px', position: 'relative', zIndex: 2 },
+  pathCard: { flex: '1 1 320px', maxWidth: '380px', minHeight: '300px', padding: '36px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(16px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', cursor: 'pointer', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative', overflow: 'hidden' },
+  pathIcon: { width: '88px', height: '88px', borderRadius: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', marginBottom: '22px', transition: 'all 0.35s ease' },
+  pathTitle: { fontSize: '24px', fontWeight: 700, color: '#fff', margin: '0 0 6px 0' },
+  pathSubtitle: { fontSize: '14px', fontWeight: 600, color: '#4ade80', margin: '0 0 14px 0', textTransform: 'uppercase', letterSpacing: '1.5px' },
+  pathDescription: { fontSize: '15px', color: 'rgba(255,255,255,0.75)', margin: 0, lineHeight: 1.6, flex: 1 },
+  pathArrow: { marginTop: '22px', color: 'rgba(255,255,255,0.6)', transition: 'transform 0.3s ease' },
+  statsBar: { display: 'flex', alignItems: 'center', gap: '10px', padding: '20px 32px', background: 'linear-gradient(145deg, rgba(20,20,25,0.9) 0%, rgba(15,15,20,0.95) 100%)', backdropFilter: 'blur(16px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.12)', marginBottom: '28px', position: 'relative', zIndex: 2, boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)' },
+  statItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' },
+  statBtn: { background: 'transparent', border: 'none', padding: '14px 28px', borderRadius: '14px', cursor: 'pointer', transition: 'all 0.25s ease' },
+  statBtnHover: { background: 'linear-gradient(135deg, rgba(74,222,128,0.2) 0%, rgba(34,197,94,0.15) 100%)', transform: 'scale(1.05)', boxShadow: '0 0 24px rgba(74,222,128,0.25)' },
+  statNumber: { fontSize: '36px', fontWeight: 700, color: '#4ade80', textShadow: '0 0 24px rgba(74,222,128,0.4)' },
+  statLabel: { fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '1px' },
+  statDivider: { width: '1px', height: '48px', background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)' },
+  browseLink: { background: 'linear-gradient(145deg, rgba(30,30,35,0.9) 0%, rgba(20,20,25,0.9) 100%)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.9)', fontSize: '16px', fontWeight: 600, cursor: 'pointer', padding: '16px 32px', borderRadius: '12px', position: 'relative', zIndex: 2, backdropFilter: 'blur(8px)', transition: 'all 0.2s ease', boxShadow: '0 4px 16px rgba(0,0,0,0.2)' },
 };
 
 export default WelcomeScreen;
