@@ -642,7 +642,7 @@ const styles: { [key: string]: CSSProperties } = {
   confirmButton: {
     width: '100%',
     padding: '16px 24px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     borderRadius: '12px',
     color: '#ffffff',
@@ -714,7 +714,7 @@ const styles: { [key: string]: CSSProperties } = {
   },
   manualSubmitButton: {
     padding: '14px 24px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     borderRadius: '12px',
     color: '#ffffff',
