@@ -948,6 +948,15 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
 
   return (
     <div style={styles.container}>
+      {/* QUIRK Logo - Top Left */}
+      <div style={styles.logoContainer}>
+        <img 
+          src="/images/quirk_logo.png" 
+          alt="Quirk" 
+          style={styles.logo}
+        />
+      </div>
+      
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerIcon}>
@@ -968,8 +977,8 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         <button
           style={{
             ...styles.audioToggle,
-            background: audioEnabled ? (ttsAvailable ? 'rgba(139, 92, 246, 0.2)' : 'rgba(74, 222, 128, 0.2)') : 'rgba(255,255,255,0.1)',
-            borderColor: audioEnabled ? (ttsAvailable ? '#8b5cf6' : '#E8C55A') : 'rgba(255,255,255,0.2)',
+            background: audioEnabled ? '#e8f4f8' : '#f5f5f5',
+            borderColor: audioEnabled ? '#0077b6' : '#ddd',
           }}
           onClick={toggleAudio}
           title={ttsAvailable ? 'ElevenLabs HD Voice' : 'Browser Speech'}
@@ -1003,8 +1012,8 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         <button
           style={{
             ...styles.questionsToggle,
-            background: showObjectionPanel ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.1)',
-            borderColor: showObjectionPanel ? '#6366f1' : 'rgba(255,255,255,0.2)',
+            background: showObjectionPanel ? '#e8f4f8' : '#f5f5f5',
+            borderColor: showObjectionPanel ? '#0077b6' : '#ddd',
           }}
           onClick={() => setShowObjectionPanel(!showObjectionPanel)}
         >
@@ -1100,7 +1109,10 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
                   </svg>
                 </div>
               )}
-              <p style={styles.messageText}>{message.content}</p>
+              <p style={{
+                ...styles.messageText,
+                color: message.role === 'user' ? '#ffffff' : '#1a1a1a',
+              }}>{message.content}</p>
               
               {/* Dealership Info Image for hours/contact queries */}
               {message.showDealerInfo && (
@@ -1254,11 +1266,23 @@ const styles: Record<string, CSSProperties> = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    padding: '20px',
-    maxWidth: '900px',
+    padding: '20px 30px',
+    maxWidth: '1000px',
     margin: '0 auto',
     width: '100%',
     boxSizing: 'border-box',
+    background: '#ffffff',
+    minHeight: '100%',
+  },
+  logoContainer: {
+    position: 'absolute',
+    top: '90px',
+    left: '30px',
+    zIndex: 10,
+  },
+  logo: {
+    height: '50px',
+    width: 'auto',
   },
   header: {
     display: 'flex',
@@ -1266,29 +1290,30 @@ const styles: Record<string, CSSProperties> = {
     gap: '16px',
     marginBottom: '24px',
     paddingBottom: '20px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
+    borderBottom: '2px solid #D1AD57',
   },
   headerIcon: {
-    width: '64px',
-    height: '64px',
-    borderRadius: '16px',
-    background: 'linear-gradient(135deg, #D1AD57 0%, #B8962E 100%)',
+    width: '56px',
+    height: '56px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #0077b6 0%, #005a8c 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     color: '#ffffff',
-    boxShadow: '0 8px 24px rgba(209,173,87,0.4)',
+    boxShadow: '0 4px 12px rgba(0,119,182,0.3)',
   },
   title: {
-    fontSize: '24px',
+    fontSize: '22px',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#1a1a1a',
     margin: 0,
   },
   subtitle: {
     fontSize: '14px',
     color: '#D1AD57',
     margin: '4px 0 0 0',
+    fontWeight: '600',
   },
   audioToggle: {
     marginLeft: 'auto',
@@ -1296,16 +1321,18 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 16px',
-    borderRadius: '12px',
-    border: '1px solid',
-    color: '#ffffff',
+    borderRadius: '8px',
+    border: '1px solid #ddd',
+    color: '#333',
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    background: '#f5f5f5',
   },
   audioLabel: {
     fontSize: '13px',
+    color: '#333',
   },
   messagesContainer: {
     flex: 1,
@@ -1314,6 +1341,11 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
+    background: '#fafafa',
+    borderRadius: '12px',
+    margin: '0 -10px',
+    paddingLeft: '10px',
+    paddingRight: '10px',
   },
   messageWrapper: {
     display: 'flex',
@@ -1326,12 +1358,14 @@ const styles: Record<string, CSSProperties> = {
     position: 'relative',
   },
   userBubble: {
-    background: 'linear-gradient(135deg, #D1AD57 0%, #B8962E 100%)',
+    background: 'linear-gradient(135deg, #0077b6 0%, #005a8c 100%)',
     borderBottomRightRadius: '4px',
+    color: '#ffffff',
   },
   assistantBubble: {
-    background: 'rgba(255,255,255,0.15)',
+    background: '#f0f0f0',
     borderBottomLeftRadius: '4px',
+    border: '1px solid #e0e0e0',
   },
   aiAvatar: {
     position: 'absolute',
@@ -1345,12 +1379,13 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     color: '#ffffff',
-    border: '2px solid rgba(255,255,255,0.2)',
+    border: '2px solid #fff',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
   },
   messageText: {
     fontSize: '15px',
     lineHeight: '1.6',
-    color: '#ffffff',
+    color: '#1a1a1a',
     margin: 0,
     whiteSpace: 'pre-wrap',
   },
@@ -1361,8 +1396,8 @@ const styles: Record<string, CSSProperties> = {
     marginTop: '16px',
   },
   vehicleCard: {
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.15)',
+    background: '#ffffff',
+    border: '1px solid #e0e0e0',
     borderRadius: '12px',
     padding: '16px',
     cursor: 'pointer',
@@ -1371,6 +1406,7 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
   },
   vehicleInfo: {
     display: 'flex',
@@ -1379,17 +1415,17 @@ const styles: Record<string, CSSProperties> = {
   },
   vehicleYear: {
     fontSize: '12px',
-    color: '#E8C55A',
+    color: '#0077b6',
     fontWeight: '600',
   },
   vehicleModel: {
     fontSize: '16px',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#1a1a1a',
   },
   vehicleTrim: {
     fontSize: '12px',
-    color: 'rgba(255,255,255,0.6)',
+    color: '#666',
   },
   vehicleDetails: {
     display: 'flex',
@@ -1399,16 +1435,16 @@ const styles: Record<string, CSSProperties> = {
   },
   vehicleColor: {
     fontSize: '12px',
-    color: 'rgba(255,255,255,0.5)',
+    color: '#888',
   },
   vehiclePrice: {
     fontSize: '16px',
     fontWeight: '700',
-    color: '#E8C55A',
+    color: '#D1AD57',
   },
   viewButton: {
     fontSize: '13px',
-    color: '#60a5fa',
+    color: '#0077b6',
     fontWeight: '600',
     marginTop: '8px',
   },
@@ -1419,47 +1455,52 @@ const styles: Record<string, CSSProperties> = {
   },
   dot: {
     fontSize: '12px',
-    color: '#E8C55A',
+    color: '#0077b6',
     animation: 'pulse 1s infinite',
   },
   suggestionsContainer: {
-    padding: '20px 0',
-    borderTop: '1px solid rgba(255,255,255,0.1)',
+    padding: '20px',
+    background: '#f8f9fa',
+    borderRadius: '12px',
+    border: '1px solid #e0e0e0',
   },
   suggestionsLabel: {
-    fontSize: '14px',
-    color: '#D1AD57',
-    margin: '0 0 12px 0',
-    fontWeight: '600',
+    fontSize: '15px',
+    color: '#1a1a1a',
+    margin: '0 0 16px 0',
+    fontWeight: '700',
   },
   suggestionsGrid: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '8px',
+    gap: '10px',
   },
   suggestionButton: {
-    background: 'rgba(209,173,87,0.1)',
-    border: '1px solid rgba(209,173,87,0.3)',
-    borderRadius: '20px',
-    padding: '10px 16px',
-    color: '#fff',
-    fontSize: '13px',
+    background: '#ffffff',
+    border: '1px solid #0077b6',
+    borderRadius: '25px',
+    padding: '12px 20px',
+    color: '#0077b6',
+    fontSize: '14px',
+    fontWeight: '500',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
   },
   inputContainer: {
     display: 'flex',
     gap: '12px',
     padding: '20px 0',
-    borderTop: '1px solid rgba(255,255,255,0.1)',
+    borderTop: '1px solid #e0e0e0',
+    background: '#ffffff',
   },
   input: {
     flex: 1,
     padding: '16px 20px',
-    background: 'rgba(255,255,255,0.15)',
-    border: '1px solid rgba(255,255,255,0.2)',
+    background: '#f5f5f5',
+    border: '1px solid #ddd',
     borderRadius: '12px',
-    color: '#ffffff',
+    color: '#1a1a1a',
     fontSize: '16px',
     outline: 'none',
   },
@@ -1467,7 +1508,7 @@ const styles: Record<string, CSSProperties> = {
     width: '56px',
     height: '56px',
     borderRadius: '12px',
-    background: 'linear-gradient(135deg, #D1AD57 0%, #B8962E 100%)',
+    background: 'linear-gradient(135deg, #0077b6 0%, #005a8c 100%)',
     border: 'none',
     color: '#ffffff',
     cursor: 'pointer',
@@ -1475,15 +1516,15 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s ease',
-    boxShadow: '0 4px 16px rgba(209,173,87,0.4)',
+    boxShadow: '0 4px 12px rgba(0,119,182,0.3)',
   },
   micButton: {
     width: '56px',
     height: '56px',
     borderRadius: '12px',
-    background: 'rgba(255,255,255,0.15)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    color: '#ffffff',
+    background: '#f5f5f5',
+    border: '1px solid #ddd',
+    color: '#333',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -1499,8 +1540,8 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    background: 'rgba(209,173,87,0.1)',
-    border: '1px solid rgba(209,173,87,0.4)',
+    background: '#ffffff',
+    border: '2px solid #D1AD57',
     borderRadius: '8px',
     padding: '12px 24px',
     color: '#D1AD57',
@@ -1516,25 +1557,24 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 16px',
-    borderRadius: '12px',
-    border: '1px solid',
-    color: '#ffffff',
+    borderRadius: '8px',
+    border: '1px solid #ddd',
+    color: '#333',
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     marginLeft: '8px',
+    background: '#f5f5f5',
   },
   
   // Objection Panel
   objectionPanel: {
-    background: 'rgba(99, 102, 241, 0.08)',
-    border: '1px solid rgba(99, 102, 241, 0.2)',
+    background: '#f8f9fa',
+    border: '1px solid #e0e0e0',
     borderRadius: '16px',
     padding: '20px',
     marginBottom: '16px',
-    maxHeight: '400px',
-    overflowY: 'auto',
   },
   objectionHeader: {
     marginBottom: '16px',
@@ -1542,93 +1582,91 @@ const styles: Record<string, CSSProperties> = {
   objectionTitle: {
     fontSize: '18px',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#1a1a1a',
     margin: '0 0 4px 0',
   },
   objectionSubtitle: {
-    fontSize: '13px',
-    color: 'rgba(255,255,255,0.6)',
+    fontSize: '14px',
+    color: '#666',
     margin: 0,
   },
   objectionCategories: {
-    display: 'flex',
-    flexDirection: 'column',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
     gap: '16px',
   },
   objectionCategory: {
-    background: 'rgba(255,255,255,0.03)',
+    background: '#ffffff',
+    border: '1px solid #e0e0e0',
     borderRadius: '12px',
-    padding: '14px',
+    padding: '16px',
   },
   categoryHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    marginBottom: '10px',
+    marginBottom: '12px',
   },
   categoryIcon: {
-    fontSize: '18px',
+    fontSize: '20px',
   },
   categoryLabel: {
     fontSize: '14px',
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#1a1a1a',
   },
   categoryPrompts: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
+    gap: '8px',
   },
   objectionPromptButton: {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: '#f0f7fa',
+    border: '1px solid #0077b6',
     borderRadius: '8px',
-    padding: '10px 12px',
-    color: 'rgba(255,255,255,0.85)',
+    padding: '10px 14px',
+    color: '#0077b6',
     fontSize: '13px',
-    textAlign: 'left',
+    fontWeight: '500',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    textAlign: 'left',
   },
   closePanelButton: {
-    width: '100%',
-    marginTop: '16px',
-    padding: '12px',
-    background: 'rgba(255,255,255,0.15)',
-    border: '1px solid rgba(255,255,255,0.2)',
+    display: 'block',
+    margin: '16px auto 0',
+    padding: '10px 24px',
+    background: '#ffffff',
+    border: '1px solid #ddd',
     borderRadius: '8px',
-    color: '#ffffff',
+    color: '#666',
     fontSize: '14px',
-    fontWeight: '600',
+    fontWeight: '500',
     cursor: 'pointer',
   },
   
-  // Follow-up Suggestions
-  followupContainer: {
-    background: 'rgba(74, 222, 128, 0.08)',
-    border: '1px solid rgba(74, 222, 128, 0.2)',
-    borderRadius: '12px',
-    padding: '14px',
-    marginBottom: '12px',
+  // Suggested Followups
+  followupsContainer: {
+    marginTop: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid #e0e0e0',
   },
-  followupLabel: {
+  followupsLabel: {
     fontSize: '12px',
-    fontWeight: '600',
-    color: '#E8C55A',
-    marginBottom: '10px',
-    display: 'block',
+    color: '#666',
+    marginBottom: '8px',
   },
-  followupButtons: {
+  followupsGrid: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: '8px',
   },
   followupButton: {
-    background: 'rgba(74, 222, 128, 0.1)',
-    border: '1px solid rgba(74, 222, 128, 0.3)',
+    background: '#f0f7fa',
+    border: '1px solid #0077b6',
     borderRadius: '8px',
     padding: '8px 12px',
-    color: '#E8C55A',
+    color: '#0077b6',
     fontSize: '12px',
     fontWeight: '500',
     cursor: 'pointer',
@@ -1638,8 +1676,8 @@ const styles: Record<string, CSSProperties> = {
     marginTop: '16px',
     borderRadius: '12px',
     overflow: 'hidden',
-    border: '1px solid rgba(209,173,87,0.3)',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+    border: '1px solid #e0e0e0',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
   },
   dealerInfoImage: {
     width: '100%',
