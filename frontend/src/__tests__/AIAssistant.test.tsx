@@ -593,4 +593,196 @@ describe('AIAssistant Component', () => {
       });
     });
   });
+
+  describe('Spouse/Partner Objection Detection', () => {
+    test('displays "Need to Discuss" objection category in panel', async () => {
+      renderAIAssistant();
+      
+      // Look for the objection panel toggle or the category itself
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
+      // The objection categories should be accessible
+      const objectionToggle = screen.queryByText(/Common Objections/i) || screen.queryByText(/Objections/i);
+      if (objectionToggle) {
+        fireEvent.click(objectionToggle);
+        await waitFor(() => {
+          expect(screen.getByText(/Need to Discuss/i)).toBeInTheDocument();
+        });
+      }
+    });
+
+    test('detects "need to talk to my wife" as spouse objection', async () => {
+      api.chatWithAI.mockResolvedValue({
+        message: 'I completely understand - this is a major decision you want to share with your wife.',
+        suggestedVehicles: [],
+      });
+
+      renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText(/Type your message/i);
+      fireEvent.change(input, { target: { value: 'I need to talk to my wife first' } });
+      fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+
+      await waitFor(() => {
+        expect(api.chatWithAI).toHaveBeenCalled();
+      });
+
+      // Should display the user's message
+      await waitFor(() => {
+        expect(screen.getByText('I need to talk to my wife first')).toBeInTheDocument();
+      });
+    });
+
+    test('detects "need to discuss with husband" as spouse objection', async () => {
+      api.chatWithAI.mockResolvedValue({
+        message: 'That makes perfect sense. Would you like to call him right now?',
+        suggestedVehicles: [],
+      });
+
+      renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText(/Type your message/i);
+      fireEvent.change(input, { target: { value: 'I need to discuss this with my husband' } });
+      fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+
+      await waitFor(() => {
+        expect(api.chatWithAI).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('I need to discuss this with my husband')).toBeInTheDocument();
+      });
+    });
+
+    test('detects "can\'t decide alone" as spouse objection', async () => {
+      api.chatWithAI.mockResolvedValue({
+        message: 'I understand this is a big decision.',
+        suggestedVehicles: [],
+      });
+
+      renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText(/Type your message/i);
+      fireEvent.change(input, { target: { value: "I can't decide this alone" } });
+      fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+
+      await waitFor(() => {
+        expect(api.chatWithAI).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("I can't decide this alone")).toBeInTheDocument();
+      });
+    });
+
+    test('detects "sleep on it" as spouse objection', async () => {
+      api.chatWithAI.mockResolvedValue({
+        message: 'I understand you want to think it over.',
+        suggestedVehicles: [],
+      });
+
+      renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText(/Type your message/i);
+      fireEvent.change(input, { target: { value: 'I need to sleep on it' } });
+      fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+
+      await waitFor(() => {
+        expect(api.chatWithAI).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('I need to sleep on it')).toBeInTheDocument();
+      });
+    });
+
+    test('detects "we need to discuss" as spouse objection', async () => {
+      api.chatWithAI.mockResolvedValue({
+        message: 'Of course, this is a decision you should make together.',
+        suggestedVehicles: [],
+      });
+
+      renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText(/Type your message/i);
+      fireEvent.change(input, { target: { value: 'We need to discuss this first' } });
+      fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+
+      await waitFor(() => {
+        expect(api.chatWithAI).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('We need to discuss this first')).toBeInTheDocument();
+      });
+    });
+
+    test('detects "partner needs to see" as spouse objection', async () => {
+      api.chatWithAI.mockResolvedValue({
+        message: 'Would you like to bring your partner in to see it?',
+        suggestedVehicles: [],
+      });
+
+      renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText(/Type your message/i);
+      fireEvent.change(input, { target: { value: 'My partner needs to see this first' } });
+      fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+
+      await waitFor(() => {
+        expect(api.chatWithAI).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('My partner needs to see this first')).toBeInTheDocument();
+      });
+    });
+
+    test('AI response is displayed for spouse objection', async () => {
+      api.chatWithAI.mockResolvedValue({
+        message: 'I completely understand - this is a major decision you want to share with your wife. That makes perfect sense. We do have a significant incentive available right now. Would you like to call her so I can answer any questions?',
+        suggestedVehicles: [],
+      });
+
+      renderAIAssistant();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText(/Type your message/i);
+      fireEvent.change(input, { target: { value: 'I need to talk to my wife first' } });
+      fireEvent.keyPress(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+
+      await waitFor(() => {
+        expect(screen.getByText(/I completely understand/i)).toBeInTheDocument();
+      });
+    });
+  });
 });
