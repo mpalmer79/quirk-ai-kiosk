@@ -22,13 +22,13 @@
   --accent-orange: #f97316;
   
   /* Background Colors - Refined dark theme */
-  --bg-primary: #0c0c0c;
-  --bg-secondary: #151515;
-  --bg-card: rgba(28, 28, 32, 0.9);
-  --bg-card-solid: #1c1c20;
-  --bg-card-hover: rgba(40, 40, 48, 0.95);
-  --bg-glass: rgba(255, 255, 255, 0.06);
-  --bg-glass-hover: rgba(255, 255, 255, 0.12);
+  --bg-primary: #162018;
+  --bg-secondary: #1e2a22;
+  --bg-card: rgba(255, 255, 255, 0.1);
+  --bg-card-solid: #243028;
+  --bg-card-hover: rgba(255, 255, 255, 0.15);
+  --bg-glass: rgba(255, 255, 255, 0.12);
+  --bg-glass-hover: rgba(255, 255, 255, 0.2);
   
   /* Text Colors */
   --text-primary: #ffffff;
