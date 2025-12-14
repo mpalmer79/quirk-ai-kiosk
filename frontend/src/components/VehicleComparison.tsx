@@ -479,7 +479,7 @@ const VehicleComparison: React.FC<KioskComponentProps> = ({
                       <ul style={styles.featuresList}>
                         {(vehicle.features || []).slice(0, 10).map((feature, fIndex) => (
                           <li key={fIndex} style={styles.featureItem}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="#1B7340" style={{ flexShrink: 0 }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="#22c55e" style={{ flexShrink: 0 }}>
                               <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
                             </svg>
                             {feature}
@@ -585,7 +585,7 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     color: '#ffffff',
     padding: '8px 12px',
     borderRadius: '20px',
@@ -625,7 +625,7 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer',
   },
   compareBtn: {
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     color: '#ffffff',
     padding: '10px 24px',
@@ -681,7 +681,7 @@ const styles: Record<string, CSSProperties> = {
     width: '40px',
     height: '40px',
     border: '3px solid rgba(255,255,255,0.1)',
-    borderTopColor: '#1B7340',
+    borderTopColor: '#22c55e',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
@@ -702,14 +702,14 @@ const styles: Record<string, CSSProperties> = {
     position: 'relative',
   },
   selectorCardSelected: {
-    border: '2px solid #1B7340',
+    border: '2px solid #22c55e',
     background: 'rgba(27, 115, 64, 0.1)',
   },
   selectedBadge: {
     position: 'absolute',
     top: '10px',
     right: '10px',
-    background: '#1B7340',
+    background: '#22c55e',
     borderRadius: '50%',
     width: '28px',
     height: '28px',
@@ -974,7 +974,7 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer',
   },
   primaryBtn: {
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     color: '#ffffff',
     padding: '14px 28px',
