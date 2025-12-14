@@ -163,7 +163,7 @@ const styles = {
     alignItems: 'center',
     gap: '10px',
     padding: '14px 28px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     borderRadius: '12px',
     color: '#ffffff',
