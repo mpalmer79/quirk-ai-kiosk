@@ -5,7 +5,7 @@ const QuestionCard = ({ option, isSelected, onClick, showCheckmark = true }) => 
     <button
       style={{
         ...styles.optionCard,
-        borderColor: isSelected ? '#1B7340' : 'rgba(255,255,255,0.1)',
+        borderColor: isSelected ? '#22c55e' : 'rgba(255,255,255,0.1)',
         background: isSelected 
           ? 'rgba(27, 115, 64, 0.2)' 
           : 'rgba(255,255,255,0.05)',
@@ -62,7 +62,7 @@ const styles = {
     width: '28px',
     height: '28px',
     borderRadius: '50%',
-    background: '#1B7340',
+    background: '#22c55e',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
