@@ -141,11 +141,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     <div style={s.container}>
       <div style={s.bgImage} /><div style={s.bgOverlay} />
       <div style={{ ...s.heroSection, opacity: isVisible ? 1 : 0, transform: isVisible ? 'translateY(0)' : 'translateY(20px)' }} className="hero-section">
-        <div style={s.greeting} className="greeting-row">
-          <div style={s.aiAvatar}><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="9" cy="10" r="1.5" fill="#fff" stroke="none"/><circle cx="15" cy="10" r="1.5" fill="#fff" stroke="none"/><path d="M8 14s1.5 2 4 2 4-2 4-2" strokeLinecap="round"/></svg></div>
-          <h1 style={s.heroTitle} className="hero-title">{customerName ? <>Nice to meet you, <span style={s.highlight}>{customerName}</span>!</> : <>Hi, I'm your <span style={s.highlight}>Quirk AI</span> assistant</>}</h1>
-        </div>
-        <h2 style={s.heroSubtitle}>How can I help you today?</h2>
+        <h2 style={s.heroSubtitle}>{customerName ? <>Hi <span style={s.highlight}>{customerName}</span>, How can I help you today?</> : <>How can I help you today?</>}</h2>
         <p style={s.heroText}>Choose an option below to get started</p>
       </div>
 
@@ -208,7 +204,7 @@ const s: Record<string, CSSProperties> = {
   continueBtn: { width: '100%', padding: '18px 32px', background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 15px rgba(27,115,64,0.3)' },
   skipBtn: { background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '14px', fontWeight: 500, cursor: 'pointer', padding: '10px' },
   privacyNote: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0 },
-  heroSection: { textAlign: 'center', marginBottom: '48px', transition: 'all 0.6s ease', position: 'relative', zIndex: 2 },
+  heroSection: { textAlign: 'center', marginBottom: '48px', marginTop: '20px', transition: 'all 0.6s ease', position: 'relative', zIndex: 2 },
   greeting: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '16px' },
   aiAvatar: { width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' },
   heroTitle: { fontSize: '28px', fontWeight: 600, color: '#fff', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.5)' },
