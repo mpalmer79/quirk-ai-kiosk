@@ -168,7 +168,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     try {
       const response = await api.chatWithAI({
         message: content,
-        inventoryContext: buildInventoryContext(),
+        inventoryContext: JSON.stringify(buildInventoryContext()),
         conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
         customerName: customerData?.customerName,
       });
