@@ -133,7 +133,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
             bottom: 0,
             zIndex: 1000,
             overflow: 'auto',
-            background: 'rgba(0,0,0,0.75)',
+            background: 'rgba(0,0,0,0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -494,7 +494,7 @@ const TradeInEstimator: React.FC<TradeInEstimatorProps> = ({
               key={s}
               style={{
                 ...pillStyle,
-                background: active ? 'rgba(74, 222, 128, 0.12)' : done ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.05)',
+                background: active ? 'rgba(74, 222, 128, 0.12)' : done ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.12)',
                 borderColor: active ? 'rgba(74, 222, 128, 0.28)' : 'rgba(255,255,255,0.10)',
                 color: active ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.78)',
               }}
