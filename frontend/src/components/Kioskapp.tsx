@@ -574,7 +574,7 @@ const styles: Record<string, CSSProperties> = {
     height: '100vh',
     display: 'flex',
     flexDirection: 'column',
-    background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0f0f0f 100%)',
+    background: 'linear-gradient(135deg, #1a2520 0%, #243028 50%, #1e2a22 100%)',
     fontFamily: '"Montserrat", "Segoe UI", sans-serif',
     color: '#ffffff',
     overflow: 'hidden',
