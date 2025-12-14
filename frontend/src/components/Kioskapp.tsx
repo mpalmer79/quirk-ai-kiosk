@@ -680,7 +680,7 @@ const styles: Record<string, CSSProperties> = {
     gap: '8px',
     padding: '16px',
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
+    color: '#fff',
     borderTop: '1px solid rgba(255,255,255,0.1)',
     background: 'rgba(0,0,0,0.3)',
   },
@@ -689,7 +689,7 @@ const styles: Record<string, CSSProperties> = {
   },
   footerTime: {
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
+    color: '#fff',
   },
 };
 
