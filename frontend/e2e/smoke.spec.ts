@@ -24,7 +24,7 @@ test.describe('Quirk AI Kiosk - Smoke Tests', () => {
     await page.locator('input[placeholder*="first name" i]').fill('TestUser');
     await page.getByText('Continue').click();
     
-    await expect(page.getByText(/Nice to meet you, TestUser/i)).toBeVisible();
+    await expect(page.getByText(/Hi TestUser/i)).toBeVisible();
   });
 
   test('can navigate to inventory via browse all', async ({ page }) => {
