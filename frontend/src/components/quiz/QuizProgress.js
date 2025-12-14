@@ -29,7 +29,7 @@ const styles = {
   },
   progressFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #1B7340 0%, #4ade80 100%)',
+    background: 'linear-gradient(90deg, #22c55e 0%, #4ade80 100%)',
     borderRadius: '4px',
     transition: 'width 0.3s ease',
   },
