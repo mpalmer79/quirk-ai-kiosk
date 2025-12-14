@@ -128,7 +128,9 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
             Your name is only used to personalize your experience today
           </p>
         </div>
-        <style>{`@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }`}</style>
+        <style>{`@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+          input::placeholder { color: #fff !important; opacity: 1 !important; }
+        `}</style>
       </div>
     );
   }
@@ -144,7 +146,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
 
       <div style={s.pathsContainer}>
         {PATHS.map((path) => (
-          <div key={path.id} style={{ ...s.pathCard, background: hoveredPath === path.id ? path.gradient : 'rgba(20,20,25,0.8)', transform: hoveredPath === path.id ? 'scale(1.03) translateY(-8px)' : 'scale(1)', borderColor: hoveredPath === path.id ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)', boxShadow: hoveredPath === path.id ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(74,222,128,0.2)' : '0 8px 32px rgba(0,0,0,0.3)' }}
+          <div key={path.id} style={{ ...s.pathCard, background: hoveredPath === path.id ? path.gradient : 'rgba(255,255,255,0.1)', transform: hoveredPath === path.id ? 'scale(1.03) translateY(-8px)' : 'scale(1)', borderColor: hoveredPath === path.id ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)', boxShadow: hoveredPath === path.id ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(74,222,128,0.2)' : '0 8px 32px rgba(0,0,0,0.3)' }}
             onMouseEnter={() => setHoveredPath(path.id)} onMouseLeave={() => setHoveredPath(null)} onClick={() => handlePathSelect(path.id)}>
             <div style={{ ...s.pathIcon, background: hoveredPath === path.id ? 'rgba(255,255,255,0.2)' : path.gradient, boxShadow: hoveredPath === path.id ? 'none' : '0 8px 24px rgba(0,0,0,0.3)' }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d={path.iconPath}/></svg>
@@ -192,15 +194,15 @@ const s: Record<string, CSSProperties> = {
   inlineAvatar: { width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 8px 32px rgba(34,197,94,0.5), 0 0 20px rgba(34,197,94,0.3)' },
   nameTitle: { fontSize: '32px', fontWeight: 700, color: '#fff', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' },
   nameSubtitle: { fontSize: '26px', fontWeight: 600, color: '#fff', margin: '0 0 28px 0', textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
-  namePrompt: { fontSize: '18px', color: 'rgba(255,255,255,0.9)', margin: '0 0 12px 0' },
-  phonePrompt: { fontSize: '18px', color: 'rgba(255,255,255,0.9)', margin: '0 0 12px 0' },
+  namePrompt: { fontSize: '18px', color: '#fff', margin: '0 0 12px 0', fontWeight: 700 },
+  phonePrompt: { fontSize: '18px', color: '#fff', margin: '0 0 12px 0', fontWeight: 700 },
   inputContainer: { position: 'relative', width: '100%', maxWidth: '420px', marginBottom: '20px' },
   nameInput: { width: '100%', padding: '20px 26px', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.3)', borderRadius: '16px', color: '#fff', fontSize: '20px', fontWeight: 600, textAlign: 'center', backdropFilter: 'blur(12px)', boxSizing: 'border-box', transition: 'all 0.2s ease', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' },
   phoneInput: { width: '100%', padding: '20px 26px', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.3)', borderRadius: '16px', color: '#fff', fontSize: '18px', fontWeight: 500, textAlign: 'center', backdropFilter: 'blur(12px)', boxSizing: 'border-box', transition: 'all 0.2s ease', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' },
   nameActions: { display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px', width: '100%', maxWidth: '420px' },
   continueBtn: { width: '100%', padding: '20px 36px', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', border: 'none', borderRadius: '14px', color: '#fff', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 32px rgba(34,197,94,0.4), 0 0 20px rgba(34,197,94,0.2)', transition: 'all 0.2s ease' },
-  skipBtn: { background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '14px', fontWeight: 500, cursor: 'pointer', padding: '12px', transition: 'color 0.2s ease' },
-  privacyNote: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0 },
+  skipBtn: { background: 'transparent', border: 'none', color: '#fff', fontSize: '14px', fontWeight: 500, cursor: 'pointer', padding: '12px', transition: 'color 0.2s ease' },
+  privacyNote: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: '#fff', margin: 0 },
   heroSection: { textAlign: 'center', marginBottom: '52px', marginTop: '24px', transition: 'all 0.6s ease', position: 'relative', zIndex: 2 },
   greeting: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '16px' },
   aiAvatar: { width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 8px 32px rgba(34,197,94,0.5)' },
