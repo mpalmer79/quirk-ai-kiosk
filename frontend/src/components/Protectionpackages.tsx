@@ -52,7 +52,7 @@ const ProtectionPackages: React.FC<KioskComponentProps> = ({ navigateTo, updateC
           <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
         </svg>
       ),
-      color: '#1B7340',
+      color: '#22c55e',
       highlights: [
         'Covers major mechanical repairs',
         'Engine, transmission, drivetrain',
@@ -594,7 +594,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: '10px',
     padding: '14px 28px',
-    background: 'linear-gradient(135deg, #1B7340 0%, #0d4a28 100%)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
     border: 'none',
     borderRadius: '10px',
     color: '#ffffff',
