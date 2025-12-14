@@ -1,123 +1,455 @@
-import type { ObjectionCategory } from './types';
+import type { CSSProperties } from 'react';
 
-export const SUGGESTED_PROMPTS = [
-  "I need a truck that can tow a boat",
-  "What's the best family SUV under $50k?",
-  "Show me something fuel efficient for commuting",
-  "I want a sporty car with good tech features",
-  "What electric vehicles do you have?",
-];
-
-export const OBJECTION_CATEGORIES: ObjectionCategory[] = [
-  {
-    id: 'price',
-    label: 'Price & Payment',
-    icon: '💰',
-    prompts: [
-      "This seems expensive - what can you do on price?",
-      "What would my monthly payment be?",
-      "Do you have any rebates or incentives?",
-      "Is there room to negotiate?",
-    ],
+export const styles: Record<string, CSSProperties> = {
+  container: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '20px 30px',
+    maxWidth: '1000px',
+    margin: '0 auto',
+    width: '100%',
+    boxSizing: 'border-box',
+    background: '#ffffff',
+    minHeight: '100%',
   },
-  {
-    id: 'timing',
-    label: 'Timing & Decision',
-    icon: '⏰',
-    prompts: [
-      "I'm not ready to buy today",
-      "I need to think about it",
-      "I want to shop around first",
-      "I'm just looking for now",
-    ],
+  logoContainer: {
+    position: 'absolute',
+    top: '90px',
+    left: '30px',
+    zIndex: 10,
   },
-  {
-    id: 'trade',
-    label: 'Trade-In',
-    icon: '🚗',
-    prompts: [
-      "What's my trade-in worth?",
-      "I still owe money on my current car",
-      "My car needs some work - will you still take it?",
-      "I want to keep my current car",
-    ],
+  logo: {
+    height: '50px',
+    width: 'auto',
   },
-  {
-    id: 'spouse',
-    label: 'Decision Makers',
-    icon: '👥',
-    prompts: [
-      "I need to talk to my spouse first",
-      "My husband/wife isn't here",
-      "We make decisions together",
-      "Can you send me information to share?",
-    ],
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    marginBottom: '24px',
+    paddingBottom: '20px',
+    borderBottom: '2px solid #D1AD57',
   },
-  {
-    id: 'credit',
-    label: 'Financing & Credit',
-    icon: '📊',
-    prompts: [
-      "I'm worried about my credit",
-      "What interest rate can I get?",
-      "Do you work with all credit types?",
-      "I've been turned down before",
-    ],
+  headerIcon: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #0077b6 0%, #005a8c 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#ffffff',
+    boxShadow: '0 4px 12px rgba(0,119,182,0.3)',
   },
-  {
-    id: 'vehicle',
-    label: 'Vehicle Concerns',
-    icon: '🔧',
-    prompts: [
-      "Is this reliable?",
-      "What's the warranty coverage?",
-      "How does this compare to competitors?",
-      "What about maintenance costs?",
-    ],
+  headerContent: {
+    flex: 1,
   },
-];
-
-// Spouse/partner objection responses
-export const SPOUSE_RESPONSES = [
-  {
-    triggers: ['spouse', 'husband', 'wife', 'partner', 'significant other', 'talk to my', 'check with'],
-    responses: [
-      "I completely understand wanting to include your partner in this decision - buying a vehicle is a big choice! Would it help if I prepared a detailed summary you could share with them?",
-      "That makes total sense! Many of our customers like to discuss together. I can put together all the specs, pricing, and photos so you have everything to review together.",
-      "Absolutely, it's important you're both on the same page. Would you like me to help you prepare the key points to discuss?",
-    ],
-    followups: [
-      "Would you like to schedule a time to come back together?",
-      "Can I prepare a comparison sheet for you to take home?",
-      "Would a video call work so your partner can see the vehicle?",
-      "Should I email you the details to share?",
-    ],
+  title: {
+    fontSize: '22px',
+    fontWeight: '700',
+    color: '#1a1a1a',
+    margin: 0,
   },
-  {
-    triggers: ['they need to see', 'bring them', 'come back with', 'not here'],
-    responses: [
-      "I'd love to meet them! In the meantime, let me get you set up with all the information - photos, specs, and pricing - so you can give them a preview.",
-      "That would be great! Would it help to take some photos or a video of the vehicle to show them tonight?",
-    ],
-    followups: [
-      "What aspects would be most important for them to know about?",
-      "Would they like to call them right now so I can answer their questions?",
-      "I can prepare a detailed summary to share with them",
-      "Would they like to come see this vehicle in person?",
-      "Can I get the keys so you can take it home to show them?",
-    ],
+  subtitle: {
+    fontSize: '14px',
+    color: '#D1AD57',
+    margin: '4px 0 0 0',
+    fontWeight: '600',
   },
-];
-
-export const INITIAL_EXTRACTED_DATA = {
-  vehicleInterest: { model: null, bodyType: null, features: [] },
-  budget: { min: null, max: null, monthlyPayment: null, downPayment: null },
-  tradeIn: { 
-    hasTrade: null, 
-    vehicle: null, 
-    hasPayoff: null, 
-    payoffAmount: null, 
-    monthlyPayment: null, 
-    financedWith: null 
-  }
+  headerActions: {
+    display: 'flex',
+    gap: '8px',
+  },
+  audioToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    borderRadius: '8px',
+    border: '1px solid #ddd',
+    color: '#333',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    background: '#f5f5f5',
+  },
+  audioLabel: {
+    fontSize: '13px',
+    color: '#333',
+  },
+  questionsToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    borderRadius: '8px',
+    border: '1px solid #ddd',
+    color: '#333',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    background: '#f5f5f5',
+  },
+  
+  // Messages
+  messagesContainer: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '20px 0',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    background: '#fafafa',
+    borderRadius: '12px',
+    margin: '0 -10px',
+    paddingLeft: '10px',
+    paddingRight: '10px',
+  },
+  messageWrapper: {
+    display: 'flex',
+    width: '100%',
+  },
+  messageBubble: {
+    maxWidth: '85%',
+    padding: '16px',
+    borderRadius: '16px',
+    position: 'relative',
+  },
+  userBubble: {
+    background: 'linear-gradient(135deg, #0077b6 0%, #005a8c 100%)',
+    borderBottomRightRadius: '4px',
+    color: '#ffffff',
+  },
+  assistantBubble: {
+    background: '#f0f0f0',
+    borderBottomLeftRadius: '4px',
+    border: '1px solid #e0e0e0',
+  },
+  aiAvatar: {
+    position: 'absolute',
+    top: '-10px',
+    left: '-10px',
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #D1AD57 0%, #B8962E 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#ffffff',
+    border: '2px solid #fff',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+  },
+  messageText: {
+    fontSize: '15px',
+    lineHeight: '1.6',
+    margin: 0,
+    whiteSpace: 'pre-wrap',
+  },
+  messageTextUser: {
+    color: '#ffffff',
+  },
+  messageTextAssistant: {
+    color: '#1a1a1a',
+  },
+  
+  // Vehicle Cards
+  vehicleGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '12px',
+    marginTop: '16px',
+  },
+  vehicleCard: {
+    background: '#ffffff',
+    border: '1px solid #e0e0e0',
+    borderRadius: '12px',
+    padding: '16px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    textAlign: 'left',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+  },
+  vehicleInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+  },
+  vehicleYear: {
+    fontSize: '12px',
+    color: '#0077b6',
+    fontWeight: '600',
+  },
+  vehicleModel: {
+    fontSize: '16px',
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  vehicleTrim: {
+    fontSize: '12px',
+    color: '#666',
+  },
+  vehicleDetails: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: '8px',
+  },
+  vehicleColor: {
+    fontSize: '12px',
+    color: '#888',
+  },
+  vehiclePrice: {
+    fontSize: '16px',
+    fontWeight: '700',
+    color: '#D1AD57',
+  },
+  viewButton: {
+    fontSize: '13px',
+    color: '#0077b6',
+    fontWeight: '600',
+    marginTop: '8px',
+  },
+  
+  // Loading
+  loadingDots: {
+    display: 'flex',
+    gap: '6px',
+    padding: '8px 0',
+  },
+  dot: {
+    fontSize: '12px',
+    color: '#0077b6',
+    animation: 'pulse 1s infinite',
+  },
+  
+  // Suggestions
+  suggestionsContainer: {
+    padding: '20px',
+    background: '#f8f9fa',
+    borderRadius: '12px',
+    border: '1px solid #e0e0e0',
+  },
+  suggestionsLabel: {
+    fontSize: '15px',
+    color: '#1a1a1a',
+    margin: '0 0 16px 0',
+    fontWeight: '700',
+  },
+  suggestionsGrid: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px',
+  },
+  suggestionButton: {
+    background: '#ffffff',
+    border: '1px solid #0077b6',
+    borderRadius: '25px',
+    padding: '12px 20px',
+    color: '#0077b6',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+  },
+  
+  // Input
+  inputContainer: {
+    display: 'flex',
+    gap: '12px',
+    padding: '20px 0',
+    borderTop: '1px solid #e0e0e0',
+    background: '#ffffff',
+  },
+  input: {
+    flex: 1,
+    padding: '16px 20px',
+    background: '#f5f5f5',
+    border: '1px solid #ddd',
+    borderRadius: '12px',
+    color: '#1a1a1a',
+    fontSize: '16px',
+    outline: 'none',
+  },
+  sendButton: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #0077b6 0%, #005a8c 100%)',
+    border: 'none',
+    color: '#ffffff',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 4px 12px rgba(0,119,182,0.3)',
+  },
+  micButton: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '12px',
+    background: '#f5f5f5',
+    border: '1px solid #ddd',
+    color: '#333',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+  },
+  micButtonActive: {
+    background: '#fee2e2',
+    borderColor: '#ef4444',
+    color: '#ef4444',
+  },
+  
+  // Start Over
+  startOverContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    paddingTop: '16px',
+  },
+  startOverButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    background: '#ffffff',
+    border: '2px solid #D1AD57',
+    borderRadius: '8px',
+    padding: '12px 24px',
+    color: '#D1AD57',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  
+  // Objection Panel
+  objectionPanel: {
+    background: '#f8f9fa',
+    border: '1px solid #e0e0e0',
+    borderRadius: '16px',
+    padding: '20px',
+    marginBottom: '16px',
+  },
+  objectionHeader: {
+    marginBottom: '16px',
+  },
+  objectionTitle: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#1a1a1a',
+    margin: '0 0 4px 0',
+  },
+  objectionSubtitle: {
+    fontSize: '14px',
+    color: '#666',
+    margin: 0,
+  },
+  objectionCategories: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+    gap: '16px',
+  },
+  objectionCategory: {
+    background: '#ffffff',
+    border: '1px solid #e0e0e0',
+    borderRadius: '12px',
+    padding: '16px',
+  },
+  categoryHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '12px',
+  },
+  categoryIcon: {
+    fontSize: '20px',
+  },
+  categoryLabel: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  categoryPrompts: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  objectionPromptButton: {
+    background: '#f0f7fa',
+    border: '1px solid #0077b6',
+    borderRadius: '8px',
+    padding: '10px 14px',
+    color: '#0077b6',
+    fontSize: '13px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    textAlign: 'left',
+  },
+  closePanelButton: {
+    display: 'block',
+    margin: '16px auto 0',
+    padding: '10px 24px',
+    background: '#ffffff',
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+    color: '#666',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+  },
+  
+  // Followups
+  followupsContainer: {
+    marginTop: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid #e0e0e0',
+  },
+  followupsLabel: {
+    fontSize: '12px',
+    color: '#666',
+    marginBottom: '8px',
+  },
+  followupsGrid: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+  },
+  followupButton: {
+    background: '#f0f7fa',
+    border: '1px solid #0077b6',
+    borderRadius: '8px',
+    padding: '8px 12px',
+    color: '#0077b6',
+    fontSize: '12px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  
+  // Dealer Info
+  dealerInfoContainer: {
+    marginTop: '16px',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    border: '1px solid #e0e0e0',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  dealerInfoImage: {
+    width: '100%',
+    height: 'auto',
+    display: 'block',
+  },
 };
+
+export default styles;
