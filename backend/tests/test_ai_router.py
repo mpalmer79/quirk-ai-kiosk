@@ -243,3 +243,75 @@ class TestAIStructuredResponseModel:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# =============================================================================
+# AI Router v1 (ai.py) - Spouse Objection Handling Tests
+# =============================================================================
+
+from app.routers.ai import SYSTEM_PROMPT, generate_fallback_response as v1_fallback
+
+
+class TestSpouseObjectionSystemPrompt:
+    """Tests to verify spouse/partner objection handling is configured in system prompt"""
+    
+    def test_system_prompt_contains_spouse_section(self):
+        """System prompt should contain spouse objection handling section"""
+        assert "SPOUSE/PARTNER OBJECTION HANDLING" in SYSTEM_PROMPT
+    
+    def test_system_prompt_contains_step_1_acknowledge(self):
+        """System prompt should contain Step 1 - Acknowledge & Validate"""
+        assert "Acknowledge & Validate" in SYSTEM_PROMPT
+        assert "major decision" in SYSTEM_PROMPT.lower()
+    
+    def test_system_prompt_contains_step_2_urgency(self):
+        """System prompt should contain Step 2 - Introduce Urgency & Incentive"""
+        assert "Urgency" in SYSTEM_PROMPT
+        assert "incentive" in SYSTEM_PROMPT.lower()
+    
+    def test_system_prompt_contains_step_3_call_spouse(self):
+        """System prompt should contain Step 3 - Propose Calling the Spouse"""
+        assert "call" in SYSTEM_PROMPT.lower()
+        assert "speaker" in SYSTEM_PROMPT.lower()
+    
+    def test_system_prompt_contains_step_4_test_drive(self):
+        """System prompt should contain Step 4 - Propose Test Drive/Take-Home"""
+        assert "test drive" in SYSTEM_PROMPT.lower() or "take it home" in SYSTEM_PROMPT.lower()
+        assert "temporary plates" in SYSTEM_PROMPT.lower()
+    
+    def test_system_prompt_contains_step_5_commitment(self):
+        """System prompt should contain Step 5 - Isolate & Confirm Commitment"""
+        assert "Confirm Commitment" in SYSTEM_PROMPT or "commitment" in SYSTEM_PROMPT.lower()
+        assert "finalize" in SYSTEM_PROMPT.lower()
+    
+    def test_system_prompt_contains_step_6_followup(self):
+        """System prompt should contain Step 6 - Provide Information & Set Follow-up"""
+        assert "follow-up" in SYSTEM_PROMPT.lower() or "followup" in SYSTEM_PROMPT.lower()
+        assert "VIN" in SYSTEM_PROMPT
+    
+    def test_system_prompt_contains_key_principles(self):
+        """System prompt should contain key principles section"""
+        assert "KEY PRINCIPLES" in SYSTEM_PROMPT
+        assert "validate" in SYSTEM_PROMPT.lower()
+        assert "INVOLVE" in SYSTEM_PROMPT
+    
+    def test_system_prompt_handles_wife_reference(self):
+        """System prompt should reference wife"""
+        assert "wife" in SYSTEM_PROMPT.lower()
+    
+    def test_system_prompt_handles_husband_reference(self):
+        """System prompt should reference husband"""
+        assert "husband" in SYSTEM_PROMPT.lower()
+    
+    def test_system_prompt_handles_partner_reference(self):
+        """System prompt should reference partner"""
+        assert "partner" in SYSTEM_PROMPT.lower()
+    
+    def test_system_prompt_no_ultimatums_principle(self):
+        """System prompt should emphasize no ultimatums"""
+        assert "ultimatum" in SYSTEM_PROMPT.lower()
+    
+    def test_system_prompt_specific_followup_time(self):
+        """System prompt should emphasize getting specific follow-up time"""
+        assert "specific" in SYSTEM_PROMPT.lower()
+        assert "time" in SYSTEM_PROMPT.lower()
