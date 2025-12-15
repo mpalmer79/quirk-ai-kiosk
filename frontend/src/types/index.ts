@@ -111,6 +111,7 @@ export interface NavigationOptions {
 export interface CustomerData {
   customerName?: string;
   phone?: string;
+  namePhaseCompleted?: boolean;
   selectedModel?: string;
   selectedCab?: string;
   colorPreferences?: string[];
