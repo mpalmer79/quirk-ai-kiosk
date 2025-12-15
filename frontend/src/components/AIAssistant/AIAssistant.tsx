@@ -63,6 +63,35 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Log chat history to traffic session
+  useEffect(() => {
+    if (messages.length === 0) return;
+    
+    const logChatHistory = async () => {
+      try {
+        // Convert messages to chat history format
+        const chatHistory = messages.map(m => ({
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp?.toISOString()
+        }));
+        
+        await api.logTrafficSession({
+          path: 'aiAssistant',
+          currentStep: 'ai_chat',
+          customerName: customerData?.customerName || undefined,
+          chatHistory,
+          actions: [`ai_chat_${messages.length}_messages`]
+        });
+      } catch (error) {
+        // Don't throw on traffic log failures
+        console.warn('Failed to log chat history:', error);
+      }
+    };
+    
+    logChatHistory();
+  }, [messages, customerData?.customerName]);
+
   // Search inventory helper
   const searchInventory = useCallback((query: string): Vehicle[] => {
     const lowerQuery = query.toLowerCase();
