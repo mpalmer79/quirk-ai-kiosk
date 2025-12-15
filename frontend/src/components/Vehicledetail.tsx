@@ -278,7 +278,15 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
                 }}
                 onClick={() => setSelectedImageIndex(idx)}
               >
-                <span style={s.thumbnailPlaceholder}>{(vehicle.model || 'V').charAt(0)}</span>
+                {imageUrl && !imageError ? (
+                  <img
+                    src={imageUrl}
+                    alt={`${vehicle.model} view ${idx + 1}`}
+                    style={s.thumbnailImage}
+                  />
+                ) : (
+                  <span style={s.thumbnailPlaceholder}>{(vehicle.model || 'V').charAt(0)}</span>
+                )}
               </div>
             ))}
           </div>
@@ -592,6 +600,12 @@ const s: Record<string, CSSProperties> = {
     fontSize: '24px',
     fontWeight: 700,
     color: 'rgba(255,255,255,0.3)',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    borderRadius: '6px',
   },
   photoCountBadge: {
     position: 'absolute',
