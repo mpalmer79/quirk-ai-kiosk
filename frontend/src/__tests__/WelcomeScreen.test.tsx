@@ -200,6 +200,7 @@ describe('WelcomeScreen Component', () => {
         expect(mockUpdateCustomerData).toHaveBeenCalledWith({
           customerName: 'John',
           phone: undefined,
+          namePhaseCompleted: true,
         });
       });
     });
