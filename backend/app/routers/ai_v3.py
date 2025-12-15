@@ -8,6 +8,7 @@ Key Features:
 - Claude tool use for real actions
 - Dynamic context building
 - Outcome tracking for learning
+- Phone-based conversation continuation
 """
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
@@ -51,7 +52,7 @@ logger = logging.getLogger("quirk_ai.intelligent")
 # =============================================================================
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-PROMPT_VERSION = "3.0.0"
+PROMPT_VERSION = "3.1.0"
 MODEL_NAME = "claude-sonnet-4-20250514"
 MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
 
@@ -152,6 +153,34 @@ TOOLS = [
             },
             "required": ["stock_number"]
         }
+    },
+    {
+        "name": "lookup_conversation",
+        "description": "Look up a customer's previous conversation using their phone number. Use this when customer says they want to continue a previous conversation or when they provide a phone number to retrieve their history.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "phone_number": {
+                    "type": "string",
+                    "description": "Customer's 10-digit phone number (digits only, e.g., '6175551234')"
+                }
+            },
+            "required": ["phone_number"]
+        }
+    },
+    {
+        "name": "save_customer_phone",
+        "description": "Save the customer's phone number to their conversation for future lookup. Use this when customer provides their phone number.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "phone_number": {
+                    "type": "string",
+                    "description": "Customer's 10-digit phone number"
+                }
+            },
+            "required": ["phone_number"]
+        }
     }
 ]
 
@@ -211,6 +240,8 @@ YOUR CAPABILITIES (Use these tools!):
 - find_similar_vehicles: Show alternatives
 - notify_staff: Get sales/appraisal/finance to help
 - mark_favorite: Save vehicles customer likes
+- lookup_conversation: Retrieve a customer's previous conversation by phone
+- save_customer_phone: Save customer's phone to their conversation
 
 CONVERSATION GUIDELINES:
 1. Use search_inventory when customer describes what they want
@@ -218,6 +249,18 @@ CONVERSATION GUIDELINES:
 3. Use notify_staff when customer is ready for test drive or appraisal
 4. Always mention stock numbers when recommending vehicles
 5. Keep responses conversational and concise (2-3 paragraphs max)
+
+CONTINUE CONVERSATION FLOW:
+When customer says "continue our conversation" or similar:
+1. Ask for their 10-digit phone number (be friendly about it)
+2. Use lookup_conversation tool with their phone number
+3. If found, summarize what you remember and ask how to proceed
+4. If not found, kindly explain and offer to start fresh
+
+SAVING CUSTOMER INFO:
+- After a productive conversation, offer to save their phone number
+- Use save_customer_phone to store it for future visits
+- This lets them continue where they left off next time
 
 {conversation_context}
 
@@ -366,6 +409,7 @@ async def execute_tool(
     """
     vehicles_to_show = []
     staff_notified = False
+    result = ""
     
     if tool_name == "search_inventory":
         query = tool_input.get("query", "")
@@ -440,6 +484,81 @@ async def execute_tool(
         stock = tool_input.get("stock_number", "")
         state_manager.mark_vehicle_favorite(state.session_id, stock)
         result = f"✓ Stock #{stock} marked as a favorite. I'll remember this is one you like!"
+    
+    elif tool_name == "lookup_conversation":
+        phone = tool_input.get("phone_number", "")
+        # Normalize to digits only
+        phone_digits = ''.join(c for c in phone if c.isdigit())
+        
+        if len(phone_digits) != 10:
+            result = "I need a valid 10-digit phone number to look up your previous conversation. Please provide your phone number with area code."
+        else:
+            previous_state = state_manager.get_state_by_phone(phone_digits)
+            
+            if previous_state:
+                # Found previous conversation - generate summary
+                summary_parts = ["✓ Found your previous conversation! Here's what I remember:"]
+                
+                if previous_state.customer_name:
+                    summary_parts.append(f"\nName: {previous_state.customer_name}")
+                
+                if previous_state.budget_max:
+                    summary_parts.append(f"\nBudget: Up to ${previous_state.budget_max:,.0f}")
+                
+                if previous_state.preferred_types:
+                    summary_parts.append(f"\nLooking for: {', '.join(previous_state.preferred_types)}")
+                
+                if previous_state.use_cases:
+                    summary_parts.append(f"\nPrimary use: {', '.join(previous_state.use_cases)}")
+                
+                if previous_state.favorite_vehicles:
+                    summary_parts.append(f"\nFavorite vehicles: {', '.join(previous_state.favorite_vehicles)}")
+                
+                if previous_state.has_trade_in:
+                    trade_info = f"\nTrade-in: {previous_state.trade_year or ''} {previous_state.trade_make or ''} {previous_state.trade_model or ''}"
+                    if previous_state.trade_monthly_payment:
+                        trade_info += f" (${previous_state.trade_monthly_payment:,.0f}/mo)"
+                    summary_parts.append(trade_info)
+                
+                if previous_state.discussed_vehicles:
+                    models = [v.model for v in previous_state.discussed_vehicles.values()][:5]
+                    summary_parts.append(f"\nVehicles we discussed: {', '.join(models)}")
+                
+                summary_parts.append(f"\n\nYour conversation had {previous_state.message_count} messages. How would you like to continue?")
+                
+                result = ''.join(summary_parts)
+                
+                # Merge previous state into current session
+                state.budget_max = previous_state.budget_max or state.budget_max
+                state.budget_min = previous_state.budget_min or state.budget_min
+                state.monthly_payment_target = previous_state.monthly_payment_target or state.monthly_payment_target
+                state.preferred_types = previous_state.preferred_types or state.preferred_types
+                state.preferred_features = previous_state.preferred_features or state.preferred_features
+                state.use_cases = previous_state.use_cases or state.use_cases
+                state.has_trade_in = previous_state.has_trade_in or state.has_trade_in
+                state.trade_year = previous_state.trade_year or state.trade_year
+                state.trade_make = previous_state.trade_make or state.trade_make
+                state.trade_model = previous_state.trade_model or state.trade_model
+                state.trade_monthly_payment = previous_state.trade_monthly_payment or state.trade_monthly_payment
+                state.trade_payoff = previous_state.trade_payoff or state.trade_payoff
+                state.favorite_vehicles = previous_state.favorite_vehicles or state.favorite_vehicles
+                state.customer_phone = phone_digits
+                state.customer_name = previous_state.customer_name or state.customer_name
+                
+                logger.info(f"Merged previous conversation into session {state.session_id}")
+            else:
+                result = f"I couldn't find a previous conversation with phone number ending in {phone_digits[-4:]}. This might be your first visit, or you may have used a different number. Would you like to start fresh?"
+    
+    elif tool_name == "save_customer_phone":
+        phone = tool_input.get("phone_number", "")
+        phone_digits = ''.join(c for c in phone if c.isdigit())
+        
+        if len(phone_digits) != 10:
+            result = "I need a valid 10-digit phone number. Please provide your full phone number with area code."
+        else:
+            state_manager.set_customer_phone(state.session_id, phone_digits)
+            state_manager.persist_session(state.session_id)
+            result = f"✓ I've saved your phone number ending in {phone_digits[-4:]}. Next time you visit, just tap 'Continue our conversation' and enter this number to pick up where we left off!"
         
     else:
         result = f"Unknown tool: {tool_name}"
@@ -723,6 +842,66 @@ async def mark_vehicle_favorite(session_id: str, stock_number: str):
     return {"status": "ok", "stock_number": stock_number}
 
 
+@router.get("/lookup/phone/{phone_number}")
+async def lookup_by_phone(phone_number: str):
+    """
+    Look up a previous conversation by phone number.
+    Returns conversation state if found.
+    """
+    state_manager = get_state_manager()
+    
+    # Normalize phone
+    phone_digits = ''.join(c for c in phone_number if c.isdigit())
+    
+    if len(phone_digits) != 10:
+        raise HTTPException(
+            status_code=400, 
+            detail="Phone number must be exactly 10 digits"
+        )
+    
+    state = state_manager.get_state_by_phone(phone_digits)
+    
+    if not state:
+        raise HTTPException(
+            status_code=404, 
+            detail="No conversation found for this phone number"
+        )
+    
+    return {
+        "found": True,
+        "phone_last_four": phone_digits[-4:],
+        "conversation": state.to_dict()
+    }
+
+
+@router.post("/state/{session_id}/phone/{phone_number}")
+async def save_customer_phone(session_id: str, phone_number: str):
+    """Save customer phone number to session for future lookup"""
+    state_manager = get_state_manager()
+    
+    # Normalize phone
+    phone_digits = ''.join(c for c in phone_number if c.isdigit())
+    
+    if len(phone_digits) != 10:
+        raise HTTPException(
+            status_code=400, 
+            detail="Phone number must be exactly 10 digits"
+        )
+    
+    state = state_manager.get_state(session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    state_manager.set_customer_phone(session_id, phone_digits)
+    state_manager.persist_session(session_id)
+    
+    return {
+        "status": "ok",
+        "phone_last_four": phone_digits[-4:],
+        "message": "Phone saved. Customer can continue conversation in future visits."
+    }
+
+
 @router.post("/state/{session_id}/finalize")
 async def finalize_conversation(
     session_id: str,
@@ -803,6 +982,9 @@ def generate_fallback_response(message: str, customer_name: Optional[str] = None
     
     elif any(word in message_lower for word in ['budget', 'price', 'afford']):
         return f"{greeting}We have options at every price point! The Trax starts around $22k, Trailblazer around $24k, and Equinox around $28k. What monthly payment are you comfortable with?"
+    
+    elif any(word in message_lower for word in ['continue', 'conversation', 'previous', 'last time']):
+        return f"{greeting}Welcome back! I'd be happy to continue where we left off. Could you please provide your 10-digit phone number so I can look up your previous conversation?"
     
     else:
         return f"{greeting}I'd love to help you find the perfect vehicle! Tell me a bit about what you're looking for - what will you mainly use it for, and are there any must-have features?"
