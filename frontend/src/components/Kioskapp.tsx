@@ -498,6 +498,7 @@ const KioskApp: React.FC = () => {
         <div style={styles.headerRight}>
           {currentScreen === 'welcome' && (
             <button 
+              className="sales-desk-btn"
               style={styles.salesDeskLink} 
               onClick={() => navigateTo('trafficLog')}
             >
@@ -564,6 +565,13 @@ const KioskApp: React.FC = () => {
         }
         ::-webkit-scrollbar-thumb:hover {
           background: rgba(255,255,255,0.3);
+        }
+        
+        /* Hide Sales Desk button on mobile */
+        @media (max-width: 768px) {
+          .sales-desk-btn {
+            display: none !important;
+          }
         }
       `}</style>
     </div>
