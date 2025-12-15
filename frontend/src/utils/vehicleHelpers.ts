@@ -25,8 +25,8 @@ export const AVAILABLE_VEHICLE_IMAGES: Record<string, string[]> = {
 export const hasLocalImage = (model: string, color: string): boolean => {
   const modelKey = model.toLowerCase()
     .replace(/\s+/g, '')
-    .replace(/-ev$/, '')
-    .replace(/-hd$/, '')
+    .replace(/-?ev$/i, '')  // Handle both "equinox-ev" and "equinoxev"
+    .replace(/-?hd$/i, '')  // Handle both "silverado-hd" and "silveradohd"
     .replace(/\d+$/, '');
   
   const colorCategory = getColorCategory(color);
@@ -39,8 +39,8 @@ export const hasLocalImage = (model: string, color: string): boolean => {
 export const getLocalImagePath = (model: string, color: string): string | null => {
   const modelKey = model.toLowerCase()
     .replace(/\s+/g, '')
-    .replace(/-ev$/, '')
-    .replace(/-hd$/, '')
+    .replace(/-?ev$/i, '')  // Handle both "equinox-ev" and "equinoxev"
+    .replace(/-?hd$/i, '')  // Handle both "silverado-hd" and "silveradohd"
     .replace(/\d+$/, '');
   
   const colorCategory = getColorCategory(color);
