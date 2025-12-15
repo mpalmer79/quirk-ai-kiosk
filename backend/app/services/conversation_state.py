@@ -629,6 +629,7 @@ class ConversationStateManager:
             return False
         
         try:
+            import json
             persist_dir = "/tmp/quirk_conversations"
             os.makedirs(persist_dir, exist_ok=True)
             
@@ -647,6 +648,7 @@ class ConversationStateManager:
     def _load_persisted_session(self, phone: str) -> Optional[ConversationState]:
         """Load a persisted session from disk"""
         try:
+            import json
             filepath = f"/tmp/quirk_conversations/{phone}.json"
             
             if not os.path.exists(filepath):
