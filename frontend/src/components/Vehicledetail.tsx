@@ -1,4 +1,4 @@
-import React, { useState, CSSProperties } from 'react';
+import React, { useState, useEffect, CSSProperties } from 'react';
 import { logTrafficSession } from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
 import { getVehicleImageUrl, getColorCategory, getColorGradient } from '../utils/vehicleHelpers';
@@ -100,6 +100,12 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     features: ['Remote Start', 'Apple CarPlay', 'Backup Camera', 'Android Auto'],
     rebates: DEFAULT_REBATES,
   };
+
+  // Reset image error state when vehicle changes
+  useEffect(() => {
+    setImageError(false);
+    setSelectedImageIndex(0);
+  }, [customerData?.selectedVehicle?.stockNumber, customerData?.selectedVehicle?.stock_number]);
 
   const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
   const vin = vehicle.vin || '';
