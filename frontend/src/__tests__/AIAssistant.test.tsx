@@ -593,10 +593,11 @@ describe('AIAssistant Component', () => {
   });
 
   describe('Common Questions Panel', () => {
-    test('displays Common Questions button', async () => {
+    test('ObjectionPanel is not shown by default', async () => {
       renderAIAssistant();
       await waitFor(() => {
-        expect(screen.getByText(/Common Questions/i)).toBeInTheDocument();
+        // ObjectionPanel should not be visible by default
+        expect(screen.queryByText(/Have Questions or Concerns/i)).not.toBeInTheDocument();
       });
     });
   });
