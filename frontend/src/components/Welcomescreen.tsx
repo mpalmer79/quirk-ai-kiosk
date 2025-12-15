@@ -72,13 +72,25 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   };
 
   const handleBrowseAll = async () => {
-    updateCustomerData({ path: 'browse' });
+    // Clear any existing filters when browsing all
+    updateCustomerData({ 
+      path: 'browse',
+      bodyStyleFilter: undefined,
+      selectedModel: undefined,
+      selectedCab: undefined,
+    });
     try { await api.logTrafficSession({ customerName: customerName || undefined, phone: customerPhone || undefined, path: 'browse', currentStep: 'inventory', actions: ['browse_all'] }); } catch {}
     navigateTo('inventory');
   };
 
   const handleStatClick = (statKey: StatType) => {
-    updateCustomerData({ path: 'browse' });
+    // Clear any existing filters first
+    updateCustomerData({ 
+      path: 'browse',
+      bodyStyleFilter: undefined,
+      selectedModel: undefined,
+      selectedCab: undefined,
+    });
     switch (statKey) {
       case 'suv':
         updateCustomerData({ bodyStyleFilter: 'SUV' });
