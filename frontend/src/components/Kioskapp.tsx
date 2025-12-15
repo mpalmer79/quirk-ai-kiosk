@@ -471,13 +471,25 @@ const KioskApp: React.FC = () => {
   };
 
   return (
-    <div style={styles.container}>
+    <div style={{
+      ...styles.container,
+      ...(currentScreen === 'aiAssistant' ? {
+        backgroundImage: 'url(/showroom.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      } : {})
+    }}>
       {/* Header */}
       <header style={{
         ...styles.header,
         ...((currentScreen === 'inventory' || currentScreen === 'modelBudget') ? {
           background: '#ffffff',
           borderBottom: '1px solid rgba(0,0,0,0.1)',
+        } : {}),
+        ...(currentScreen === 'aiAssistant' ? {
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(10px)',
         } : {})
       }}>
         {/* Left spacer for centering */}
