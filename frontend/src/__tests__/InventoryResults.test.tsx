@@ -480,7 +480,7 @@ describe('InventoryResults Component', () => {
   });
 
   describe('Navigation', () => {
-    test('Start Over button navigates to welcome', async () => {
+    test('Start Over button clears filters and navigates to welcome', async () => {
       renderInventoryResults();
 
       await waitFor(() => {
@@ -488,6 +488,11 @@ describe('InventoryResults Component', () => {
       });
 
       fireEvent.click(screen.getByText('Start Over'));
+      expect(mockUpdateCustomerData).toHaveBeenCalledWith({
+        selectedModel: undefined,
+        bodyStyleFilter: undefined,
+        selectedCab: undefined,
+      });
       expect(mockNavigateTo).toHaveBeenCalledWith('welcome');
     });
 
