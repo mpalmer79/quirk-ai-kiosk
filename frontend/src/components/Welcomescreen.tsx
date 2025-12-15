@@ -120,15 +120,15 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       <div style={s.container}>
         <div style={s.bgImage} /><div style={s.bgOverlay} />
         
-        <div style={{ ...s.twoColumnLayout, opacity: isVisible ? 1 : 0, transform: isVisible ? 'translateY(0)' : 'translateY(20px)' }}>
+        <div className="welcome-two-column" style={{ ...s.twoColumnLayout, opacity: isVisible ? 1 : 0, transform: isVisible ? 'translateY(0)' : 'translateY(20px)' }}>
           
           {/* Left Column - Google Reviews */}
-          <div style={s.columnCard}>
+          <div className="welcome-reviews-column" style={s.columnCard}>
             <GoogleReviews rotationInterval={10000} />
           </div>
           
           {/* Right Column - Name Capture */}
-          <div style={s.columnCard}>
+          <div className="welcome-capture-column" style={s.columnCard}>
             <div style={s.nameCaptureInner}>
               <div style={s.titleRow}>
                 <div style={s.inlineAvatar}><AvatarIcon /></div>
@@ -158,8 +158,50 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
           </div>
         </div>
         
-        <style>{`@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+        <style>{`
+          @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
           input::placeholder { color: rgba(255,255,255,0.7) !important; }
+          
+          /* Mobile Portrait - Stack vertically with name capture on top */
+          @media (max-width: 768px) and (orientation: portrait) {
+            .welcome-two-column {
+              flex-direction: column-reverse !important;
+              gap: 24px !important;
+              padding: 20px !important;
+            }
+            .welcome-two-column > div {
+              flex: 1 1 auto !important;
+              max-width: 100% !important;
+              min-height: auto !important;
+            }
+            .welcome-reviews-column {
+              max-height: 300px;
+              overflow: hidden;
+            }
+          }
+          
+          /* Mobile Landscape - Side by side */
+          @media (max-width: 900px) and (orientation: landscape) {
+            .welcome-two-column {
+              gap: 20px !important;
+              padding: 10px !important;
+            }
+            .welcome-two-column > div {
+              flex: 1 1 45% !important;
+              min-height: auto !important;
+            }
+          }
+          
+          /* Tablet Portrait */
+          @media (min-width: 769px) and (max-width: 1024px) and (orientation: portrait) {
+            .welcome-two-column {
+              flex-direction: column-reverse !important;
+              gap: 30px !important;
+            }
+            .welcome-two-column > div {
+              max-width: 600px !important;
+            }
+          }
         `}</style>
       </div>
     );
