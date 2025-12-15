@@ -16,6 +16,7 @@ export const styles: Record<string, CSSProperties> = {
   header: {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: '16px',
     marginBottom: '24px',
     paddingBottom: '20px',
