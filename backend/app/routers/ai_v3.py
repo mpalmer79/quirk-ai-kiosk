@@ -53,7 +53,7 @@ logger = logging.getLogger("quirk_ai.intelligent")
 # =============================================================================
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-PROMPT_VERSION = "3.2.0"
+PROMPT_VERSION = "3.3.0"
 MODEL_NAME = "claude-sonnet-4-20250514"
 MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
 
@@ -101,6 +101,34 @@ async def call_with_retry(
 
 # Tool definitions for Claude
 TOOLS = [
+    {
+        "name": "calculate_budget",
+        "description": "Calculate what vehicle price a customer can afford based on their down payment and desired monthly payment. ALWAYS use this when a customer mentions both a down payment AND monthly payment amount. Uses 7% APR at 84 months.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "down_payment": {
+                    "type": "number",
+                    "description": "Customer's cash down payment amount in dollars"
+                },
+                "monthly_payment": {
+                    "type": "number",
+                    "description": "Customer's desired monthly payment amount in dollars"
+                },
+                "apr": {
+                    "type": "number",
+                    "description": "Annual percentage rate (default 7.0 if not specified)",
+                    "default": 7.0
+                },
+                "term_months": {
+                    "type": "integer",
+                    "description": "Loan term in months (default 84 if not specified)",
+                    "default": 84
+                }
+            },
+            "required": ["down_payment", "monthly_payment"]
+        }
+    },
     {
         "name": "search_inventory",
         "description": "Search dealership inventory for vehicles matching customer needs. Use this when the customer asks about available vehicles, specific models, or wants recommendations.",
@@ -285,6 +313,7 @@ PERSONALITY:
 - Focused on finding the RIGHT vehicle, not just ANY vehicle
 
 YOUR CAPABILITIES (Use these tools!):
+- calculate_budget: CRITICAL - Calculate what vehicle price customer can afford from down payment + monthly payment
 - search_inventory: Find vehicles matching customer needs
 - get_vehicle_details: Get specifics on a vehicle
 - find_similar_vehicles: Show alternatives
@@ -292,6 +321,19 @@ YOUR CAPABILITIES (Use these tools!):
 - mark_favorite: Save vehicles customer likes
 - lookup_conversation: Retrieve a customer's previous conversation by phone
 - save_customer_phone: Save customer's phone to their conversation
+
+💰 BUDGET QUALIFICATION (CRITICAL - Act like a professional sales consultant!):
+When a customer mentions BOTH a down payment AND a monthly payment:
+1. IMMEDIATELY use the calculate_budget tool to determine their max vehicle price
+2. Use the calculated max_price when searching inventory - do NOT show vehicles they can't afford
+3. Explain the calculation clearly: "With $X down and $Y/month at 7% APR for 84 months, you're looking at vehicles up to $Z"
+4. ALWAYS disclose: "Taxes and fees are separate from this calculation. New Hampshire doesn't tax vehicle payments, but other states may add tax on top."
+
+Example: Customer says "$10,000 down, $600/month"
+- Use calculate_budget tool → returns ~$49,750 max vehicle price
+- Search for Silverado 1500 with max_price: 49750
+- Show ONLY vehicles within their budget
+- Do NOT show $80k trucks to a customer who can afford $50k
 
 CONVERSATION GUIDELINES:
 1. Use search_inventory when customer describes what they want
@@ -506,7 +548,46 @@ async def execute_tool(
     vehicles_to_show = []
     staff_notified = False
     
-    if tool_name == "search_inventory":
+    if tool_name == "calculate_budget":
+        down_payment = tool_input.get("down_payment", 0)
+        monthly_payment = tool_input.get("monthly_payment", 0)
+        apr = tool_input.get("apr", 7.0)  # Default 7% APR
+        term_months = tool_input.get("term_months", 84)  # Default 84 months
+        
+        # Calculate present value of loan (what they can finance)
+        monthly_rate = apr / 100 / 12
+        
+        if monthly_rate > 0:
+            # PV = PMT × [(1 - (1 + r)^-n) / r]
+            pv_factor = (1 - (1 + monthly_rate) ** -term_months) / monthly_rate
+            financed_amount = monthly_payment * pv_factor
+        else:
+            financed_amount = monthly_payment * term_months
+        
+        max_vehicle_price = down_payment + financed_amount
+        total_of_payments = monthly_payment * term_months
+        total_interest = total_of_payments - financed_amount
+        
+        # Update state with budget info
+        state.budget_max = max_vehicle_price
+        state.down_payment = down_payment
+        state.monthly_payment_target = monthly_payment
+        
+        result = f"""BUDGET CALCULATION RESULT:
+- Down Payment: ${down_payment:,.0f}
+- Monthly Payment: ${monthly_payment:,.0f}
+- APR: {apr}%
+- Term: {term_months} months
+- Amount Financed: ${financed_amount:,.0f}
+- MAX VEHICLE PRICE: ${max_vehicle_price:,.0f}
+- Total Interest: ${total_interest:,.0f}
+
+IMPORTANT: Use max_price of {int(max_vehicle_price)} when searching inventory.
+DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may add tax."""
+        
+        return (result, vehicles_to_show, staff_notified)
+    
+    elif tool_name == "search_inventory":
         query = tool_input.get("query", "")
         
         # Use semantic retrieval
@@ -522,10 +603,17 @@ async def execute_tool(
                 if (sv.vehicle.get('bodyStyle') or '').lower() == tool_input['body_style'].lower()
             ]
         
-        if tool_input.get("max_price"):
+        # Apply max_price filter from tool input OR from calculated budget
+        max_price = tool_input.get("max_price")
+        if not max_price and state.budget_max:
+            # Use budget from calculate_budget tool if no explicit max_price given
+            max_price = state.budget_max
+            logger.info(f"Using calculated budget max: ${max_price:,.0f}")
+        
+        if max_price:
             scored_vehicles = [
                 sv for sv in scored_vehicles
-                if (sv.vehicle.get('MSRP') or sv.vehicle.get('price', 0)) <= tool_input['max_price']
+                if (sv.vehicle.get('MSRP') or sv.vehicle.get('price', 0)) <= max_price
             ]
         
         # CRITICAL: Filter out vehicles matching trade-in model
