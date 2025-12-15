@@ -203,7 +203,32 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         customerName: customerData?.customerName,
       });
 
-      const matchingVehicles = searchInventory(content);
+      // Use vehicles from V3 API response if available, otherwise fall back to local search
+      let matchingVehicles: Vehicle[] = [];
+      
+      if (response.vehicles && response.vehicles.length > 0) {
+        // V3 API returned vehicles - use these (they're already budget-qualified)
+        // Map from API format to frontend Vehicle format
+        matchingVehicles = response.vehicles.map((v: any) => {
+          // Find full vehicle data from inventory by stock number
+          const fullVehicle = inventory.find(
+            inv => (inv.stockNumber || inv.stock_number) === v.stock_number
+          );
+          return fullVehicle || {
+            stockNumber: v.stock_number,
+            stock_number: v.stock_number,
+            model: v.model,
+            price: v.price,
+            salePrice: v.price,
+          } as Vehicle;
+        }).filter(Boolean);
+      }
+      
+      // Fall back to local search only if V3 didn't return vehicles
+      if (matchingVehicles.length === 0) {
+        matchingVehicles = searchInventory(content);
+      }
+      
       const isHoursQuery = detectHoursQuery(content);
 
       const assistantMessage: Message = {
