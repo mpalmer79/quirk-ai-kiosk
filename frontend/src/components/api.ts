@@ -745,10 +745,31 @@ export const chatWithAI = async (request: AIChatRequest): Promise<AIChatResponse
     customer_name: request.customerName || null
   };
   
-  return apiRequest<AIChatResponse>('/v3/ai/chat', {
+  // V3 endpoint is at /api/v3/ai/chat (not under /v1)
+  // Get base URL without any version prefix
+  let baseUrl = API_BASE_URL;
+  
+  // Remove /v1 suffix if present (REACT_APP_API_URL may include it)
+  if (baseUrl.endsWith('/v1')) {
+    baseUrl = baseUrl.slice(0, -3); // Remove '/v1'
+  }
+  
+  const url = `${baseUrl}/v3/ai/chat`;
+  
+  const response = await fetch(url, {
     method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(v3Request),
   });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `API Error: ${response.status}`);
+  }
+  
+  return await response.json() as AIChatResponse;
 };
 
 // ============================================
