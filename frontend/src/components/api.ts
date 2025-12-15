@@ -253,7 +253,7 @@ interface ActiveSessionsResponse {
 
 interface AIChatRequest {
   message: string;
-  inventoryContext: string;
+  inventoryContext?: string;
   conversationHistory: Array<{ role: string; content: string }>;
   customerName?: string;
 }
@@ -261,6 +261,17 @@ interface AIChatRequest {
 interface AIChatResponse {
   message: string;
   suggestedVehicles?: string[];
+  vehicles?: Array<{
+    stock_number: string;
+    model: string;
+    price?: number;
+    match_reasons: string[];
+    score: number;
+  }>;
+  conversation_state?: Record<string, unknown>;
+  tools_used?: string[];
+  staff_notified?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 // ============================================
@@ -720,11 +731,23 @@ export const getSessionForDashboard = async (sessionId: string): Promise<ActiveS
 
 /**
  * Chat with AI assistant for vehicle recommendations
+ * Uses V3 intelligent AI with tools and persistent memory
  */
 export const chatWithAI = async (request: AIChatRequest): Promise<AIChatResponse> => {
-  return apiRequest<AIChatResponse>('/ai/chat', {
+  // Build V3-compatible request with session_id
+  const v3Request = {
+    message: request.message,
+    session_id: getSessionId(),
+    conversation_history: request.conversationHistory.map(m => ({
+      role: m.role,
+      content: m.content
+    })),
+    customer_name: request.customerName || null
+  };
+  
+  return apiRequest<AIChatResponse>('/v3/ai/chat', {
     method: 'POST',
-    body: JSON.stringify(request),
+    body: JSON.stringify(v3Request),
   });
 };
 
