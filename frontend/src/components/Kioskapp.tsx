@@ -126,6 +126,7 @@ const screenErrorStyles: Record<string, CSSProperties> = {
 // Initial customer data state
 const initialCustomerData: CustomerData = {
   customerName: undefined,
+  namePhaseCompleted: undefined,
   path: undefined,
   stockNumber: undefined,
   selectedModel: undefined,
