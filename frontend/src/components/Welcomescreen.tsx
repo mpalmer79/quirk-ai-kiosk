@@ -20,7 +20,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   const [stats, setStats] = useState<InventoryStats | null>(null);
   const [customerName, setCustomerName] = useState(customerData?.customerName || '');
   const [customerPhone, setCustomerPhone] = useState(customerData?.phone || '');
-  const [nameSubmitted, setNameSubmitted] = useState(!!customerData?.customerName);
+  const [nameSubmitted, setNameSubmitted] = useState(!!customerData?.customerName || !!customerData?.namePhaseCompleted);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const formatPhoneNumber = (value: string): string => {
@@ -49,17 +49,21 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     const formattedPhone = phoneDigits.length === 10 ? customerPhone : null;
     if (trimmedName) {
       const formattedName = trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
-      updateCustomerData({ customerName: formattedName, phone: formattedPhone || undefined });
+      updateCustomerData({ customerName: formattedName, phone: formattedPhone || undefined, namePhaseCompleted: true });
       setCustomerName(formattedName);
       await logSession(formattedName, formattedPhone);
     } else if (formattedPhone) {
-      updateCustomerData({ phone: formattedPhone });
+      updateCustomerData({ phone: formattedPhone, namePhaseCompleted: true });
       await logSession(null, formattedPhone);
     }
     setNameSubmitted(true);
   };
 
-  const handleSkipName = async () => { await logSession(null, null); setNameSubmitted(true); };
+  const handleSkipName = async () => { 
+    updateCustomerData({ namePhaseCompleted: true }); 
+    await logSession(null, null); 
+    setNameSubmitted(true); 
+  };
 
   const handlePathSelect = async (path: PathId) => {
     updateCustomerData({ path });
