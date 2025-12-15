@@ -85,7 +85,6 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   
   // Image loading state - use verified URL instead of error flag
   const [verifiedImageUrl, setVerifiedImageUrl] = useState<string | null>(null);
-  const [imageLoading, setImageLoading] = useState(true);
   const imagePreloadRef = useRef<HTMLImageElement | null>(null);
 
   // Get vehicle from customerData or use placeholder
@@ -112,7 +111,6 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   useEffect(() => {
     // Reset state when vehicle changes
     setVerifiedImageUrl(null);
-    setImageLoading(true);
     setSelectedImageIndex(0);
     
     // Clean up previous preload
@@ -123,7 +121,6 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     }
     
     if (!computedImageUrl) {
-      setImageLoading(false);
       return;
     }
     
@@ -135,7 +132,6 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       // Only update if this is still the current preload
       if (imagePreloadRef.current === img) {
         setVerifiedImageUrl(computedImageUrl);
-        setImageLoading(false);
       }
     };
     
@@ -143,7 +139,6 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       // Only update if this is still the current preload
       if (imagePreloadRef.current === img) {
         setVerifiedImageUrl(null);
-        setImageLoading(false);
       }
     };
     
