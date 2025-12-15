@@ -95,18 +95,19 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       const searchText = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim} ${vehicle.exteriorColor}`.toLowerCase();
       
       // Check for color matches
-      for (const [color, keywords] of Object.entries(colorKeywords)) {
+      for (const [colorKey, keywords] of Object.entries(colorKeywords)) {
         if (keywords.some(k => lowerQuery.includes(k))) {
-          if (!keywords.some(k => searchText.includes(k))) {
+          // Check if vehicle has any of the color keywords
+          if (!keywords.some(k => searchText.includes(k)) && !searchText.includes(colorKey)) {
             return false;
           }
         }
       }
       
       // Check for model matches
-      for (const [model, keywords] of Object.entries(modelKeywords)) {
+      for (const [modelKey, keywords] of Object.entries(modelKeywords)) {
         if (keywords.some(k => lowerQuery.includes(k))) {
-          if (searchText.includes(model)) {
+          if (searchText.includes(modelKey)) {
             return true;
           }
         }
@@ -209,7 +210,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     }
 
     setIsLoading(false);
-  }, [messages, isLoading, extractedData, customerData, inventory, extractDataFromMessage, detectObjection, detectHoursQuery, searchInventory, buildInventoryContext, speakText, stopSpeaking]);
+  }, [messages, isLoading, extractedData, customerData, extractDataFromMessage, detectObjection, detectHoursQuery, searchInventory, buildInventoryContext, speakText, stopSpeaking]);
 
   // Store sendMessage in ref for speech recognition callback
   useEffect(() => {
