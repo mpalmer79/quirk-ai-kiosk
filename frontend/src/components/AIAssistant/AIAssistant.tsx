@@ -194,9 +194,20 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       
       const matchingVehicles = searchInventory(content);
       
-      const fallbackContent = matchingVehicles.length > 0 
-        ? `I found ${matchingVehicles.length} vehicles that might match what you're looking for! Take a look below.`
-        : `I'd be happy to help you find the perfect vehicle. Could you tell me more about what you're looking for?`;
+      // Detect if user is speaking Spanish
+      const spanishPatterns = /español|busco|quiero|necesito|camioneta|carro|¿|á|é|í|ó|ú|ñ/i;
+      const isSpanish = spanishPatterns.test(content);
+      
+      let fallbackContent: string;
+      if (matchingVehicles.length > 0) {
+        fallbackContent = isSpanish
+          ? `¡Encontré ${matchingVehicles.length} vehículos que podrían ser lo que busca! Écheles un vistazo.`
+          : `I found ${matchingVehicles.length} vehicles that might match what you're looking for! Take a look below.`;
+      } else {
+        fallbackContent = isSpanish
+          ? `¡Estaré encantado de ayudarle a encontrar el vehículo perfecto! ¿Podría contarme más sobre lo que está buscando?`
+          : `I'd be happy to help you find the perfect vehicle. Could you tell me more about what you're looking for?`;
+      }
       
       const fallbackMessage: Message = {
         id: `assistant-${Date.now()}`,
