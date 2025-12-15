@@ -475,7 +475,7 @@ const KioskApp: React.FC = () => {
       {/* Header */}
       <header style={{
         ...styles.header,
-        ...(currentScreen === 'inventory' ? {
+        ...((currentScreen === 'inventory' || currentScreen === 'modelBudget') ? {
           background: '#ffffff',
           borderBottom: '1px solid rgba(0,0,0,0.1)',
         } : {})
@@ -496,7 +496,7 @@ const KioskApp: React.FC = () => {
         <div style={styles.logoContainer}>
           <div style={{
             ...styles.logo,
-            ...(currentScreen === 'inventory' ? {
+            ...((currentScreen === 'inventory' || currentScreen === 'modelBudget') ? {
               background: 'rgba(30, 41, 59, 0.95)',
               padding: '10px 20px',
               borderRadius: '12px',
@@ -535,7 +535,7 @@ const KioskApp: React.FC = () => {
       {/* Footer */}
       <footer style={{
         ...styles.footer,
-        ...(currentScreen === 'inventory' ? {
+        ...((currentScreen === 'inventory' || currentScreen === 'modelBudget') ? {
           background: '#ffffff',
           borderTop: '1px solid rgba(0,0,0,0.1)',
           color: '#1e293b',
@@ -544,12 +544,12 @@ const KioskApp: React.FC = () => {
         <span>Quirk Chevrolet</span>
         <span style={{
           ...styles.footerDot,
-          ...(currentScreen === 'inventory' ? { color: 'rgba(0,0,0,0.3)' } : {})
+          ...((currentScreen === 'inventory' || currentScreen === 'modelBudget') ? { color: 'rgba(0,0,0,0.3)' } : {})
         }}>•</span>
         <span>New England's #1 Dealer</span>
         <span style={{
           ...styles.footerDot,
-          ...(currentScreen === 'inventory' ? { color: 'rgba(0,0,0,0.3)' } : {})
+          ...((currentScreen === 'inventory' || currentScreen === 'modelBudget') ? { color: 'rgba(0,0,0,0.3)' } : {})
         }}>•</span>
         <span style={styles.footerTime}>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
       </footer>
