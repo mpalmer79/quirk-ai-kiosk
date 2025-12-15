@@ -1,6 +1,6 @@
 # QUIRK AI Kiosk
 
-**AI-Powered Showroom Experience for Quirk Auto Dealers**
+**AI-Powered Showroom Experience for Quirk Chevrolet NH**
 
 An interactive in-store kiosk system that enables customers to browse inventory, compare vehicles, get AI-powered recommendations, estimate trade-in values, and calculate payments — all through a touchscreen interface designed for the dealership showroom floor.
 
