@@ -8,7 +8,6 @@ Key Features:
 - Claude tool use for real actions
 - Dynamic context building
 - Outcome tracking for learning
-- Phone-based conversation continuation
 """
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
@@ -52,7 +51,7 @@ logger = logging.getLogger("quirk_ai.intelligent")
 # =============================================================================
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-PROMPT_VERSION = "3.1.0"
+PROMPT_VERSION = "3.1.1"
 MODEL_NAME = "claude-sonnet-4-20250514"
 MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
 
@@ -271,6 +270,15 @@ TRADE-IN POLICY:
 - Offer FREE professional appraisal (takes ~10-15 minutes)
 - Ask about: current payment, lease vs finance, payoff amount, lender
 
+⚠️ CRITICAL TRADE-IN RULE:
+When a customer mentions trading in a vehicle (e.g., "I'm trading in my Equinox"):
+- The trade-in vehicle is what they're GETTING RID OF, not what they want to buy
+- NEVER search for or show vehicles matching the trade-in model
+- Continue showing vehicles that match their ORIGINAL request (e.g., trucks for towing)
+- Example: If customer wants "a truck to tow a boat" and says "I'm trading in my Equinox":
+  - CORRECT: Continue showing Silverado trucks
+  - WRONG: Show Equinox vehicles for sale
+
 SPOUSE OBJECTION HANDLING:
 When customer needs to consult spouse:
 1. Validate the need to discuss together
@@ -291,13 +299,23 @@ def build_dynamic_context(state: ConversationState) -> str:
     if not state or state.message_count == 0:
         return "CUSTOMER CONTEXT:\nNew customer - no information gathered yet."
     
-    return f"""CUSTOMER CONTEXT (What you know about this customer):
+    context = f"""CUSTOMER CONTEXT (What you know about this customer):
 {state.to_context_summary()}
 
 CONVERSATION PROGRESS:
 - Messages exchanged: {state.message_count}
 - Stage: {state.stage.value}
 - Interest level: {state.interest_level.value}"""
+    
+    # Add explicit trade-in exclusion warning
+    if state.trade_model:
+        context += f"""
+
+⚠️ TRADE-IN EXCLUSION: Customer is trading in a {state.trade_model}.
+DO NOT show or search for {state.trade_model} vehicles - they want something DIFFERENT!
+Focus on their original request (what they want to BUY, not trade)."""
+    
+    return context
 
 
 def build_inventory_context(retriever: SemanticVehicleRetriever) -> str:
@@ -409,7 +427,6 @@ async def execute_tool(
     """
     vehicles_to_show = []
     staff_notified = False
-    result = ""
     
     if tool_name == "search_inventory":
         query = tool_input.get("query", "")
@@ -432,6 +449,17 @@ async def execute_tool(
                 sv for sv in scored_vehicles
                 if (sv.vehicle.get('MSRP') or sv.vehicle.get('price', 0)) <= tool_input['max_price']
             ]
+        
+        # CRITICAL: Filter out vehicles matching trade-in model
+        # Customer is trading IN this model, not looking to BUY it
+        if state.trade_model:
+            trade_model_lower = state.trade_model.lower()
+            scored_vehicles = [
+                sv for sv in scored_vehicles
+                if trade_model_lower not in (sv.vehicle.get('Model') or sv.vehicle.get('model', '')).lower()
+            ]
+            if scored_vehicles:
+                logger.info(f"Filtered out {state.trade_model} vehicles (trade-in model)")
         
         vehicles_to_show = scored_vehicles
         result = format_vehicles_for_tool_result(scored_vehicles)
@@ -982,9 +1010,6 @@ def generate_fallback_response(message: str, customer_name: Optional[str] = None
     
     elif any(word in message_lower for word in ['budget', 'price', 'afford']):
         return f"{greeting}We have options at every price point! The Trax starts around $22k, Trailblazer around $24k, and Equinox around $28k. What monthly payment are you comfortable with?"
-    
-    elif any(word in message_lower for word in ['continue', 'conversation', 'previous', 'last time']):
-        return f"{greeting}Welcome back! I'd be happy to continue where we left off. Could you please provide your 10-digit phone number so I can look up your previous conversation?"
     
     else:
         return f"{greeting}I'd love to help you find the perfect vehicle! Tell me a bit about what you're looking for - what will you mainly use it for, and are there any must-have features?"
