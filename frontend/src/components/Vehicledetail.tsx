@@ -107,16 +107,6 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   // Get image URL directly
   const imageUrl = getVehicleImageUrl(vehicle);
   
-  // Debug logging - remove after confirming fix works
-  useEffect(() => {
-    console.log('[VehicleDetail] Vehicle changed:', {
-      vehicleKey,
-      model: vehicle.model,
-      exteriorColor: vehicle.exteriorColor || vehicle.exterior_color,
-      imageUrl,
-    });
-  }, [vehicleKey, vehicle.model, vehicle.exteriorColor, vehicle.exterior_color, imageUrl]);
-  
   // Reset image error when vehicle changes (vehicleKey changes)
   useEffect(() => {
     setImageError(false);
