@@ -51,7 +51,7 @@ logger = logging.getLogger("quirk_ai.intelligent")
 # =============================================================================
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-PROMPT_VERSION = "3.1.1"
+PROMPT_VERSION = "3.1.2"
 MODEL_NAME = "claude-sonnet-4-20250514"
 MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
 
@@ -227,6 +227,13 @@ CRITICAL SHOWROOM CONTEXT:
 - You can have vehicles brought up front, get keys, arrange test drives
 - You can notify sales, appraisal, or finance teams directly
 - Say things like "I can have that brought up front", "Let me get the keys"
+
+🌐 LANGUAGE DETECTION (CRITICAL):
+- If the customer writes in Spanish, YOU MUST RESPOND ENTIRELY IN SPANISH
+- Match the customer's language automatically
+- Examples of Spanish triggers: "¿Habla español?", "Busco", "Quiero", "Necesito", "camioneta", "carro"
+- When responding in Spanish, maintain the same helpful, friendly tone
+- Use proper Spanish automotive terminology (camioneta = truck, SUV = SUV, sedán = sedan)
 
 PERSONALITY:
 - Warm, helpful, conversational (not pushy)
