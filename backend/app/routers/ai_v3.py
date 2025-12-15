@@ -1,1 +1,808 @@
+"""
+Quirk AI Kiosk - Intelligent AI Assistant Router (V3)
+Production-grade AI with persistent memory, tool use, and smart vehicle retrieval.
 
+Key Features:
+- Persistent conversation state across turns
+- Semantic vehicle retrieval (RAG-lite)
+- Claude tool use for real actions
+- Dynamic context building
+- Outcome tracking for learning
+"""
+
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
+import httpx
+import json
+import re
+import logging
+from datetime import datetime
+from enum import Enum
+
+# Core services
+from app.services.conversation_state import (
+    ConversationStateManager,
+    ConversationState,
+    ConversationStage,
+    InterestLevel,
+    get_state_manager
+)
+from app.services.vehicle_retriever import (
+    SemanticVehicleRetriever,
+    ScoredVehicle,
+    get_vehicle_retriever
+)
+from app.services.outcome_tracker import (
+    OutcomeTracker,
+    ConversationOutcome,
+    get_outcome_tracker
+)
+from app.services.entity_extraction import get_entity_extractor
+
+# Security
+from app.core.security import get_key_manager
+
+router = APIRouter()
+logger = logging.getLogger("quirk_ai.intelligent")
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+PROMPT_VERSION = "3.0.0"
+MODEL_NAME = "claude-sonnet-4-20250514"
+MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
+
+# Tool definitions for Claude
+TOOLS = [
+    {
+        "name": "search_inventory",
+        "description": "Search dealership inventory for vehicles matching customer needs. Use this when the customer asks about available vehicles, specific models, or wants recommendations.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Natural language search query based on customer needs (e.g., 'blue truck for towing', 'family SUV under 50k')"
+                },
+                "body_style": {
+                    "type": "string",
+                    "description": "Filter by body style: Truck, SUV, Van, Sedan, Sports Car",
+                    "enum": ["Truck", "SUV", "Van", "Sedan", "Sports Car", "Coupe", "Convertible"]
+                },
+                "max_price": {
+                    "type": "number",
+                    "description": "Maximum price filter"
+                },
+                "min_seating": {
+                    "type": "integer",
+                    "description": "Minimum seating capacity needed"
+                },
+                "min_towing": {
+                    "type": "integer",
+                    "description": "Minimum towing capacity in lbs"
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "get_vehicle_details",
+        "description": "Get detailed information about a specific vehicle by stock number. Use when customer asks about a specific vehicle or wants more details.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "stock_number": {
+                    "type": "string",
+                    "description": "The vehicle stock number (e.g., M12345)"
+                }
+            },
+            "required": ["stock_number"]
+        }
+    },
+    {
+        "name": "find_similar_vehicles",
+        "description": "Find vehicles similar to one the customer likes. Use when they want alternatives or comparisons.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "stock_number": {
+                    "type": "string",
+                    "description": "Stock number of the vehicle to find similar matches for"
+                }
+            },
+            "required": ["stock_number"]
+        }
+    },
+    {
+        "name": "notify_staff",
+        "description": "Notify dealership staff to assist the customer. Use when customer is ready for test drive, wants appraisal, or needs finance help.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "notification_type": {
+                    "type": "string",
+                    "description": "Type of staff to notify",
+                    "enum": ["sales", "appraisal", "finance"]
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Brief message about what the customer needs"
+                },
+                "vehicle_stock": {
+                    "type": "string",
+                    "description": "Stock number of vehicle customer is interested in (if applicable)"
+                }
+            },
+            "required": ["notification_type", "message"]
+        }
+    },
+    {
+        "name": "mark_favorite",
+        "description": "Mark a vehicle as a customer favorite for quick reference.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "stock_number": {
+                    "type": "string",
+                    "description": "Stock number to mark as favorite"
+                }
+            },
+            "required": ["stock_number"]
+        }
+    }
+]
+
+# =============================================================================
+# REQUEST/RESPONSE MODELS
+# =============================================================================
+
+class ConversationMessage(BaseModel):
+    role: str
+    content: str
+
+
+class IntelligentChatRequest(BaseModel):
+    message: str
+    session_id: str
+    conversation_history: List[ConversationMessage] = []
+    customer_name: Optional[str] = None
+
+
+class VehicleRecommendation(BaseModel):
+    stock_number: str
+    model: str
+    price: Optional[float]
+    match_reasons: List[str]
+    score: float
+
+
+class IntelligentChatResponse(BaseModel):
+    message: str
+    vehicles: Optional[List[VehicleRecommendation]] = None
+    conversation_state: Optional[Dict[str, Any]] = None
+    tools_used: List[str] = []
+    staff_notified: bool = False
+    metadata: Optional[Dict[str, Any]] = None
+
+
+# =============================================================================
+# SYSTEM PROMPT - DYNAMIC CONTEXT AWARE
+# =============================================================================
+
+SYSTEM_PROMPT_TEMPLATE = """You are a knowledgeable, friendly AI sales assistant on an interactive kiosk INSIDE the Quirk Chevrolet showroom. The customer is standing in front of you RIGHT NOW.
+
+CRITICAL SHOWROOM CONTEXT:
+- Customer is ALREADY HERE - never say "come in" or "visit us"
+- You can have vehicles brought up front, get keys, arrange test drives
+- You can notify sales, appraisal, or finance teams directly
+- Say things like "I can have that brought up front", "Let me get the keys"
+
+PERSONALITY:
+- Warm, helpful, conversational (not pushy)
+- Patient and understanding
+- Focused on finding the RIGHT vehicle, not just ANY vehicle
+
+YOUR CAPABILITIES (Use these tools!):
+- search_inventory: Find vehicles matching customer needs
+- get_vehicle_details: Get specifics on a vehicle
+- find_similar_vehicles: Show alternatives
+- notify_staff: Get sales/appraisal/finance to help
+- mark_favorite: Save vehicles customer likes
+
+CONVERSATION GUIDELINES:
+1. Use search_inventory when customer describes what they want
+2. Use get_vehicle_details when discussing specific stock numbers
+3. Use notify_staff when customer is ready for test drive or appraisal
+4. Always mention stock numbers when recommending vehicles
+5. Keep responses conversational and concise (2-3 paragraphs max)
+
+{conversation_context}
+
+{inventory_context}
+
+TRADE-IN POLICY:
+- NEVER give dollar values for trade-ins
+- Offer FREE professional appraisal (takes ~10-15 minutes)
+- Ask about: current payment, lease vs finance, payoff amount, lender
+
+SPOUSE OBJECTION HANDLING:
+When customer needs to consult spouse:
+1. Validate the need to discuss together
+2. Mention time-sensitive incentives
+3. Offer to call spouse on speaker
+4. Offer to let them take vehicle home to show spouse
+5. Get specific follow-up time
+
+Remember: You have TOOLS - use them to provide real, accurate inventory information!"""
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def build_dynamic_context(state: ConversationState) -> str:
+    """Build dynamic context from conversation state"""
+    if not state or state.message_count == 0:
+        return "CUSTOMER CONTEXT:\nNew customer - no information gathered yet."
+    
+    return f"""CUSTOMER CONTEXT (What you know about this customer):
+{state.to_context_summary()}
+
+CONVERSATION PROGRESS:
+- Messages exchanged: {state.message_count}
+- Stage: {state.stage.value}
+- Interest level: {state.interest_level.value}"""
+
+
+def build_inventory_context(retriever: SemanticVehicleRetriever) -> str:
+    """Build inventory summary for context"""
+    summary = retriever.get_inventory_summary()
+    
+    if summary.get('total', 0) == 0:
+        return "INVENTORY: Unable to load inventory data."
+    
+    return f"""CURRENT INVENTORY SUMMARY:
+- Total vehicles: {summary['total']}
+- Types: {', '.join(f"{k}: {v}" for k, v in summary.get('by_body_style', {}).items())}
+- Price range: ${summary.get('price_range', {}).get('min', 0):,.0f} - ${summary.get('price_range', {}).get('max', 0):,.0f}
+- Top models: {', '.join(summary.get('top_models', {}).keys())}"""
+
+
+def format_vehicle_for_response(vehicle: Dict[str, Any], reasons: List[str] = None) -> Dict[str, Any]:
+    """Format vehicle data for response"""
+    return {
+        "stock_number": vehicle.get('Stock Number') or vehicle.get('stockNumber', ''),
+        "year": vehicle.get('Year') or vehicle.get('year', ''),
+        "make": vehicle.get('Make') or vehicle.get('make', 'Chevrolet'),
+        "model": vehicle.get('Model') or vehicle.get('model', ''),
+        "trim": vehicle.get('Trim') or vehicle.get('trim', ''),
+        "price": vehicle.get('MSRP') or vehicle.get('msrp') or vehicle.get('price', 0),
+        "body_style": vehicle.get('bodyStyle', ''),
+        "drivetrain": vehicle.get('drivetrain', ''),
+        "exterior_color": vehicle.get('exteriorColor') or vehicle.get('Exterior Color', ''),
+        "features": vehicle.get('features', [])[:5],
+        "seating_capacity": vehicle.get('seatingCapacity', 5),
+        "towing_capacity": vehicle.get('towingCapacity', 0),
+        "match_reasons": reasons or [],
+    }
+
+
+def format_vehicles_for_tool_result(vehicles: List[ScoredVehicle]) -> str:
+    """Format vehicle list for tool result to Claude"""
+    if not vehicles:
+        return "No vehicles found matching the criteria."
+    
+    result_parts = [f"Found {len(vehicles)} matching vehicles:\n"]
+    
+    for idx, sv in enumerate(vehicles, 1):
+        v = sv.vehicle
+        stock = v.get('Stock Number') or v.get('stockNumber', '')
+        year = v.get('Year') or v.get('year', '')
+        model = v.get('Model') or v.get('model', '')
+        trim = v.get('Trim') or v.get('trim', '')
+        price = v.get('MSRP') or v.get('msrp') or v.get('price', 0)
+        color = v.get('exteriorColor') or v.get('Exterior Color', '')
+        
+        result_parts.append(
+            f"{idx}. Stock #{stock}: {year} {model} {trim}\n"
+            f"   Price: ${price:,.0f} | Color: {color}\n"
+            f"   Why it matches: {', '.join(sv.match_reasons[:3])}\n"
+        )
+    
+    return '\n'.join(result_parts)
+
+
+def format_vehicle_details_for_tool(vehicle: Dict[str, Any]) -> str:
+    """Format single vehicle details for tool result"""
+    if not vehicle:
+        return "Vehicle not found."
+    
+    stock = vehicle.get('Stock Number') or vehicle.get('stockNumber', '')
+    year = vehicle.get('Year') or vehicle.get('year', '')
+    make = vehicle.get('Make') or vehicle.get('make', 'Chevrolet')
+    model = vehicle.get('Model') or vehicle.get('model', '')
+    trim = vehicle.get('Trim') or vehicle.get('trim', '')
+    price = vehicle.get('MSRP') or vehicle.get('msrp') or vehicle.get('price', 0)
+    color = vehicle.get('exteriorColor') or vehicle.get('Exterior Color', '')
+    drivetrain = vehicle.get('drivetrain', '')
+    features = vehicle.get('features', [])
+    seating = vehicle.get('seatingCapacity', 5)
+    towing = vehicle.get('towingCapacity', 0)
+    
+    return f"""Vehicle Details - Stock #{stock}:
+{year} {make} {model} {trim}
+
+PRICE: ${price:,.0f}
+COLOR: {color}
+DRIVETRAIN: {drivetrain}
+SEATING: {seating} passengers
+TOWING CAPACITY: {towing:,} lbs
+
+KEY FEATURES:
+{chr(10).join(f'- {f}' for f in features[:8])}
+
+This vehicle is available in our showroom. I can have it brought up front or get the keys for a closer look."""
+
+
+# =============================================================================
+# TOOL EXECUTION
+# =============================================================================
+
+async def execute_tool(
+    tool_name: str,
+    tool_input: Dict[str, Any],
+    state: ConversationState,
+    retriever: SemanticVehicleRetriever,
+    state_manager: ConversationStateManager
+) -> tuple:
+    """
+    Execute a tool and return the result.
+    
+    Returns:
+        (result_text, vehicles_to_show, staff_notified)
+    """
+    vehicles_to_show = []
+    staff_notified = False
+    
+    if tool_name == "search_inventory":
+        query = tool_input.get("query", "")
+        
+        # Use semantic retrieval
+        scored_vehicles = retriever.retrieve(
+            query=query,
+            conversation_state=state,
+            limit=6
+        )
+        
+        if tool_input.get("body_style"):
+            scored_vehicles = [
+                sv for sv in scored_vehicles 
+                if (sv.vehicle.get('bodyStyle') or '').lower() == tool_input['body_style'].lower()
+            ]
+        
+        if tool_input.get("max_price"):
+            scored_vehicles = [
+                sv for sv in scored_vehicles
+                if (sv.vehicle.get('MSRP') or sv.vehicle.get('price', 0)) <= tool_input['max_price']
+            ]
+        
+        vehicles_to_show = scored_vehicles
+        result = format_vehicles_for_tool_result(scored_vehicles)
+        
+    elif tool_name == "get_vehicle_details":
+        stock = tool_input.get("stock_number", "")
+        vehicle = retriever.get_vehicle_by_stock(stock)
+        
+        if vehicle:
+            vehicles_to_show = [ScoredVehicle(
+                vehicle=vehicle, 
+                score=100, 
+                match_reasons=["Requested by customer"],
+                preference_matches={}
+            )]
+        
+        result = format_vehicle_details_for_tool(vehicle)
+        
+    elif tool_name == "find_similar_vehicles":
+        stock = tool_input.get("stock_number", "")
+        source_vehicle = retriever.get_vehicle_by_stock(stock)
+        
+        if source_vehicle:
+            similar = retriever.retrieve_similar(source_vehicle, limit=4)
+            vehicles_to_show = similar
+            result = f"Similar vehicles to Stock #{stock}:\n" + format_vehicles_for_tool_result(similar)
+        else:
+            result = f"Could not find vehicle {stock} to compare."
+            
+    elif tool_name == "notify_staff":
+        notification_type = tool_input.get("notification_type", "sales")
+        message = tool_input.get("message", "Customer needs assistance")
+        vehicle_stock = tool_input.get("vehicle_stock")
+        
+        # Update state
+        state.staff_notified = True
+        state.staff_notification_type = notification_type
+        
+        if notification_type == "appraisal":
+            state.appraisal_requested = True
+        elif notification_type == "sales":
+            state.test_drive_requested = True
+        
+        staff_notified = True
+        result = f"✓ {notification_type.title()} team has been notified: {message}"
+        if vehicle_stock:
+            result += f" (regarding Stock #{vehicle_stock})"
+            
+    elif tool_name == "mark_favorite":
+        stock = tool_input.get("stock_number", "")
+        state_manager.mark_vehicle_favorite(state.session_id, stock)
+        result = f"✓ Stock #{stock} marked as a favorite. I'll remember this is one you like!"
+        
+    else:
+        result = f"Unknown tool: {tool_name}"
+    
+    return result, vehicles_to_show, staff_notified
+
+
+# =============================================================================
+# MAIN CHAT ENDPOINT
+# =============================================================================
+
+@router.post("/chat", response_model=IntelligentChatResponse)
+async def intelligent_chat(
+    request: IntelligentChatRequest,
+    background_tasks: BackgroundTasks
+):
+    """
+    Intelligent chat endpoint with persistent memory and tool use.
+    
+    Features:
+    - Persistent conversation state
+    - Semantic vehicle retrieval
+    - Claude tool use for real actions
+    - Dynamic context building
+    """
+    start_time = datetime.utcnow()
+    tools_used = []
+    all_vehicles = []
+    staff_notified = False
+    
+    # Get services
+    key_manager = get_key_manager()
+    api_key = key_manager.anthropic_key
+    state_manager = get_state_manager()
+    retriever = get_vehicle_retriever()
+    outcome_tracker = get_outcome_tracker()
+    
+    # Check API key
+    if not api_key:
+        return IntelligentChatResponse(
+            message=generate_fallback_response(request.message, request.customer_name),
+            metadata={"fallback": True, "reason": "no_api_key"}
+        )
+    
+    # Ensure retriever is fitted with inventory
+    if not retriever._is_fitted:
+        try:
+            # Load inventory (you'll need to import/inject this based on your setup)
+            from app.routers.inventory import load_inventory
+            inventory = load_inventory()
+            retriever.fit(inventory)
+            logger.info(f"Fitted retriever with {len(inventory)} vehicles")
+        except Exception as e:
+            logger.error(f"Failed to load inventory for retriever: {e}")
+    
+    # Get or create conversation state
+    state = state_manager.get_or_create_state(
+        request.session_id,
+        request.customer_name
+    )
+    
+    # Build dynamic system prompt
+    conversation_context = build_dynamic_context(state)
+    inventory_context = build_inventory_context(retriever)
+    
+    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+        conversation_context=conversation_context,
+        inventory_context=inventory_context
+    )
+    
+    # Build messages
+    messages = []
+    for msg in request.conversation_history[-10:]:
+        messages.append({"role": msg.role, "content": msg.content})
+    
+    # Add current message with context hints
+    user_message = request.message
+    if request.customer_name and not request.conversation_history:
+        user_message = f"(Customer's name is {request.customer_name}) {request.message}"
+    
+    messages.append({"role": "user", "content": user_message})
+    
+    try:
+        # Initial API call with tools
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                ANTHROPIC_API_URL,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01"
+                },
+                json={
+                    "model": MODEL_NAME,
+                    "max_tokens": 2048,
+                    "system": system_prompt,
+                    "messages": messages,
+                    "tools": TOOLS,
+                },
+                timeout=45.0
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Anthropic API error: {response.status_code}")
+                raise Exception(f"API error: {response.status_code}")
+            
+            result = response.json()
+        
+        # Process response - handle tool use loop
+        max_tool_iterations = 5
+        iteration = 0
+        final_response = ""
+        
+        while iteration < max_tool_iterations:
+            iteration += 1
+            
+            stop_reason = result.get("stop_reason")
+            content_blocks = result.get("content", [])
+            
+            # Extract text and tool use blocks
+            text_content = ""
+            tool_use_blocks = []
+            
+            for block in content_blocks:
+                if block.get("type") == "text":
+                    text_content += block.get("text", "")
+                elif block.get("type") == "tool_use":
+                    tool_use_blocks.append(block)
+            
+            # If no tool use, we're done
+            if stop_reason != "tool_use" or not tool_use_blocks:
+                final_response = text_content
+                break
+            
+            # Execute tools and collect results
+            tool_results = []
+            
+            for tool_block in tool_use_blocks:
+                tool_name = tool_block.get("name")
+                tool_id = tool_block.get("id")
+                tool_input = tool_block.get("input", {})
+                
+                tools_used.append(tool_name)
+                logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
+                
+                # Execute the tool
+                tool_result, vehicles, notified = await execute_tool(
+                    tool_name,
+                    tool_input,
+                    state,
+                    retriever,
+                    state_manager
+                )
+                
+                all_vehicles.extend(vehicles)
+                if notified:
+                    staff_notified = True
+                
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "content": tool_result
+                })
+            
+            # Continue conversation with tool results
+            messages.append({"role": "assistant", "content": content_blocks})
+            messages.append({"role": "user", "content": tool_results})
+            
+            # Make another API call
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    ANTHROPIC_API_URL,
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01"
+                    },
+                    json={
+                        "model": MODEL_NAME,
+                        "max_tokens": 2048,
+                        "system": system_prompt,
+                        "messages": messages,
+                        "tools": TOOLS,
+                    },
+                    timeout=45.0
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Anthropic API error in tool loop: {response.status_code}")
+                    break
+                
+                result = response.json()
+        
+        # Update conversation state
+        mentioned_vehicles = [sv.vehicle for sv in all_vehicles] if all_vehicles else None
+        state = state_manager.update_state(
+            session_id=request.session_id,
+            user_message=request.message,
+            assistant_response=final_response,
+            mentioned_vehicles=mentioned_vehicles,
+            customer_name=request.customer_name
+        )
+        
+        # Record quality signal
+        if tools_used:
+            outcome_tracker.record_signal(
+                request.session_id,
+                "positive",
+                f"Used tools: {', '.join(tools_used)}"
+            )
+        
+        # Build response
+        vehicle_recommendations = None
+        if all_vehicles:
+            vehicle_recommendations = [
+                VehicleRecommendation(
+                    stock_number=sv.vehicle.get('Stock Number') or sv.vehicle.get('stockNumber', ''),
+                    model=f"{sv.vehicle.get('Year', '')} {sv.vehicle.get('Model', '')} {sv.vehicle.get('Trim', '')}".strip(),
+                    price=sv.vehicle.get('MSRP') or sv.vehicle.get('price'),
+                    match_reasons=sv.match_reasons[:3],
+                    score=sv.score
+                )
+                for sv in all_vehicles[:6]
+            ]
+        
+        latency_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        
+        return IntelligentChatResponse(
+            message=final_response,
+            vehicles=vehicle_recommendations,
+            conversation_state=state.to_dict(),
+            tools_used=tools_used,
+            staff_notified=staff_notified,
+            metadata={
+                "prompt_version": PROMPT_VERSION,
+                "model": MODEL_NAME,
+                "latency_ms": round(latency_ms, 2),
+                "tool_iterations": iteration,
+                "conversation_stage": state.stage.value,
+                "interest_level": state.interest_level.value,
+            }
+        )
+        
+    except httpx.TimeoutException:
+        logger.error("API timeout")
+        outcome_tracker.record_signal(request.session_id, "negative", "API timeout")
+        return IntelligentChatResponse(
+            message=generate_fallback_response(request.message, request.customer_name),
+            metadata={"fallback": True, "reason": "timeout"}
+        )
+    except Exception as e:
+        logger.exception(f"Intelligent chat error: {e}")
+        outcome_tracker.record_signal(request.session_id, "negative", f"Error: {str(e)[:50]}")
+        return IntelligentChatResponse(
+            message=generate_fallback_response(request.message, request.customer_name),
+            metadata={"fallback": True, "reason": "error", "error": str(e)[:100]}
+        )
+
+
+# =============================================================================
+# ADDITIONAL ENDPOINTS
+# =============================================================================
+
+@router.get("/state/{session_id}")
+async def get_conversation_state(session_id: str):
+    """Get current conversation state for a session"""
+    state_manager = get_state_manager()
+    state = state_manager.get_state(session_id)
+    
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return state.to_dict()
+
+
+@router.post("/state/{session_id}/favorite/{stock_number}")
+async def mark_vehicle_favorite(session_id: str, stock_number: str):
+    """Mark a vehicle as favorite for a session"""
+    state_manager = get_state_manager()
+    state_manager.mark_vehicle_favorite(session_id, stock_number)
+    return {"status": "ok", "stock_number": stock_number}
+
+
+@router.post("/state/{session_id}/finalize")
+async def finalize_conversation(
+    session_id: str,
+    outcome: Optional[str] = None
+):
+    """Finalize a conversation and record outcome"""
+    state_manager = get_state_manager()
+    outcome_tracker = get_outcome_tracker()
+    
+    state = state_manager.get_state(session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Convert outcome string to enum if provided
+    outcome_enum = None
+    if outcome:
+        try:
+            outcome_enum = ConversationOutcome(outcome)
+        except ValueError:
+            pass
+    
+    record = outcome_tracker.finalize_conversation(
+        state,
+        outcome=outcome_enum,
+        prompt_version=PROMPT_VERSION
+    )
+    
+    return record.to_dict()
+
+
+@router.get("/analytics")
+async def get_analytics():
+    """Get AI conversation analytics"""
+    outcome_tracker = get_outcome_tracker()
+    return outcome_tracker.get_analytics()
+
+
+@router.get("/analytics/suggestions")
+async def get_improvement_suggestions():
+    """Get suggestions for AI improvement"""
+    outcome_tracker = get_outcome_tracker()
+    return outcome_tracker.get_improvement_suggestions()
+
+
+@router.get("/health")
+async def health_check():
+    """Health check for intelligent AI service"""
+    key_manager = get_key_manager()
+    retriever = get_vehicle_retriever()
+    
+    return {
+        "status": "healthy",
+        "version": PROMPT_VERSION,
+        "model": MODEL_NAME,
+        "api_key_configured": bool(key_manager.anthropic_key),
+        "retriever_fitted": retriever._is_fitted,
+        "inventory_count": len(retriever.inventory) if retriever._is_fitted else 0,
+    }
+
+
+# =============================================================================
+# FALLBACK RESPONSE
+# =============================================================================
+
+def generate_fallback_response(message: str, customer_name: Optional[str] = None) -> str:
+    """Generate fallback response when AI is unavailable"""
+    greeting = f"Hi {customer_name}! " if customer_name else "Hi there! "
+    message_lower = message.lower()
+    
+    if any(word in message_lower for word in ['truck', 'tow', 'haul', 'work']):
+        return f"{greeting}Looking for a truck? Great choice! Our Silverado lineup offers excellent towing capacity up to 13,300 lbs for the 1500, and our HD trucks can handle serious hauling. Would you like me to show you what's available?"
+    
+    elif any(word in message_lower for word in ['suv', 'family', 'space', 'kids']):
+        return f"{greeting}For family needs, I'd recommend our SUV lineup! The Equinox is perfect for smaller families, Traverse offers three rows, and Tahoe/Suburban are ideal for larger families. What size family are you shopping for?"
+    
+    elif any(word in message_lower for word in ['electric', 'ev', 'hybrid']):
+        return f"{greeting}Interested in electric? Our Equinox EV offers up to 319 miles of range, and the Silverado EV combines truck capability with zero emissions. Both qualify for federal tax credits!"
+    
+    elif any(word in message_lower for word in ['budget', 'price', 'afford']):
+        return f"{greeting}We have options at every price point! The Trax starts around $22k, Trailblazer around $24k, and Equinox around $28k. What monthly payment are you comfortable with?"
+    
+    else:
+        return f"{greeting}I'd love to help you find the perfect vehicle! Tell me a bit about what you're looking for - what will you mainly use it for, and are there any must-have features?"
