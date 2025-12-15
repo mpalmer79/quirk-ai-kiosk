@@ -473,7 +473,13 @@ const KioskApp: React.FC = () => {
   return (
     <div style={styles.container}>
       {/* Header */}
-      <header style={styles.header}>
+      <header style={{
+        ...styles.header,
+        ...(currentScreen === 'inventory' ? {
+          background: '#ffffff',
+          borderBottom: '1px solid rgba(0,0,0,0.1)',
+        } : {})
+      }}>
         {/* Left spacer for centering */}
         <div style={styles.headerLeft}>
           {currentScreen !== 'welcome' && currentScreen !== 'trafficLog' && currentScreen !== 'salesDashboard' && canGoBack && (
@@ -488,7 +494,14 @@ const KioskApp: React.FC = () => {
         
         {/* Centered Logo */}
         <div style={styles.logoContainer}>
-          <div style={styles.logo} onClick={resetJourney}>
+          <div style={{
+            ...styles.logo,
+            ...(currentScreen === 'inventory' ? {
+              background: 'rgba(30, 41, 59, 0.95)',
+              padding: '10px 20px',
+              borderRadius: '12px',
+            } : {})
+          }} onClick={resetJourney}>
             <span style={styles.logoText}>QUIRK</span>
             <span style={styles.logoAI}>AI</span>
           </div>
@@ -520,11 +533,24 @@ const KioskApp: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer style={styles.footer}>
+      <footer style={{
+        ...styles.footer,
+        ...(currentScreen === 'inventory' ? {
+          background: '#ffffff',
+          borderTop: '1px solid rgba(0,0,0,0.1)',
+          color: '#1e293b',
+        } : {})
+      }}>
         <span>Quirk Chevrolet</span>
-        <span style={styles.footerDot}>•</span>
+        <span style={{
+          ...styles.footerDot,
+          ...(currentScreen === 'inventory' ? { color: 'rgba(0,0,0,0.3)' } : {})
+        }}>•</span>
         <span>New England's #1 Dealer</span>
-        <span style={styles.footerDot}>•</span>
+        <span style={{
+          ...styles.footerDot,
+          ...(currentScreen === 'inventory' ? { color: 'rgba(0,0,0,0.3)' } : {})
+        }}>•</span>
         <span style={styles.footerTime}>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
       </footer>
 
