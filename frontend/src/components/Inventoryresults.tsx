@@ -626,6 +626,9 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
     gap: '24px',
     marginBottom: '40px',
+    padding: '24px',
+    background: 'rgba(241, 245, 249, 0.6)',
+    borderRadius: '16px',
   },
   vehicleCard: {
     background: '#ffffff',
@@ -717,20 +720,20 @@ const styles: Record<string, CSSProperties> = {
   },
   vehicleTrim: {
     fontSize: '13px',
-    color: 'rgba(0,0,0,0.5)',
+    color: '#1e293b',
     margin: '2px 0 0 0',
   },
   stockNumber: {
     fontSize: '11px',
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.4)',
+    color: '#1e293b',
   },
   vehicleColor: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     fontSize: '13px',
-    color: 'rgba(0,0,0,0.6)',
+    color: '#1e293b',
     marginBottom: '12px',
   },
   colorSwatch: {
@@ -775,13 +778,13 @@ const styles: Record<string, CSSProperties> = {
   priceLabel: {
     fontSize: '11px',
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.4)',
+    color: '#1e293b',
     textTransform: 'uppercase',
   },
   msrpValue: {
     fontSize: '18px',
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.5)',
+    color: '#1e293b',
   },
   paymentValue: {
     fontSize: '22px',
