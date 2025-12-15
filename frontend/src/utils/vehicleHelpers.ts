@@ -14,8 +14,8 @@ import type { Vehicle } from '../types';
  * 2. Add the model and color to this registry
  */
 export const AVAILABLE_VEHICLE_IMAGES: Record<string, string[]> = {
-  'corvette': ['black'],
-  'equinox': ['blue', 'gray', 'green', 'red', 'white'],
+  'corvette': ['black', 'red', 'white', 'yellow'],
+  'equinox': ['black', 'blue', 'gray', 'green', 'red', 'white'],
   'trailblazer': ['white'],
 };
 
@@ -130,13 +130,13 @@ export const getColorCategory = (colorDesc: string): string => {
   const color = colorDesc.toLowerCase();
   if (color.includes('black')) return 'black';
   if (color.includes('white') || color.includes('summit') || color.includes('arctic') || color.includes('polar')) return 'white';
-  if (color.includes('red') || color.includes('cherry') || color.includes('cajun') || color.includes('radiant')) return 'red';
+  if (color.includes('red') || color.includes('cherry') || color.includes('cajun') || color.includes('radiant') || color.includes('mist')) return 'red';
   if (color.includes('blue') || color.includes('northsky') || color.includes('glacier') || color.includes('reef')) return 'blue';
   if (color.includes('silver') || color.includes('sterling')) return 'silver';
   if (color.includes('gray') || color.includes('grey') || color.includes('shadow')) return 'gray';
   if (color.includes('green') || color.includes('woodland')) return 'green';
   if (color.includes('orange') || color.includes('tangier')) return 'orange';
-  if (color.includes('yellow') || color.includes('accelerate')) return 'yellow';
+  if (color.includes('yellow') || color.includes('accelerate') || color.includes('competition')) return 'yellow';
   if (color.includes('brown') || color.includes('harvest')) return 'brown';
   return '';
 };
