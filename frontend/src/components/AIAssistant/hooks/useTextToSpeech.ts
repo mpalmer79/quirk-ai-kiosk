@@ -24,6 +24,36 @@ export const useTextToSpeech = ({ enabled }: UseTextToSpeechProps) => {
     checkTTS();
   }, []);
 
+  // stopSpeaking - defined first since speakText depends on it
+  const stopSpeaking = useCallback(() => {
+    // Stop browser speech
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    
+    // Stop audio element
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    
+    setIsSpeaking(false);
+  }, []);
+
+  // speakWithBrowser - defined before speakText since it's used as fallback
+  const speakWithBrowser = useCallback((text: string) => {
+    if ('speechSynthesis' in window) {
+      setIsSpeaking(true);
+      speechSynthRef.current = new SpeechSynthesisUtterance(text);
+      speechSynthRef.current.rate = 1.0;
+      speechSynthRef.current.pitch = 1.0;
+      speechSynthRef.current.onend = () => setIsSpeaking(false);
+      speechSynthRef.current.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(speechSynthRef.current);
+    }
+  }, []);
+
+  // speakText - main function that uses stopSpeaking and speakWithBrowser
   const speakText = useCallback(async (text: string) => {
     if (!enabled || !text) return;
 
@@ -57,34 +87,7 @@ export const useTextToSpeech = ({ enabled }: UseTextToSpeechProps) => {
     } else {
       speakWithBrowser(text);
     }
-  }, [enabled, ttsAvailable]);
-
-  const speakWithBrowser = useCallback((text: string) => {
-    if ('speechSynthesis' in window) {
-      setIsSpeaking(true);
-      speechSynthRef.current = new SpeechSynthesisUtterance(text);
-      speechSynthRef.current.rate = 1.0;
-      speechSynthRef.current.pitch = 1.0;
-      speechSynthRef.current.onend = () => setIsSpeaking(false);
-      speechSynthRef.current.onerror = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(speechSynthRef.current);
-    }
-  }, []);
-
-  const stopSpeaking = useCallback(() => {
-    // Stop browser speech
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    
-    // Stop audio element
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-    
-    setIsSpeaking(false);
-  }, []);
+  }, [enabled, ttsAvailable, stopSpeaking, speakWithBrowser]);
 
   return {
     isSpeaking,
