@@ -215,6 +215,17 @@ describe('WelcomeScreen Component', () => {
       });
     });
 
+    test('clicking Skip sets namePhaseCompleted flag', async () => {
+      renderWelcomeScreen();
+      
+      const skipBtn = screen.getByText(/Skip for now/i);
+      fireEvent.click(skipBtn);
+
+      await waitFor(() => {
+        expect(mockUpdateCustomerData).toHaveBeenCalledWith({ namePhaseCompleted: true });
+      });
+    });
+
     test('logs session when name is submitted', async () => {
       renderWelcomeScreen();
       
@@ -606,6 +617,14 @@ describe('WelcomeScreen Component', () => {
       renderWelcomeScreen({ customerData: { customerName: 'John' } });
       
       // Should immediately show Phase 2
+      expect(screen.getByText(/How can I help you today/i)).toBeInTheDocument();
+      expect(screen.queryByText('Continue')).not.toBeInTheDocument();
+    });
+
+    test('skips Phase 1 when namePhaseCompleted is true (user skipped previously)', () => {
+      renderWelcomeScreen({ customerData: { namePhaseCompleted: true } });
+      
+      // Should immediately show Phase 2 even without a name
       expect(screen.getByText(/How can I help you today/i)).toBeInTheDocument();
       expect(screen.queryByText('Continue')).not.toBeInTheDocument();
     });
