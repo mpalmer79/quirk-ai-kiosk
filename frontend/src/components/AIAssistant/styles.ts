@@ -10,18 +10,11 @@ export const styles: Record<string, CSSProperties> = {
     margin: '0 auto',
     width: '100%',
     boxSizing: 'border-box',
-    background: '#ffffff',
+    backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92)), url(/showroom.jpg)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
     minHeight: '100%',
-  },
-  logoContainer: {
-    position: 'absolute',
-    top: '90px',
-    left: '30px',
-    zIndex: 10,
-  },
-  logo: {
-    height: '50px',
-    width: 'auto',
   },
   header: {
     display: 'flex',
