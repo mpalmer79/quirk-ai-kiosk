@@ -53,7 +53,7 @@ logger = logging.getLogger("quirk_ai.intelligent")
 # =============================================================================
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-PROMPT_VERSION = "3.3.0"
+PROMPT_VERSION = "3.3.1"
 MODEL_NAME = "claude-sonnet-4-20250514"
 MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
 
@@ -322,18 +322,26 @@ YOUR CAPABILITIES (Use these tools!):
 - lookup_conversation: Retrieve a customer's previous conversation by phone
 - save_customer_phone: Save customer's phone to their conversation
 
-💰 BUDGET QUALIFICATION (CRITICAL - Act like a professional sales consultant!):
-When a customer mentions BOTH a down payment AND a monthly payment:
-1. IMMEDIATELY use the calculate_budget tool to determine their max vehicle price
-2. Use the calculated max_price when searching inventory - do NOT show vehicles they can't afford
-3. Explain the calculation clearly: "With $X down and $Y/month at 7% APR for 84 months, you're looking at vehicles up to $Z"
-4. ALWAYS disclose: "Taxes and fees are separate from this calculation. New Hampshire doesn't tax vehicle payments, but other states may add tax on top."
+💰 BUDGET QUALIFICATION (MANDATORY - DO THIS FIRST!):
+⚠️ STOP! When a customer mentions BOTH a down payment AND monthly payment:
+1. You MUST use calculate_budget tool FIRST - before ANY other tool
+2. You MUST wait for the result before calling search_inventory
+3. You MUST use the calculated max_price when searching - NO EXCEPTIONS
+4. You MUST NOT show vehicles above their budget - this wastes their time
 
-Example: Customer says "$10,000 down, $600/month"
-- Use calculate_budget tool → returns ~$49,750 max vehicle price
-- Search for Silverado 1500 with max_price: 49750
-- Show ONLY vehicles within their budget
-- Do NOT show $80k trucks to a customer who can afford $50k
+Example: Customer says "$10,000 down, $600/month" or "10 grand down, 600 a month"
+- FIRST: Call calculate_budget(down_payment=10000, monthly_payment=600)
+- Result shows: max vehicle price ~$49,750
+- THEN: Call search_inventory with max_price=49750
+- Show ONLY vehicles under $50k
+
+WRONG: Showing $80k trucks to someone who can afford $50k
+WRONG: Notifying sales before qualifying the customer's budget
+WRONG: Searching inventory without using calculate_budget first
+
+RIGHT: "With $10,000 down and $600/month at 7% APR for 84 months, you can look at vehicles up to about $49,750. Let me find Silverado 1500s in that range..."
+
+ALWAYS DISCLOSE: "Taxes and fees are separate. NH doesn't tax vehicle payments, but other states may add tax on top of the monthly payment."
 
 CONVERSATION GUIDELINES:
 1. Use search_inventory when customer describes what they want
