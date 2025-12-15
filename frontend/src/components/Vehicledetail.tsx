@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, CSSProperties } from 'react';
+import React, { useState, useEffect, CSSProperties } from 'react';
 import { logTrafficSession } from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
 import { getVehicleImageUrl, getColorCategory, getColorGradient } from '../utils/vehicleHelpers';
@@ -82,10 +82,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showConditionalOffers, setShowConditionalOffers] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
-  
-  // Image loading state - use verified URL instead of error flag
-  const [verifiedImageUrl, setVerifiedImageUrl] = useState<string | null>(null);
-  const imagePreloadRef = useRef<HTMLImageElement | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   // Get vehicle from customerData or use placeholder
   const vehicle: DetailedVehicle = customerData?.selectedVehicle || {
@@ -104,55 +101,27 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     rebates: DEFAULT_REBATES,
   };
 
-  // Compute the expected image URL from vehicle data
-  const computedImageUrl = getVehicleImageUrl(vehicle);
+  // Create a unique key for this vehicle - forces React to create fresh img element
+  const vehicleKey = vehicle.stockNumber || vehicle.stock_number || vehicle.vin || 'default';
   
-  // Preload and verify image when vehicle changes
+  // Get image URL directly
+  const imageUrl = getVehicleImageUrl(vehicle);
+  
+  // Debug logging - remove after confirming fix works
   useEffect(() => {
-    // Reset state when vehicle changes
-    setVerifiedImageUrl(null);
+    console.log('[VehicleDetail] Vehicle changed:', {
+      vehicleKey,
+      model: vehicle.model,
+      exteriorColor: vehicle.exteriorColor || vehicle.exterior_color,
+      imageUrl,
+    });
+  }, [vehicleKey, vehicle.model, vehicle.exteriorColor, vehicle.exterior_color, imageUrl]);
+  
+  // Reset image error when vehicle changes (vehicleKey changes)
+  useEffect(() => {
+    setImageError(false);
     setSelectedImageIndex(0);
-    
-    // Clean up previous preload
-    if (imagePreloadRef.current) {
-      imagePreloadRef.current.onload = null;
-      imagePreloadRef.current.onerror = null;
-      imagePreloadRef.current = null;
-    }
-    
-    if (!computedImageUrl) {
-      return;
-    }
-    
-    // Create new image to preload
-    const img = new Image();
-    imagePreloadRef.current = img;
-    
-    img.onload = () => {
-      // Only update if this is still the current preload
-      if (imagePreloadRef.current === img) {
-        setVerifiedImageUrl(computedImageUrl);
-      }
-    };
-    
-    img.onerror = () => {
-      // Only update if this is still the current preload
-      if (imagePreloadRef.current === img) {
-        setVerifiedImageUrl(null);
-      }
-    };
-    
-    img.src = computedImageUrl;
-    
-    // Cleanup on unmount or vehicle change
-    return () => {
-      if (imagePreloadRef.current) {
-        imagePreloadRef.current.onload = null;
-        imagePreloadRef.current.onerror = null;
-        imagePreloadRef.current = null;
-      }
-    };
-  }, [computedImageUrl]);
+  }, [vehicleKey]);
 
   const stockNumber = vehicle.stockNumber || vehicle.stock_number || '';
   const vin = vehicle.vin || '';
@@ -304,13 +273,15 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       <div style={s.mainContent}>
         {/* Left Column - Images */}
         <div style={s.leftColumn}>
-          {/* Main Image */}
+          {/* Main Image - key forces fresh img element per vehicle */}
           <div style={{ ...s.mainImageContainer, background: gradient }}>
-            {verifiedImageUrl ? (
+            {imageUrl && !imageError ? (
               <img
-                src={verifiedImageUrl}
+                key={`main-${vehicleKey}`}
+                src={imageUrl}
                 alt={title}
                 style={s.mainImage}
+                onError={() => setImageError(true)}
               />
             ) : (
               <span style={s.imagePlaceholder}>{(vehicle.model || 'V').charAt(0)}</span>
@@ -329,11 +300,13 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
                 }}
                 onClick={() => setSelectedImageIndex(idx)}
               >
-                {verifiedImageUrl ? (
+                {imageUrl && !imageError ? (
                   <img
-                    src={verifiedImageUrl}
+                    key={`thumb-${vehicleKey}-${idx}`}
+                    src={imageUrl}
                     alt={`${vehicle.model} view ${idx + 1}`}
                     style={s.thumbnailImage}
+                    onError={() => setImageError(true)}
                   />
                 ) : (
                   <span style={s.thumbnailPlaceholder}>{(vehicle.model || 'V').charAt(0)}</span>
