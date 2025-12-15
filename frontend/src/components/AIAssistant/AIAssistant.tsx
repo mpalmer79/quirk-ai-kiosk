@@ -247,9 +247,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         audioEnabled={audioEnabled}
         isSpeaking={isSpeaking}
         ttsAvailable={ttsAvailable}
-        showObjectionPanel={showObjectionPanel}
         onToggleAudio={toggleAudio}
-        onToggleObjectionPanel={() => setShowObjectionPanel(!showObjectionPanel)}
       />
       
       {showObjectionPanel && (
