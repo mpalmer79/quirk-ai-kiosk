@@ -87,7 +87,7 @@ const getVehicleImageUrl = (vehicle: Vehicle): string | null => {
   return null;
 };
 
-const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData }) => {
+const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomerData, customerData, resetJourney }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -493,7 +493,7 @@ const InventoryResults: React.FC<KioskComponentProps> = ({ navigateTo, updateCus
       {/* Refine Search */}
       <div style={styles.refineSection}>
         <p style={styles.refineText}>Not seeing what you're looking for?</p>
-        <button style={styles.refineButton} onClick={() => navigateTo('welcome')}>
+        <button style={styles.refineButton} onClick={() => resetJourney ? resetJourney() : navigateTo('welcome')}>
           Start Over
         </button>
       </div>
