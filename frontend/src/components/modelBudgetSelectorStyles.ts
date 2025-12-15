@@ -116,9 +116,9 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
     gap: '12px',
     width: '100%',
-    paddingBottom: '40px',
     padding: '24px',
-    background: 'rgba(241, 245, 249, 0.6)',
+    paddingBottom: '40px',
+    background: 'rgba(241, 245, 249, 0.7)',
     borderRadius: '16px',
   },
   startOverContainer: {
