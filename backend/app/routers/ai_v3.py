@@ -17,6 +17,8 @@ import httpx
 import json
 import re
 import logging
+import asyncio
+import random
 from datetime import datetime
 from enum import Enum
 
@@ -51,9 +53,51 @@ logger = logging.getLogger("quirk_ai.intelligent")
 # =============================================================================
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-PROMPT_VERSION = "3.1.2"
+PROMPT_VERSION = "3.2.0"
 MODEL_NAME = "claude-sonnet-4-20250514"
 MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
+
+# Retry configuration (from V2)
+MAX_RETRIES = 3
+BASE_DELAY = 1.0  # seconds
+MAX_DELAY = 10.0  # seconds
+
+
+async def call_with_retry(
+    func,
+    max_retries: int = MAX_RETRIES,
+    base_delay: float = BASE_DELAY,
+    max_delay: float = MAX_DELAY,
+    *args,
+    **kwargs
+) -> Any:
+    """
+    Execute an async function with exponential backoff retry.
+    """
+    last_exception = None
+    
+    for attempt in range(max_retries):
+        try:
+            return await func(*args, **kwargs)
+        except (httpx.HTTPStatusError, httpx.RequestError, httpx.TimeoutException) as e:
+            last_exception = e
+            
+            if attempt < max_retries - 1:
+                # Calculate delay with exponential backoff and jitter
+                delay = min(base_delay * (2 ** attempt), max_delay)
+                # Add jitter (±20%)
+                delay = delay * (0.8 + random.random() * 0.4)
+                
+                logger.warning(
+                    f"API call failed (attempt {attempt + 1}/{max_retries}), "
+                    f"retrying in {delay:.2f}s: {str(e)}"
+                )
+                
+                await asyncio.sleep(delay)
+            else:
+                logger.error(f"API call failed after {max_retries} attempts: {str(e)}")
+    
+    raise last_exception
 
 # Tool definitions for Claude
 TOOLS = [
@@ -286,13 +330,40 @@ When a customer mentions trading in a vehicle (e.g., "I'm trading in my Equinox"
   - CORRECT: Continue showing Silverado trucks
   - WRONG: Show Equinox vehicles for sale
 
-SPOUSE OBJECTION HANDLING:
-When customer needs to consult spouse:
-1. Validate the need to discuss together
-2. Mention time-sensitive incentives
-3. Offer to call spouse on speaker
-4. Offer to let them take vehicle home to show spouse
-5. Get specific follow-up time
+SPOUSE OBJECTION HANDLING (CRITICAL):
+When a customer says they "need to talk to my wife/husband/spouse/partner" or indicates they can't decide alone, follow this proven 6-step process:
+
+Step 1 - Acknowledge & Validate:
+"I completely understand - this is a major decision you want to share with your [wife/husband/partner]. That makes perfect sense."
+(Establishes empathy and trust - never make them feel pressured)
+
+Step 2 - Introduce Urgency & Incentive:
+"We do have a significant incentive available right now that makes this a particularly advantageous time. This kind of offer is time-sensitive and may not be available tomorrow."
+(Creates urgency while highlighting present value - be specific about the incentive if you know it)
+
+Step 3 - Propose Calling the Spouse (Primary Option):
+"Considering how great this offer is, would you like to call [her/him] right now? You can put me on speaker, and I can quickly go over the key benefits and answer any questions [she/he] might have immediately. That way you won't miss out on this pricing."
+(Proactive solution that maintains momentum)
+
+Step 4 - Propose Test Drive/Take-Home (Fallback if they decline calling):
+"No problem at all - my goal is to make sure you're both comfortable with this. How about this: would you like to take this vehicle for a drive to show [her/him]? I can get temporary plates ready so you can take it home for an hour or so. That way you can discuss it in person and [she/he] can see it firsthand."
+(Physical presence of the vehicle helps secure the decision and gets the spouse invested)
+
+Step 5 - Isolate & Confirm Commitment:
+"If you drive it over now, and you both decide this is the perfect vehicle, are you in a position to finalize the purchase when you return today?"
+(Ensures commitment and prevents further stalling - gets verbal agreement)
+
+Step 6 - Provide Information & Set Follow-up:
+"Great! I'll prepare a detailed summary with this specific vehicle's VIN, the complete price breakdown, and all the incentive details. What time should I expect you back, or when would be the best time for me to follow up with you and your [wife/husband] this evening?"
+(Structures the exit and the next interaction - never let them leave without a specific follow-up time)
+
+KEY PRINCIPLES:
+- Always validate their need to discuss with their partner - it's a reasonable request
+- Present options, not ultimatums
+- The goal is to INVOLVE the spouse in the decision, not bypass them
+- Getting the vehicle in front of the spouse is the strongest close
+- Always get a specific follow-up time - "I'll call you" is not specific enough
+- If they insist on leaving without commitment, get their phone number and a specific callback time
 
 Remember: You have TOOLS - use them to provide real, accurate inventory information!"""
 
@@ -1003,8 +1074,32 @@ async def health_check():
 
 def generate_fallback_response(message: str, customer_name: Optional[str] = None) -> str:
     """Generate fallback response when AI is unavailable"""
-    greeting = f"Hi {customer_name}! " if customer_name else "Hi there! "
     message_lower = message.lower()
+    
+    # Detect Spanish
+    spanish_patterns = ['español', 'busco', 'quiero', 'necesito', 'camioneta', 'carro', '¿']
+    is_spanish = any(p in message_lower for p in spanish_patterns) or any(c in message for c in 'áéíóúñ')
+    
+    if is_spanish:
+        greeting = f"¡Hola {customer_name}! " if customer_name else "¡Hola! "
+        
+        if any(word in message_lower for word in ['camioneta', 'truck', 'remolcar', 'trabajo']):
+            return f"{greeting}¿Busca una camioneta? ¡Excelente elección! Nuestra línea Silverado ofrece una capacidad de remolque de hasta 13,300 lbs. ¿Le gustaría ver lo que tenemos disponible?"
+        
+        elif any(word in message_lower for word in ['suv', 'familia', 'espacio', 'niños']):
+            return f"{greeting}Para necesidades familiares, le recomiendo nuestra línea de SUV. El Equinox es perfecto para familias pequeñas, el Traverse ofrece tres filas, y el Tahoe/Suburban son ideales para familias más grandes. ¿Qué tamaño busca?"
+        
+        elif any(word in message_lower for word in ['eléctrico', 'ev', 'híbrido']):
+            return f"{greeting}¿Interesado en vehículos eléctricos? Nuestro Equinox EV ofrece hasta 319 millas de autonomía, y el Silverado EV combina capacidad de camioneta con cero emisiones. ¡Ambos califican para créditos fiscales federales!"
+        
+        elif any(word in message_lower for word in ['precio', 'costo', 'económico', 'presupuesto']):
+            return f"{greeting}¡Tenemos opciones para cada presupuesto! El Trax comienza alrededor de $22k, el Trailblazer alrededor de $24k, y el Equinox alrededor de $28k. ¿Qué pago mensual le acomoda?"
+        
+        else:
+            return f"{greeting}¡Me encantaría ayudarle a encontrar el vehículo perfecto! Cuénteme un poco sobre lo que está buscando - ¿para qué lo usará principalmente y hay alguna característica que debe tener?"
+    
+    # English fallback
+    greeting = f"Hi {customer_name}! " if customer_name else "Hi there! "
     
     if any(word in message_lower for word in ['truck', 'tow', 'haul', 'work']):
         return f"{greeting}Looking for a truck? Great choice! Our Silverado lineup offers excellent towing capacity up to 13,300 lbs for the 1500, and our HD trucks can handle serious hauling. Would you like me to show you what's available?"
@@ -1015,7 +1110,10 @@ def generate_fallback_response(message: str, customer_name: Optional[str] = None
     elif any(word in message_lower for word in ['electric', 'ev', 'hybrid']):
         return f"{greeting}Interested in electric? Our Equinox EV offers up to 319 miles of range, and the Silverado EV combines truck capability with zero emissions. Both qualify for federal tax credits!"
     
-    elif any(word in message_lower for word in ['budget', 'price', 'afford']):
+    elif any(word in message_lower for word in ['sport', 'fast', 'performance', 'fun', 'corvette', 'camaro']):
+        return f"{greeting}Looking for something exciting? The Corvette is an American icon with mid-engine performance that rivals European exotics! We also have the legendary Camaro for muscle car heritage. Want me to show you what's in stock?"
+    
+    elif any(word in message_lower for word in ['budget', 'price', 'afford', 'cheap']):
         return f"{greeting}We have options at every price point! The Trax starts around $22k, Trailblazer around $24k, and Equinox around $28k. What monthly payment are you comfortable with?"
     
     else:
