@@ -516,6 +516,7 @@ const styles: Record<string, CSSProperties> = {
     overflowY: 'auto',
     overflowX: 'hidden',
     boxSizing: 'border-box',
+    background: '#ffffff',
   },
   loadingContainer: {
     flex: 1,
@@ -528,14 +529,14 @@ const styles: Record<string, CSSProperties> = {
   loadingSpinner: {
     width: '48px',
     height: '48px',
-    border: '4px solid rgba(255,255,255,0.1)',
+    border: '4px solid rgba(0,0,0,0.1)',
     borderTopColor: '#22c55e',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
   loadingText: {
     fontSize: '18px',
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(0,0,0,0.6)',
   },
   errorContainer: {
     flex: 1,
@@ -550,7 +551,7 @@ const styles: Record<string, CSSProperties> = {
   },
   errorText: {
     fontSize: '18px',
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(0,0,0,0.6)',
   },
   retryButton: {
     padding: '12px 24px',
@@ -571,7 +572,11 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: 'wrap',
     gap: '16px',
   },
-  headerLeft: {},
+  headerLeft: {
+    background: 'rgba(30, 41, 59, 0.95)',
+    padding: '16px 24px',
+    borderRadius: '12px',
+  },
   headerRight: {
     display: 'flex',
     alignItems: 'center',
@@ -589,13 +594,13 @@ const styles: Record<string, CSSProperties> = {
   },
   subtitle: {
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.6)',
     margin: 0,
   },
   sortSelect: {
     padding: '10px 16px',
-    background: 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.06) 100%)',
-    border: '1px solid rgba(255,255,255,0.15)',
+    background: 'rgba(30, 41, 59, 0.95)',
+    border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '10px',
     color: '#ffffff',
     fontSize: '14px',
@@ -606,7 +611,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 16px',
-    background: 'linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(22,163,74,0.15) 100%)',
+    background: 'rgba(30, 41, 59, 0.95)',
     border: '1px solid rgba(34,197,94,0.4)',
     borderRadius: '10px',
     color: '#4ade80',
@@ -614,7 +619,7 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    boxShadow: '0 2px 8px rgba(34,197,94,0.15)',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
   },
   vehicleGrid: {
     display: 'grid',
@@ -623,14 +628,14 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '40px',
   },
   vehicleCard: {
-    background: 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.08) 100%)',
+    background: '#ffffff',
     borderRadius: '20px',
-    border: '1px solid rgba(255,255,255,0.12)',
+    border: '1px solid rgba(0,0,0,0.08)',
     overflow: 'hidden',
     cursor: 'pointer',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     position: 'relative',
-    boxShadow: '0 8px 32px rgba(255,255,255,0.06)',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
   },
   matchBadge: {
     position: 'absolute',
@@ -707,32 +712,32 @@ const styles: Record<string, CSSProperties> = {
   vehicleName: {
     fontSize: '20px',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#1e293b',
     margin: 0,
   },
   vehicleTrim: {
     fontSize: '13px',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(0,0,0,0.5)',
     margin: '2px 0 0 0',
   },
   stockNumber: {
     fontSize: '11px',
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(0,0,0,0.4)',
   },
   vehicleColor: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     fontSize: '13px',
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(0,0,0,0.6)',
     marginBottom: '12px',
   },
   colorSwatch: {
     width: '16px',
     height: '16px',
     borderRadius: '50%',
-    border: '2px solid rgba(255,255,255,0.2)',
+    border: '2px solid rgba(0,0,0,0.1)',
   },
   featureTags: {
     display: 'flex',
@@ -742,21 +747,21 @@ const styles: Record<string, CSSProperties> = {
   },
   featureTag: {
     padding: '6px 12px',
-    background: 'linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(16,185,129,0.15) 100%)',
+    background: 'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(16,185,129,0.1) 100%)',
     borderRadius: '14px',
     fontSize: '11px',
     fontWeight: '600',
-    color: '#4ade80',
-    border: '1px solid rgba(34,197,94,0.25)',
+    color: '#16a34a',
+    border: '1px solid rgba(34,197,94,0.3)',
   },
   pricingSection: {
     display: 'flex',
     justifyContent: 'space-between',
     padding: '14px',
-    background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%)',
+    background: 'linear-gradient(135deg, rgba(0,0,0,0.03) 0%, rgba(0,0,0,0.01) 100%)',
     borderRadius: '12px',
     marginBottom: '16px',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid rgba(0,0,0,0.05)',
   },
   priceColumn: {
     display: 'flex',
@@ -770,13 +775,13 @@ const styles: Record<string, CSSProperties> = {
   priceLabel: {
     fontSize: '11px',
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(0,0,0,0.4)',
     textTransform: 'uppercase',
   },
   msrpValue: {
     fontSize: '18px',
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(0,0,0,0.5)',
   },
   paymentValue: {
     fontSize: '22px',
@@ -816,12 +821,12 @@ const styles: Record<string, CSSProperties> = {
   noResultsTitle: {
     fontSize: '24px',
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#1e293b',
     margin: '0 0 8px 0',
   },
   noResultsText: {
     fontSize: '16px',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(0,0,0,0.5)',
   },
   refineSection: {
     display: 'flex',
@@ -829,18 +834,18 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'center',
     gap: '16px',
     padding: '24px',
-    background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%)',
+    background: 'linear-gradient(145deg, rgba(0,0,0,0.03) 0%, rgba(0,0,0,0.01) 100%)',
     borderRadius: '16px',
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: '1px solid rgba(0,0,0,0.08)',
   },
   refineText: {
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(0,0,0,0.5)',
     margin: 0,
   },
   refineButton: {
     padding: '10px 20px',
-    background: 'rgba(255,255,255,0.1)',
+    background: 'rgba(30, 41, 59, 0.95)',
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '8px',
     color: '#ffffff',
