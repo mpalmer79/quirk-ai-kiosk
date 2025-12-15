@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import json
 import logging
+import os
 from collections import defaultdict
 
 from app.services.entity_extraction import (
@@ -311,6 +312,7 @@ class ConversationStateManager:
     def __init__(self):
         self.extractor = get_entity_extractor()
         self._sessions: Dict[str, ConversationState] = {}
+        self._phone_index: Dict[str, str] = {}  # phone -> session_id mapping
     
     def get_or_create_state(
         self, 
@@ -576,6 +578,127 @@ class ConversationStateManager:
     def get_state(self, session_id: str) -> Optional[ConversationState]:
         """Get state for a session"""
         return self._sessions.get(session_id)
+    
+    def set_customer_phone(self, session_id: str, phone: str) -> None:
+        """Set customer phone for a session and index it for lookup"""
+        state = self._sessions.get(session_id)
+        if state:
+            # Normalize phone number (digits only)
+            normalized = ''.join(c for c in phone if c.isdigit())
+            if len(normalized) == 10:
+                state.customer_phone = normalized
+                # Also store in phone index for quick lookup
+                self._phone_index[normalized] = session_id
+                logger.info(f"Indexed session {session_id} by phone {normalized[-4:]}")
+    
+    def get_state_by_phone(self, phone: str) -> Optional[ConversationState]:
+        """
+        Look up a conversation state by phone number.
+        Returns the most recent conversation for that phone.
+        """
+        # Normalize phone number
+        normalized = ''.join(c for c in phone if c.isdigit())
+        
+        if len(normalized) != 10:
+            logger.warning(f"Invalid phone number format: {phone}")
+            return None
+        
+        # Check in-memory index first
+        if normalized in self._phone_index:
+            session_id = self._phone_index[normalized]
+            if session_id in self._sessions:
+                return self._sessions[session_id]
+        
+        # Search all sessions for this phone
+        matching_sessions = [
+            state for state in self._sessions.values()
+            if state.customer_phone == normalized
+        ]
+        
+        if matching_sessions:
+            # Return the most recent one
+            return max(matching_sessions, key=lambda s: s.last_activity)
+        
+        # Check persisted sessions
+        return self._load_persisted_session(normalized)
+    
+    def persist_session(self, session_id: str) -> bool:
+        """Persist a session to disk for later retrieval"""
+        state = self._sessions.get(session_id)
+        if not state or not state.customer_phone:
+            return False
+        
+        try:
+            persist_dir = "/tmp/quirk_conversations"
+            os.makedirs(persist_dir, exist_ok=True)
+            
+            filename = f"{state.customer_phone}.json"
+            filepath = os.path.join(persist_dir, filename)
+            
+            with open(filepath, 'w') as f:
+                json.dump(state.to_dict(), f, indent=2, default=str)
+            
+            logger.info(f"Persisted session for phone {state.customer_phone[-4:]}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to persist session: {e}")
+            return False
+    
+    def _load_persisted_session(self, phone: str) -> Optional[ConversationState]:
+        """Load a persisted session from disk"""
+        try:
+            filepath = f"/tmp/quirk_conversations/{phone}.json"
+            
+            if not os.path.exists(filepath):
+                return None
+            
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+            
+            # Reconstruct ConversationState from dict
+            state = ConversationState(session_id=data['session_id'])
+            state.customer_name = data.get('customer_name')
+            state.customer_phone = phone
+            
+            # Restore budget
+            budget = data.get('budget', {})
+            state.budget_min = budget.get('min')
+            state.budget_max = budget.get('max')
+            state.monthly_payment_target = budget.get('monthly_target')
+            state.down_payment = budget.get('down_payment')
+            
+            # Restore preferences
+            prefs = data.get('preferences', {})
+            state.preferred_types = set(prefs.get('types', []))
+            state.preferred_features = set(prefs.get('features', []))
+            state.use_cases = set(prefs.get('use_cases', []))
+            state.min_seating = prefs.get('min_seating')
+            state.min_towing = prefs.get('min_towing')
+            state.fuel_preference = prefs.get('fuel')
+            state.drivetrain_preference = prefs.get('drivetrain')
+            
+            # Restore trade-in
+            trade = data.get('trade_in', {})
+            state.has_trade_in = trade.get('has_trade', False)
+            state.trade_year = trade.get('year')
+            state.trade_make = trade.get('make')
+            state.trade_model = trade.get('model')
+            state.trade_mileage = trade.get('mileage')
+            state.trade_monthly_payment = trade.get('monthly_payment')
+            state.trade_payoff = trade.get('payoff')
+            state.trade_lender = trade.get('lender')
+            
+            # Restore conversation state
+            state.message_count = data.get('message_count', 0)
+            state.favorite_vehicles = data.get('favorite_vehicles', [])
+            state.needs_spouse_approval = data.get('needs_spouse_approval', False)
+            
+            logger.info(f"Loaded persisted session for phone {phone[-4:]}")
+            return state
+            
+        except Exception as e:
+            logger.error(f"Failed to load persisted session: {e}")
+            return None
     
     def cleanup_old_sessions(self, max_age_hours: int = 24) -> int:
         """Remove sessions older than max_age_hours"""
