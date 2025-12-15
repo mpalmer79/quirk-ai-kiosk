@@ -39,8 +39,8 @@ from app.routers import inventory, recommendations, leads, analytics, traffic, a
 # Import v2 routers
 from app.routers import recommendations_v2, ai_v2
 
-# Import v3 smart recommendations router
-from app.routers import smart_recommendations
+# Import v3 routers (smart recommendations + intelligent AI with tools/memory/RAG)
+from app.routers import smart_recommendations, ai_v3
 
 # Import photo analysis router
 from app.routers import photo_analysis
@@ -216,6 +216,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"📍 Environment: {ENVIRONMENT}")
     logger.info("📊 Loading inventory enrichment service...")
     logger.info("🧠 Initializing entity extraction service...")
+    logger.info("🔧 Initializing intelligent AI services (v3)...")
     
     # Initialize database
     if is_database_configured():
@@ -257,7 +258,7 @@ Backend API for Quirk AI Kiosk customer journey with AI-powered recommendations.
 ### Features
 - **V1**: Core inventory, recommendations, leads, analytics, traffic, AI chat
 - **V2**: Enhanced recommendations with structured AI responses
-- **V3**: Smart recommendations with entity extraction and conversation analysis
+- **V3**: Smart recommendations with entity extraction, conversation analysis, and intelligent AI with tools/memory
 
 ### Rate Limits
 - AI Chat: 30 requests/minute
@@ -267,7 +268,7 @@ Backend API for Quirk AI Kiosk customer journey with AI-powered recommendations.
 ### Authentication
 Session-based identification via X-Session-ID header.
     """,
-    version="2.3.0",
+    version="2.4.0",
     lifespan=lifespan,
     docs_url="/docs" if IS_DEVELOPMENT else None,  # Disable docs in production
     redoc_url="/redoc" if IS_DEVELOPMENT else None,
@@ -402,8 +403,9 @@ app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
 app.include_router(recommendations_v2.router, prefix="/api/v2/recommendations", tags=["recommendations-v2"])
 app.include_router(ai_v2.router, prefix="/api/v2/ai", tags=["ai-v2"])
 
-# V3 Routes (Smart AI Recommendations)
+# V3 Routes (Smart Recommendations + Intelligent AI with Tools/Memory/RAG)
 app.include_router(smart_recommendations.router, prefix="/api/v3/smart", tags=["smart-recommendations"])
+app.include_router(ai_v3.router, prefix="/api/v3/ai", tags=["ai-v3-intelligent"])
 
 # Photo analysis router
 app.include_router(photo_analysis.router, prefix="/api/v1/trade-in-photos", tags=["photo-analysis"])
@@ -425,13 +427,13 @@ async def root():
     return {
         "service": "Quirk AI Kiosk API",
         "status": "running",
-        "version": "2.3.0",
+        "version": "2.4.0",
         "environment": ENVIRONMENT,
         "docs": "/docs" if IS_DEVELOPMENT else "disabled",
         "features": {
             "v1": ["inventory", "recommendations", "leads", "analytics", "traffic", "ai"],
             "v2": ["enhanced-recommendations", "structured-ai"],
-            "v3": ["smart-recommendations", "entity-extraction", "conversation-analysis"]
+            "v3": ["smart-recommendations", "entity-extraction", "conversation-analysis", "intelligent-ai-tools-memory"]
         },
         "storage": "postgresql" if is_database_configured() else "json"
     }
@@ -449,7 +451,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "service": "quirk-kiosk-api",
-        "version": "2.3.0",
+        "version": "2.4.0",
         "environment": ENVIRONMENT,
         "checks": {}
     }
@@ -498,6 +500,20 @@ async def health_check():
         health_status["checks"]["inventory"] = {
             "status": "degraded",
             "error": str(e) if IS_DEVELOPMENT else "load_error"
+        }
+    
+    # V3 Intelligent AI check
+    try:
+        from app.services.vehicle_retriever import get_vehicle_retriever
+        retriever = get_vehicle_retriever()
+        health_status["checks"]["intelligent_ai"] = {
+            "status": "healthy" if retriever._is_fitted else "not_fitted",
+            "inventory_indexed": len(retriever.inventory) if retriever._is_fitted else 0
+        }
+    except Exception as e:
+        health_status["checks"]["intelligent_ai"] = {
+            "status": "degraded",
+            "error": str(e) if IS_DEVELOPMENT else "init_error"
         }
     
     # Set overall status
