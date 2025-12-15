@@ -1,1 +1,604 @@
+"""
+Conversation State Manager
+Maintains persistent state across conversation turns for intelligent context building.
 
+Features:
+- Entity accumulation (budget, preferences, trade-in info)
+- Discussed vehicles tracking
+- Conversation stage detection
+- Objection history
+- Interest signals for staff notification
+"""
+
+from typing import Dict, Any, List, Optional, Set
+from dataclasses import dataclass, field, asdict
+from datetime import datetime, timedelta
+from enum import Enum
+import json
+import logging
+from collections import defaultdict
+
+from app.services.entity_extraction import (
+    ConversationEntityExtractor,
+    ExtractedEntities,
+    get_entity_extractor
+)
+
+logger = logging.getLogger("quirk_ai.conversation_state")
+
+
+class ConversationStage(str, Enum):
+    """Tracks where customer is in the buying journey"""
+    GREETING = "greeting"
+    DISCOVERY = "discovery"           # Learning about needs
+    BROWSING = "browsing"             # Looking at inventory
+    COMPARING = "comparing"           # Comparing specific vehicles
+    DEEP_DIVE = "deep_dive"           # Focused on 1-2 vehicles
+    TRADE_IN = "trade_in"             # Discussing trade
+    FINANCING = "financing"           # Payment/financing questions
+    OBJECTION = "objection"           # Handling objections
+    COMMITMENT = "commitment"         # Ready to move forward
+    HANDOFF = "handoff"               # Ready for sales team
+
+
+class InterestLevel(str, Enum):
+    """Customer interest/engagement level"""
+    COLD = "cold"                     # Just browsing
+    WARM = "warm"                     # Showing interest
+    HOT = "hot"                       # Ready to act
+    COOLING = "cooling"               # Was interested, now hesitant
+
+
+@dataclass
+class DiscussedVehicle:
+    """Tracks a vehicle that was discussed in conversation"""
+    stock_number: str
+    model: str
+    mentioned_at: datetime
+    times_mentioned: int = 1
+    customer_sentiment: str = "neutral"  # positive, neutral, negative
+    features_discussed: List[str] = field(default_factory=list)
+    objections_raised: List[str] = field(default_factory=list)
+    is_favorite: bool = False
+
+
+@dataclass
+class ObjectionRecord:
+    """Records an objection raised by the customer"""
+    category: str  # price, spouse, timing, features, competition
+    text: str
+    raised_at: datetime
+    addressed: bool = False
+    resolution: Optional[str] = None
+
+
+@dataclass 
+class ConversationState:
+    """
+    Complete conversation state - accumulated across all turns.
+    This is what makes the AI "remember" and get smarter during conversation.
+    """
+    session_id: str
+    started_at: datetime = field(default_factory=datetime.utcnow)
+    last_activity: datetime = field(default_factory=datetime.utcnow)
+    
+    # Customer identification
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    
+    # Accumulated entities from all messages
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    monthly_payment_target: Optional[float] = None
+    down_payment: Optional[float] = None
+    
+    # Vehicle preferences (accumulated)
+    preferred_types: Set[str] = field(default_factory=set)
+    preferred_features: Set[str] = field(default_factory=set)
+    use_cases: Set[str] = field(default_factory=set)
+    min_seating: Optional[int] = None
+    min_towing: Optional[int] = None
+    fuel_preference: Optional[str] = None
+    drivetrain_preference: Optional[str] = None
+    color_preferences: Set[str] = field(default_factory=set)
+    
+    # Trade-in information
+    has_trade_in: bool = False
+    trade_year: Optional[int] = None
+    trade_make: Optional[str] = None
+    trade_model: Optional[str] = None
+    trade_mileage: Optional[int] = None
+    trade_monthly_payment: Optional[float] = None
+    trade_payoff: Optional[float] = None
+    trade_lender: Optional[str] = None
+    trade_is_lease: Optional[bool] = None
+    trade_condition: Optional[str] = None
+    
+    # Conversation tracking
+    stage: ConversationStage = ConversationStage.GREETING
+    interest_level: InterestLevel = InterestLevel.COLD
+    message_count: int = 0
+    
+    # Discussed vehicles
+    discussed_vehicles: Dict[str, DiscussedVehicle] = field(default_factory=dict)
+    favorite_vehicles: List[str] = field(default_factory=list)
+    rejected_vehicles: List[str] = field(default_factory=list)
+    
+    # Objections
+    objections: List[ObjectionRecord] = field(default_factory=list)
+    needs_spouse_approval: bool = False
+    spouse_reference: Optional[str] = None
+    
+    # Staff notification tracking
+    staff_notified: bool = False
+    staff_notification_type: Optional[str] = None
+    test_drive_requested: bool = False
+    appraisal_requested: bool = False
+    
+    # Sentiment tracking
+    overall_sentiment: str = "neutral"
+    frustration_signals: int = 0
+    excitement_signals: int = 0
+    
+    # Key moments
+    key_moments: List[Dict[str, Any]] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            "session_id": self.session_id,
+            "started_at": self.started_at.isoformat(),
+            "last_activity": self.last_activity.isoformat(),
+            "customer_name": self.customer_name,
+            "customer_phone": self.customer_phone,
+            "budget": {
+                "min": self.budget_min,
+                "max": self.budget_max,
+                "monthly_target": self.monthly_payment_target,
+                "down_payment": self.down_payment,
+            },
+            "preferences": {
+                "types": list(self.preferred_types),
+                "features": list(self.preferred_features),
+                "use_cases": list(self.use_cases),
+                "min_seating": self.min_seating,
+                "min_towing": self.min_towing,
+                "fuel": self.fuel_preference,
+                "drivetrain": self.drivetrain_preference,
+                "colors": list(self.color_preferences),
+            },
+            "trade_in": {
+                "has_trade": self.has_trade_in,
+                "year": self.trade_year,
+                "make": self.trade_make,
+                "model": self.trade_model,
+                "mileage": self.trade_mileage,
+                "monthly_payment": self.trade_monthly_payment,
+                "payoff": self.trade_payoff,
+                "lender": self.trade_lender,
+                "is_lease": self.trade_is_lease,
+            },
+            "stage": self.stage.value,
+            "interest_level": self.interest_level.value,
+            "message_count": self.message_count,
+            "discussed_vehicles": {
+                k: {
+                    "stock_number": v.stock_number,
+                    "model": v.model,
+                    "times_mentioned": v.times_mentioned,
+                    "sentiment": v.customer_sentiment,
+                    "is_favorite": v.is_favorite,
+                }
+                for k, v in self.discussed_vehicles.items()
+            },
+            "favorite_vehicles": self.favorite_vehicles,
+            "objections": [
+                {"category": o.category, "addressed": o.addressed}
+                for o in self.objections
+            ],
+            "needs_spouse_approval": self.needs_spouse_approval,
+            "overall_sentiment": self.overall_sentiment,
+            "staff_notified": self.staff_notified,
+            "test_drive_requested": self.test_drive_requested,
+        }
+    
+    def to_context_summary(self) -> str:
+        """Generate a natural language summary for the AI prompt"""
+        parts = []
+        
+        # Customer info
+        if self.customer_name:
+            parts.append(f"Customer name: {self.customer_name}")
+        
+        # Stage and interest
+        parts.append(f"Conversation stage: {self.stage.value}")
+        parts.append(f"Interest level: {self.interest_level.value}")
+        
+        # Budget
+        if self.budget_max:
+            if self.budget_min:
+                parts.append(f"Budget: ${self.budget_min:,.0f} - ${self.budget_max:,.0f}")
+            else:
+                parts.append(f"Budget: up to ${self.budget_max:,.0f}")
+        if self.monthly_payment_target:
+            parts.append(f"Target monthly payment: ${self.monthly_payment_target:,.0f}")
+        
+        # Preferences
+        if self.preferred_types:
+            parts.append(f"Looking for: {', '.join(self.preferred_types)}")
+        if self.use_cases:
+            parts.append(f"Primary use: {', '.join(self.use_cases)}")
+        if self.preferred_features:
+            parts.append(f"Must-have features: {', '.join(list(self.preferred_features)[:5])}")
+        if self.min_seating:
+            parts.append(f"Needs seating for: {self.min_seating}+ people")
+        if self.min_towing:
+            parts.append(f"Needs to tow: {self.min_towing:,}+ lbs")
+        
+        # Trade-in
+        if self.has_trade_in:
+            trade_desc = "Has a trade-in"
+            if self.trade_year and self.trade_make:
+                trade_desc = f"Trading in: {self.trade_year} {self.trade_make} {self.trade_model or ''}"
+            if self.trade_monthly_payment:
+                trade_desc += f" (currently paying ${self.trade_monthly_payment:,.0f}/mo)"
+            if self.trade_payoff:
+                trade_desc += f" (payoff: ${self.trade_payoff:,.0f})"
+            parts.append(trade_desc)
+        
+        # Discussed vehicles
+        if self.discussed_vehicles:
+            favorites = [v for v in self.discussed_vehicles.values() if v.is_favorite]
+            if favorites:
+                parts.append(f"Favorite vehicles: {', '.join(v.model for v in favorites)}")
+            else:
+                recent = sorted(self.discussed_vehicles.values(), 
+                              key=lambda x: x.times_mentioned, reverse=True)[:3]
+                parts.append(f"Vehicles discussed: {', '.join(v.model for v in recent)}")
+        
+        # Objections
+        unaddressed = [o for o in self.objections if not o.addressed]
+        if unaddressed:
+            parts.append(f"Unaddressed concerns: {', '.join(o.category for o in unaddressed)}")
+        
+        if self.needs_spouse_approval:
+            ref = self.spouse_reference or "spouse"
+            parts.append(f"Needs to consult with {ref} before deciding")
+        
+        # Sentiment
+        if self.frustration_signals > 2:
+            parts.append("⚠️ Customer showing signs of frustration")
+        elif self.excitement_signals > 2:
+            parts.append("✓ Customer showing strong interest/excitement")
+        
+        return "\n".join(parts)
+
+
+class ConversationStateManager:
+    """
+    Manages conversation state across turns.
+    Updates state based on new messages and extracted entities.
+    """
+    
+    # Stage transition triggers
+    STAGE_KEYWORDS = {
+        ConversationStage.DISCOVERY: ['looking for', 'need', 'want', 'help me find'],
+        ConversationStage.BROWSING: ['show me', 'what do you have', 'inventory', 'browse'],
+        ConversationStage.COMPARING: ['compare', 'difference', 'versus', 'vs', 'or the'],
+        ConversationStage.DEEP_DIVE: ['tell me more', 'features', 'specs', 'this one'],
+        ConversationStage.TRADE_IN: ['trade', 'current car', 'trading in', 'my car'],
+        ConversationStage.FINANCING: ['payment', 'finance', 'lease', 'monthly', 'afford'],
+        ConversationStage.COMMITMENT: ['ready', 'let\'s do it', 'i\'ll take', 'buy', 'purchase'],
+    }
+    
+    INTEREST_SIGNALS = {
+        'hot': ['love it', 'perfect', 'exactly what', 'this is the one', 'ready to', 'let\'s do'],
+        'warm': ['like', 'interested', 'looks good', 'nice', 'could work', 'tell me more'],
+        'cooling': ['not sure', 'maybe', 'think about it', 'come back', 'need to'],
+    }
+    
+    FRUSTRATION_SIGNALS = [
+        'frustrated', 'annoying', 'waste', 'terrible', 'horrible', 
+        'not helpful', 'don\'t understand', 'already told you'
+    ]
+    
+    EXCITEMENT_SIGNALS = [
+        'wow', 'amazing', 'love', 'perfect', 'exactly', 'awesome', 
+        'great', 'fantastic', 'beautiful', 'incredible'
+    ]
+    
+    def __init__(self):
+        self.extractor = get_entity_extractor()
+        self._sessions: Dict[str, ConversationState] = {}
+    
+    def get_or_create_state(
+        self, 
+        session_id: str, 
+        customer_name: Optional[str] = None
+    ) -> ConversationState:
+        """Get existing state or create new one for session"""
+        if session_id not in self._sessions:
+            self._sessions[session_id] = ConversationState(
+                session_id=session_id,
+                customer_name=customer_name
+            )
+            logger.info(f"Created new conversation state for session {session_id}")
+        
+        state = self._sessions[session_id]
+        if customer_name and not state.customer_name:
+            state.customer_name = customer_name
+        
+        return state
+    
+    def update_state(
+        self,
+        session_id: str,
+        user_message: str,
+        assistant_response: str,
+        mentioned_vehicles: Optional[List[Dict[str, Any]]] = None,
+        customer_name: Optional[str] = None
+    ) -> ConversationState:
+        """
+        Update conversation state based on new message exchange.
+        
+        Args:
+            session_id: Session identifier
+            user_message: The customer's message
+            assistant_response: The AI's response
+            mentioned_vehicles: Vehicles mentioned in the response
+            customer_name: Customer's name if known
+            
+        Returns:
+            Updated ConversationState
+        """
+        state = self.get_or_create_state(session_id, customer_name)
+        state.last_activity = datetime.utcnow()
+        state.message_count += 1
+        
+        # Extract entities from user message
+        entities = self.extractor.extract_all(user_message)
+        
+        # Update budget info
+        if entities.budget.has_budget_constraint:
+            if entities.budget.max_price:
+                state.budget_max = entities.budget.max_price
+            if entities.budget.min_price:
+                state.budget_min = entities.budget.min_price
+            if entities.budget.monthly_payment:
+                state.monthly_payment_target = entities.budget.monthly_payment
+            if entities.budget.down_payment:
+                state.down_payment = entities.budget.down_payment
+        
+        # Update preferences
+        for vtype in entities.preferences.vehicle_types:
+            state.preferred_types.add(vtype)
+        for feature in entities.preferences.must_have_features:
+            state.preferred_features.add(feature)
+        for use_case in entities.preferences.use_cases:
+            state.use_cases.add(use_case)
+        
+        if entities.preferences.min_seating:
+            state.min_seating = max(state.min_seating or 0, entities.preferences.min_seating)
+        if entities.preferences.min_towing:
+            state.min_towing = max(state.min_towing or 0, entities.preferences.min_towing)
+        if entities.preferences.fuel_preference:
+            state.fuel_preference = entities.preferences.fuel_preference
+        if entities.preferences.drivetrain_preference:
+            state.drivetrain_preference = entities.preferences.drivetrain_preference
+        
+        # Update trade-in info
+        if entities.trade_in.mentioned:
+            state.has_trade_in = True
+            if entities.trade_in.year:
+                state.trade_year = entities.trade_in.year
+            if entities.trade_in.make:
+                state.trade_make = entities.trade_in.make
+            if entities.trade_in.model:
+                state.trade_model = entities.trade_in.model
+            if entities.trade_in.mileage:
+                state.trade_mileage = entities.trade_in.mileage
+            if entities.trade_in.monthly_payment:
+                state.trade_monthly_payment = entities.trade_in.monthly_payment
+            if entities.trade_in.payoff_amount:
+                state.trade_payoff = entities.trade_in.payoff_amount
+            if entities.trade_in.lender:
+                state.trade_lender = entities.trade_in.lender
+            if entities.trade_in.is_lease is not None:
+                state.trade_is_lease = entities.trade_in.is_lease
+        
+        # Update objection tracking
+        if entities.context.needs_spouse_approval:
+            state.needs_spouse_approval = True
+            state.spouse_reference = entities.context.spouse_reference
+            
+            # Record as objection if not already recorded
+            if not any(o.category == 'spouse' for o in state.objections):
+                state.objections.append(ObjectionRecord(
+                    category='spouse',
+                    text=user_message,
+                    raised_at=datetime.utcnow()
+                ))
+        
+        # Update discussed vehicles
+        if mentioned_vehicles:
+            for vehicle in mentioned_vehicles:
+                stock = vehicle.get('Stock Number') or vehicle.get('stockNumber', '')
+                if stock:
+                    if stock in state.discussed_vehicles:
+                        state.discussed_vehicles[stock].times_mentioned += 1
+                        state.discussed_vehicles[stock].mentioned_at = datetime.utcnow()
+                    else:
+                        state.discussed_vehicles[stock] = DiscussedVehicle(
+                            stock_number=stock,
+                            model=vehicle.get('Model') or vehicle.get('model', 'Unknown'),
+                            mentioned_at=datetime.utcnow()
+                        )
+        
+        # Update stage
+        self._update_stage(state, user_message)
+        
+        # Update interest level
+        self._update_interest_level(state, user_message)
+        
+        # Update sentiment
+        self._update_sentiment(state, user_message)
+        
+        # Record key moments
+        self._record_key_moments(state, user_message, entities)
+        
+        logger.debug(f"Updated state for {session_id}: stage={state.stage}, interest={state.interest_level}")
+        
+        return state
+    
+    def _update_stage(self, state: ConversationState, message: str) -> None:
+        """Update conversation stage based on message content"""
+        message_lower = message.lower()
+        
+        # Check for stage transition triggers
+        for stage, keywords in self.STAGE_KEYWORDS.items():
+            if any(kw in message_lower for kw in keywords):
+                # Only advance stage, don't go backwards (with exceptions)
+                current_order = list(ConversationStage).index(state.stage)
+                new_order = list(ConversationStage).index(stage)
+                
+                if new_order > current_order:
+                    state.stage = stage
+                    logger.debug(f"Stage advanced to {stage}")
+                elif stage in [ConversationStage.TRADE_IN, ConversationStage.FINANCING]:
+                    # These can happen at any time
+                    state.stage = stage
+                break
+        
+        # Auto-advance from greeting after first substantive exchange
+        if state.stage == ConversationStage.GREETING and state.message_count > 1:
+            state.stage = ConversationStage.DISCOVERY
+    
+    def _update_interest_level(self, state: ConversationState, message: str) -> None:
+        """Update customer interest level based on signals"""
+        message_lower = message.lower()
+        
+        for level, signals in self.INTEREST_SIGNALS.items():
+            if any(signal in message_lower for signal in signals):
+                state.interest_level = InterestLevel(level)
+                break
+        
+        # Escalate based on behavior
+        if len(state.discussed_vehicles) >= 3 and state.interest_level == InterestLevel.COLD:
+            state.interest_level = InterestLevel.WARM
+        
+        if state.test_drive_requested or state.appraisal_requested:
+            state.interest_level = InterestLevel.HOT
+    
+    def _update_sentiment(self, state: ConversationState, message: str) -> None:
+        """Update sentiment tracking"""
+        message_lower = message.lower()
+        
+        if any(word in message_lower for word in self.FRUSTRATION_SIGNALS):
+            state.frustration_signals += 1
+            state.overall_sentiment = 'frustrated' if state.frustration_signals > 2 else 'concerned'
+        elif any(word in message_lower for word in self.EXCITEMENT_SIGNALS):
+            state.excitement_signals += 1
+            state.overall_sentiment = 'excited' if state.excitement_signals > 2 else 'positive'
+    
+    def _record_key_moments(
+        self, 
+        state: ConversationState, 
+        message: str,
+        entities: ExtractedEntities
+    ) -> None:
+        """Record significant moments in the conversation"""
+        moment = None
+        
+        if entities.budget.has_budget_constraint and not state.budget_max:
+            moment = {"type": "budget_revealed", "value": entities.budget.max_price}
+        elif entities.trade_in.mentioned and not state.has_trade_in:
+            moment = {"type": "trade_in_mentioned"}
+        elif entities.context.needs_spouse_approval and not state.needs_spouse_approval:
+            moment = {"type": "spouse_objection", "reference": entities.context.spouse_reference}
+        elif 'test drive' in message.lower():
+            moment = {"type": "test_drive_interest"}
+            state.test_drive_requested = True
+        
+        if moment:
+            moment["timestamp"] = datetime.utcnow().isoformat()
+            moment["message_number"] = state.message_count
+            state.key_moments.append(moment)
+    
+    def mark_vehicle_favorite(self, session_id: str, stock_number: str) -> None:
+        """Mark a vehicle as customer favorite"""
+        state = self._sessions.get(session_id)
+        if state and stock_number in state.discussed_vehicles:
+            state.discussed_vehicles[stock_number].is_favorite = True
+            if stock_number not in state.favorite_vehicles:
+                state.favorite_vehicles.append(stock_number)
+    
+    def mark_vehicle_rejected(self, session_id: str, stock_number: str, reason: str) -> None:
+        """Mark a vehicle as rejected with reason"""
+        state = self._sessions.get(session_id)
+        if state:
+            if stock_number in state.discussed_vehicles:
+                state.discussed_vehicles[stock_number].customer_sentiment = 'negative'
+                state.discussed_vehicles[stock_number].objections_raised.append(reason)
+            if stock_number not in state.rejected_vehicles:
+                state.rejected_vehicles.append(stock_number)
+    
+    def record_objection(
+        self, 
+        session_id: str, 
+        category: str, 
+        text: str
+    ) -> None:
+        """Record a customer objection"""
+        state = self._sessions.get(session_id)
+        if state:
+            state.objections.append(ObjectionRecord(
+                category=category,
+                text=text,
+                raised_at=datetime.utcnow()
+            ))
+    
+    def mark_objection_addressed(
+        self, 
+        session_id: str, 
+        category: str, 
+        resolution: str
+    ) -> None:
+        """Mark an objection as addressed"""
+        state = self._sessions.get(session_id)
+        if state:
+            for objection in state.objections:
+                if objection.category == category and not objection.addressed:
+                    objection.addressed = True
+                    objection.resolution = resolution
+                    break
+    
+    def get_state(self, session_id: str) -> Optional[ConversationState]:
+        """Get state for a session"""
+        return self._sessions.get(session_id)
+    
+    def cleanup_old_sessions(self, max_age_hours: int = 24) -> int:
+        """Remove sessions older than max_age_hours"""
+        cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
+        old_sessions = [
+            sid for sid, state in self._sessions.items()
+            if state.last_activity < cutoff
+        ]
+        
+        for sid in old_sessions:
+            del self._sessions[sid]
+        
+        logger.info(f"Cleaned up {len(old_sessions)} old sessions")
+        return len(old_sessions)
+
+
+# Module-level singleton
+_state_manager: Optional[ConversationStateManager] = None
+
+
+def get_state_manager() -> ConversationStateManager:
+    """Get or create the conversation state manager instance"""
+    global _state_manager
+    if _state_manager is None:
+        _state_manager = ConversationStateManager()
+    return _state_manager
