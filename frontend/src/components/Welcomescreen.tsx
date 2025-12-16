@@ -9,7 +9,7 @@ type StatType = 'total' | 'suv' | 'truck' | 'price' | null;
 
 const PATHS: Array<{ id: PathId; title: string; subtitle: string; description: string; gradient: string; iconPath: string }> = [
   { id: 'stockLookup', title: 'I Have a Stock Number', subtitle: 'Find the exact vehicle', description: 'Enter your stock number to view availability, pricing, and schedule a test drive.', gradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', iconPath: 'M11 11m-8 0a8 8 0 1 0 16 0a8 8 0 1 0 -16 0M21 21l-4.35-4.35M11 8v6M8 11h6' },
-  { id: 'aiAssistant', title: 'Chat with Quirk AI', subtitle: "LET'S HAVE A CONVERSATION", description: "Let's walk through this together and find the right vehicle that fits what you're looking for.", gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', iconPath: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
+  { id: 'aiAssistant', title: 'Chat with Quirk AI', subtitle: "LET'S HAVE A CONVERSATION", description: "(BEST OPTION) Let's walk through this together and find the right vehicle that fits what you're looking for.", gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', iconPath: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
   { id: 'modelBudget', title: 'I Know What I Want', subtitle: 'Browse by model & budget', description: 'Select your preferred model and set your budget to see matching inventory.', gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', iconPath: 'M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M5 17h-2v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5' },
 ];
 
@@ -217,20 +217,41 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
       </div>
 
       <div style={s.pathsContainer}>
-        {PATHS.map((path) => (
-          <div key={path.id} style={{ ...s.pathCard, background: hoveredPath === path.id ? path.gradient : 'rgba(255,255,255,0.1)', transform: hoveredPath === path.id ? 'scale(1.03) translateY(-8px)' : 'scale(1)', borderColor: hoveredPath === path.id ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)', boxShadow: hoveredPath === path.id ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(74,222,128,0.2)' : '0 8px 32px rgba(0,0,0,0.3)' }}
-            onMouseEnter={() => setHoveredPath(path.id)} onMouseLeave={() => setHoveredPath(null)} onClick={() => handlePathSelect(path.id)}>
-            <div style={{ ...s.pathIcon, background: hoveredPath === path.id ? 'rgba(255,255,255,0.2)' : path.gradient, boxShadow: hoveredPath === path.id ? 'none' : '0 8px 24px rgba(0,0,0,0.3)' }}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d={path.iconPath}/></svg>
+        {PATHS.map((path) => {
+          const isAICard = path.id === 'aiAssistant';
+          const isHovered = hoveredPath === path.id;
+          
+          // Special styling for AI card - white glow effect
+          const aiCardStyle = isAICard ? {
+            boxShadow: isHovered 
+              ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(168,85,247,0.4), 0 0 60px rgba(255,255,255,0.3)' 
+              : '0 8px 32px rgba(0,0,0,0.3), 0 0 40px rgba(255,255,255,0.25), 0 0 20px rgba(168,85,247,0.2)',
+            border: '2px solid rgba(255,255,255,0.5)',
+            transform: isHovered ? 'scale(1.05) translateY(-10px)' : 'scale(1.02)',
+          } : {};
+          
+          return (
+            <div key={path.id} style={{ 
+              ...s.pathCard, 
+              background: isHovered ? path.gradient : 'rgba(255,255,255,0.1)', 
+              transform: isHovered ? 'scale(1.03) translateY(-8px)' : 'scale(1)', 
+              borderColor: isHovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)', 
+              boxShadow: isHovered ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(74,222,128,0.2)' : '0 8px 32px rgba(0,0,0,0.3)',
+              ...aiCardStyle,
+            }}
+              onMouseEnter={() => setHoveredPath(path.id)} onMouseLeave={() => setHoveredPath(null)} onClick={() => handlePathSelect(path.id)}>
+              <div style={{ ...s.pathIcon, background: isHovered ? 'rgba(255,255,255,0.2)' : path.gradient, boxShadow: isHovered ? 'none' : '0 8px 24px rgba(0,0,0,0.3)' }}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d={path.iconPath}/></svg>
+              </div>
+              <h3 style={s.pathTitle}>{path.title}</h3>
+              <p style={s.pathSubtitle}>{path.subtitle}</p>
+              <p style={s.pathDescription}>{path.description}</p>
+              <div style={{ ...s.pathArrow, transform: isHovered ? 'translateX(4px)' : 'translateX(0)' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </div>
             </div>
-            <h3 style={s.pathTitle}>{path.title}</h3>
-            <p style={s.pathSubtitle}>{path.subtitle}</p>
-            <p style={s.pathDescription}>{path.description}</p>
-            <div style={{ ...s.pathArrow, transform: hoveredPath === path.id ? 'translateX(4px)' : 'translateX(0)' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {stats && (
