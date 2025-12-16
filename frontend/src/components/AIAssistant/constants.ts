@@ -3,11 +3,12 @@ import type { ObjectionCategory } from './types';
 export const SUGGESTED_PROMPTS = [
   "What's the best family SUV under $50K?",
   "I'm in for service today and am curious about what's new with Chevrolet.",
-  "¿Puedo hablar contigo en español?",
   "I have a long commute. I need a fuel efficient vehicle.",
   "I want a sporty car with good tech features.",
   "What do you have for electric vehicles?",
   "I drive under 20K miles per year. What are the benefits of leasing my next vehicle?",
+  "¿Puedo hablar contigo en español?",
+  "Bonjour, pouvez-vous me parler en français?",
 ];
 
 export const OBJECTION_CATEGORIES: ObjectionCategory[] = [
