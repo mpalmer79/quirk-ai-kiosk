@@ -135,6 +135,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   }, [tradeVehicle.year, tradeVehicle.make]);
 
   // Build dynamic categories based on actual inventory
+  // UPDATED: Now passes through image property for image-based cards
   const VEHICLE_CATEGORIES: VehicleCategories = Object.entries(BASE_CATEGORIES).reduce(
     (acc: VehicleCategories, [key, category]) => {
       const availableModels: AvailableModel[] = category.modelNames
@@ -149,6 +150,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
         acc[key] = {
           name: category.name,
           icon: category.icon,
+          image: category.image,  // Pass through image path for image-based cards
           models: availableModels,
         };
       }
@@ -193,7 +195,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   // Fixed: Allow decimals in currency input - store raw value
   const handlePayoffAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
     // Allow only digits and one decimal point
-    const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+    const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./, '$1');
     setPayoffAmount(rawValue);
   };
 
@@ -211,7 +213,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   // Fixed: Allow decimals in currency input - store raw value
   const handleMonthlyPaymentChange = (e: ChangeEvent<HTMLInputElement>): void => {
     // Allow only digits and one decimal point
-    const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+    const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./, '$1');
     setMonthlyPayment(rawValue);
   };
 
@@ -289,7 +291,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     );
   }
 
-  // Step 1: Category Selection
+  // Step 1: Category Selection - Image-based cards like GM Protection packages
   const renderCategorySelection = (): JSX.Element => (
     <div style={styles.stepContainer}>
       <div style={styles.stepHeader}>
@@ -306,9 +308,52 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
       <div style={styles.categoryGrid}>
         {Object.entries(VEHICLE_CATEGORIES).map(([key, category]) => (
           <button key={key} style={styles.categoryCard} onClick={() => handleCategorySelect(key)}>
-            <span style={styles.categoryIcon}>{category.icon}</span>
-            <span style={styles.categoryName}>{category.name}</span>
-            <span style={styles.categoryCount}>{category.models.length} models</span>
+            {/* Image container with fallback to emoji */}
+            {category.image ? (
+              <div style={styles.categoryImageContainer as React.CSSProperties}>
+                <img 
+                  src={category.image} 
+                  alt={category.name}
+                  style={styles.categoryImage as React.CSSProperties}
+                  onError={(e) => {
+                    // Hide broken image, show fallback
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    const parent = (e.target as HTMLImageElement).parentElement;
+                    if (parent) {
+                      const fallback = parent.querySelector('[data-fallback]') as HTMLElement;
+                      if (fallback) fallback.style.display = 'flex';
+                    }
+                  }}
+                />
+                <div 
+                  data-fallback
+                  style={{ 
+                    ...styles.categoryImagePlaceholder as React.CSSProperties, 
+                    display: 'none',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                  }}
+                >
+                  <span style={styles.categoryFallbackIcon as React.CSSProperties}>{category.icon}</span>
+                </div>
+                <div style={styles.categoryImageOverlay as React.CSSProperties} />
+                <div style={styles.categoryBadgeIcon as React.CSSProperties}>
+                  <span style={{ fontSize: '14px' }}>{category.icon}</span>
+                </div>
+              </div>
+            ) : (
+              <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
+                <span style={styles.categoryFallbackIcon as React.CSSProperties}>{category.icon}</span>
+              </div>
+            )}
+            {/* Text content below image */}
+            <div style={styles.categoryContent as React.CSSProperties}>
+              <div style={styles.categoryName}>{category.name}</div>
+              <div style={styles.categoryCount}>{category.models.length} models</div>
+            </div>
           </button>
         ))}
       </div>
