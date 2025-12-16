@@ -163,10 +163,10 @@ describe('AIAssistant Component', () => {
       });
     });
 
-    test('displays truck towing prompt', async () => {
+    test('displays Spanish prompt', async () => {
       renderAIAssistant();
       await waitFor(() => {
-        expect(screen.getByText(/I need a truck that can tow a boat/i)).toBeInTheDocument();
+        expect(screen.getByText(/¿Puedo hablar contigo en español\?/i)).toBeInTheDocument();
       });
     });
 
@@ -181,10 +181,10 @@ describe('AIAssistant Component', () => {
       renderAIAssistant();
       
       await waitFor(() => {
-        expect(screen.getByText(/I need a truck that can tow a boat/i)).toBeInTheDocument();
+        expect(screen.getByText(/best family SUV/i)).toBeInTheDocument();
       });
 
-      const prompt = screen.getByText(/I need a truck that can tow a boat/i);
+      const prompt = screen.getByText(/best family SUV/i);
       fireEvent.click(prompt);
 
       await waitFor(() => {
