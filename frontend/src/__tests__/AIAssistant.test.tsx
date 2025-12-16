@@ -166,7 +166,7 @@ describe('AIAssistant Component', () => {
     test('displays Spanish prompt', async () => {
       renderAIAssistant();
       await waitFor(() => {
-        expect(screen.getByText(/¿Puedo hablar contigo en español\?/i)).toBeInTheDocument();
+        expect(screen.getByText(/Bienvenido a Quirk Chevrolet/i)).toBeInTheDocument();
       });
     });
 
