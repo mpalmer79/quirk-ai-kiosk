@@ -125,14 +125,15 @@ useEffect(() => { loadData(); }, [activeFilter]);
       <div style={s.tableContainer} className="traffic-table-container">
         <table style={s.table} className="traffic-table">
           <thead>
-            <tr>{['Time', 'Customer', 'Path', 'Vehicle', 'Trade-In', 'Status', 'Actions'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+            <tr>{['Time', 'Cust #', 'Customer', 'Path', 'Vehicle', 'Trade-In', 'Status', 'Actions'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
           </thead>
           <tbody>
             {sessions.length === 0 ? (
-              <tr><td colSpan={7} style={s.emptyState}>{activeFilter ? 'No sessions match this filter' : 'No sessions recorded yet'}</td></tr>
+              <tr><td colSpan={8} style={s.emptyState}>{activeFilter ? 'No sessions match this filter' : 'No sessions recorded yet'}</td></tr>
             ) : sessions.map((session) => (
               <tr key={session.sessionId} style={s.tr} onClick={() => setSelectedSession(session)}>
                 <td style={s.td}><span style={s.timeValue}>{formatDate(session.createdAt)}</span></td>
+                <td style={s.td}><span style={s.custNumValue}>{session.phone ? session.phone.replace(/\D/g, '').slice(-4) : '—'}</span></td>
                 <td style={s.td}>
                   <div style={s.customerCell}>
                     <span style={s.customerName}>{session.customerName || 'Anonymous'}</span>
@@ -297,6 +298,7 @@ const s: Record<string, CSSProperties> = {
   td: { padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'middle' },
   emptyState: { textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.4)', fontSize: '14px' },
   timeValue: { fontSize: '13px', color: 'rgba(255,255,255,0.7)' },
+  custNumValue: { fontSize: '14px', fontWeight: 600, color: '#D4AF37', fontFamily: 'monospace', letterSpacing: '1px' },
   customerCell: { display: 'flex', flexDirection: 'column', gap: '2px' },
   customerName: { fontSize: '14px', fontWeight: 600, color: '#fff' },
   customerPhone: { fontSize: '12px', color: 'rgba(255,255,255,0.5)' },
