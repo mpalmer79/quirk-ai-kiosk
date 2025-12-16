@@ -7,8 +7,8 @@ export const SUGGESTED_PROMPTS = [
   "I want a sporty car with good tech features.",
   "What do you have for electric vehicles?",
   "I drive under 20K miles per year. What are the benefits of leasing my next vehicle?",
-  "Bienvenido a Quirk Chevrolet. Hablemos de su próximo vehículo.",
-  "Bienvenue chez Quirk Chevrolet. Parlons de votre prochain véhicule.",
+  "Bienvenido a Quirk Chevrolet. ¿Qué puedo ayudarle a lograr hoy?",
+  "Bienvenue chez Quirk Chevrolet. Que puis-je vous aider à accomplir aujourd'hui ?",
 ];
 
 export const OBJECTION_CATEGORIES: ObjectionCategory[] = [
