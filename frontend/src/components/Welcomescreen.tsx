@@ -9,7 +9,7 @@ type StatType = 'total' | 'suv' | 'truck' | 'price' | null;
 
 const PATHS: Array<{ id: PathId; title: string; subtitle: string; description: string; gradient: string; iconPath: string }> = [
   { id: 'stockLookup', title: 'I Have a Stock Number', subtitle: 'Find the exact vehicle', description: 'Enter your stock number to view availability, pricing, and schedule a test drive.', gradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', iconPath: 'M11 11m-8 0a8 8 0 1 0 16 0a8 8 0 1 0 -16 0M21 21l-4.35-4.35M11 8v6M8 11h6' },
-  { id: 'aiAssistant', title: 'Chat with Quirk AI', subtitle: "LET'S HAVE A CONVERSATION", description: "(BEST OPTION) Let's walk through this together and find the right vehicle that fits what you're looking for.", gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', iconPath: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
+  { id: 'aiAssistant', title: 'Chat with Quirk AI', subtitle: "LET'S HAVE A CONVERSATION", description: "(BEST OPTION) Let's walk through this together and find the right vehicle that fits what you're looking for.", gradient: 'linear-gradient(135deg, #D4AF37 0%, #B8960C 100%)', iconPath: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
   { id: 'modelBudget', title: 'I Know What I Want', subtitle: 'Browse by model & budget', description: 'Select your preferred model and set your budget to see matching inventory.', gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', iconPath: 'M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M5 17h-2v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5' },
 ];
 
@@ -227,10 +227,10 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
           let cardTransform: string;
           
           if (isAICard) {
-            // Special styling for AI card - white glow effect
+            // Special styling for AI card - white glow effect with gold accent
             cardBoxShadow = isHovered 
-              ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(168,85,247,0.4), 0 0 80px rgba(255,255,255,0.6)' 
-              : '0 8px 32px rgba(0,0,0,0.3), 0 0 60px rgba(255,255,255,0.5), 0 0 100px rgba(255,255,255,0.3), 0 0 30px rgba(168,85,247,0.3)';
+              ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(212,175,55,0.4), 0 0 80px rgba(255,255,255,0.6)' 
+              : '0 8px 32px rgba(0,0,0,0.3), 0 0 60px rgba(255,255,255,0.5), 0 0 100px rgba(255,255,255,0.3), 0 0 30px rgba(212,175,55,0.3)';
             cardBorder = '2px solid rgba(255,255,255,0.9)';
             cardTransform = isHovered ? 'scale(1.05) translateY(-10px)' : 'scale(1.02)';
           } else {
