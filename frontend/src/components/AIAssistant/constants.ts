@@ -1,12 +1,12 @@
 import type { ObjectionCategory } from './types';
 
 export const SUGGESTED_PROMPTS = [
-  "I need a truck that can tow a boat",
-  "What's the best family SUV under $50k?",
-  "Show me something fuel efficient for commuting",
-  "I want a sporty car with good tech features",
-  "What electric vehicles do you have?",
-  "I want to continue our conversation",
+  "What's the best family SUV under $50K?",
+  "I'm in for service today and am curious about what's new with Chevrolet.",
+  "¿Puedo hablar contigo en español?",
+  "I have a long commute. I need a fuel efficient vehicle.",
+  "I want a sporty car with good tech features.",
+  "What do you have for electric vehicles?",
 ];
 
 export const OBJECTION_CATEGORIES: ObjectionCategory[] = [
