@@ -160,7 +160,8 @@ class TestTrafficStatistics:
         ]
         
         with_vehicle = sum(1 for s in sessions if s.get("vehicleInterest"))
-        with_trade_in = sum(1 for s in sessions if s.get("tradeIn", {}).get("hasTrade"))
+        # Fix: Use (s.get("tradeIn") or {}) to handle None values
+        with_trade_in = sum(1 for s in sessions if (s.get("tradeIn") or {}).get("hasTrade"))
         
         assert with_vehicle == 3
         assert with_trade_in == 3
@@ -472,12 +473,17 @@ class TestErrorHandling:
             try:
                 if ts:
                     datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                parsed = ts
+                    parsed = ts  # Valid timestamp, use it
+                else:
+                    # Empty string or None - use current time
+                    parsed = datetime.utcnow().isoformat()
             except (ValueError, AttributeError):
+                # Invalid format - use current time
                 parsed = datetime.utcnow().isoformat()
             
-            # Should have a valid ISO timestamp
+            # Should have a valid ISO timestamp (never None)
             assert parsed is not None
+            assert len(parsed) > 0
     
     def test_handle_malformed_session_data(self):
         """Handle malformed session data"""
