@@ -1,6 +1,7 @@
 import type { ObjectionCategory } from './types';
 
 export const SUGGESTED_PROMPTS = [
+  "Let's pick up where we left off.",
   "What's the best family SUV under $50K?",
   "I'm in for service today and am curious about what's new with Chevrolet.",
   "I have a long commute. I need a fuel efficient vehicle.",
