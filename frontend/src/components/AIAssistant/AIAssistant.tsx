@@ -275,7 +275,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     }
 
     setIsLoading(false);
-  }, [messages, isLoading, extractedData, customerData, extractDataFromMessage, detectObjection, detectHoursQuery, searchInventory, buildInventoryContext, speakText, stopSpeaking]);
+  }, [messages, isLoading, extractedData, customerData, extractDataFromMessage, detectObjection, detectHoursQuery, searchInventory, buildInventoryContext, speakText, stopSpeaking, inventory]);
 
   // Store sendMessage in ref for speech recognition callback
   useEffect(() => {
