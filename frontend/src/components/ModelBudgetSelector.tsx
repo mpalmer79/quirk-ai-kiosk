@@ -340,9 +340,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                   <span style={styles.categoryFallbackIcon as React.CSSProperties}>{category.icon}</span>
                 </div>
                 <div style={styles.categoryImageOverlay as React.CSSProperties} />
-                <div style={styles.categoryBadgeIcon as React.CSSProperties}>
-                  <span style={{ fontSize: '14px' }}>{category.icon}</span>
-                </div>
               </div>
             ) : (
               <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
