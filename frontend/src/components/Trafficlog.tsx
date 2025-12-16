@@ -122,8 +122,8 @@ useEffect(() => { loadData(); }, [activeFilter]);
         </div>
       )}
 
-      <div style={s.tableContainer}>
-        <table style={s.table}>
+      <div style={s.tableContainer} className="traffic-table-container">
+        <table style={s.table} className="traffic-table">
           <thead>
             <tr>{['Time', 'Customer', 'Path', 'Vehicle', 'Trade-In', 'Status', 'Actions'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
           </thead>
@@ -248,7 +248,22 @@ useEffect(() => { loadData(); }, [activeFilter]);
           </div>
         </div>
       )}
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        /* Mobile horizontal scroll for table */
+        @media (max-width: 768px) {
+          .traffic-table-container {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -20px;
+            padding: 0 20px;
+          }
+          .traffic-table {
+            min-width: 800px;
+          }
+        }
+      `}</style>
     </div>
   );
 };
