@@ -1,6 +1,14 @@
 import type { CSSProperties } from 'react';
 
+// =============================================================================
+// QUIRK AI KIOSK - Model Budget Selector Styles
+// Design: Dark, cutting-edge tech aesthetic with depth and polish
+// =============================================================================
+
 const styles: Record<string, CSSProperties> = {
+  // ---------------------------------------------------------------------------
+  // MAIN CONTAINER - Dark gradient background
+  // ---------------------------------------------------------------------------
   container: {
     flex: 1,
     display: 'flex',
@@ -13,8 +21,13 @@ const styles: Record<string, CSSProperties> = {
     WebkitOverflowScrolling: 'touch',
     minHeight: 0,
     boxSizing: 'border-box',
-    background: '#ffffff',
+    // Deep dark gradient with subtle blue undertones
+    background: 'linear-gradient(165deg, #0f172a 0%, #1e1b4b 35%, #0f172a 70%, #020617 100%)',
   },
+
+  // ---------------------------------------------------------------------------
+  // LOADING STATE
+  // ---------------------------------------------------------------------------
   loadingContainer: {
     flex: 1,
     display: 'flex',
@@ -26,15 +39,19 @@ const styles: Record<string, CSSProperties> = {
   loadingSpinner: {
     width: '48px',
     height: '48px',
-    border: '4px solid rgba(0,0,0,0.1)',
+    border: '4px solid rgba(34, 197, 94, 0.2)',
     borderTopColor: '#22c55e',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
   loadingText: {
     fontSize: '16px',
-    color: 'rgba(0,0,0,0.6)',
+    color: 'rgba(255,255,255,0.7)',
   },
+
+  // ---------------------------------------------------------------------------
+  // STEP CONTAINER
+  // ---------------------------------------------------------------------------
   stepContainer: {
     flex: '1 0 auto',
     display: 'flex',
@@ -45,27 +62,40 @@ const styles: Record<string, CSSProperties> = {
     width: '100%',
     paddingBottom: '100px',
   },
+
+  // ---------------------------------------------------------------------------
+  // BACK BUTTON
+  // ---------------------------------------------------------------------------
   backButton: {
     alignSelf: 'flex-start',
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: '8px',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: '10px',
     padding: '10px 20px',
-    color: '#ffffff',
+    color: 'rgba(255,255,255,0.9)',
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
     marginBottom: '24px',
+    backdropFilter: 'blur(10px)',
+    transition: 'all 0.2s ease',
   },
+
+  // ---------------------------------------------------------------------------
+  // STEP HEADER - Glassmorphism card
+  // ---------------------------------------------------------------------------
   stepHeader: {
     textAlign: 'center',
     marginBottom: '32px',
-    padding: '20px 30px',
-    background: 'rgba(30, 41, 59, 0.95)',
-    borderRadius: '16px',
+    padding: '28px 36px',
+    background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
+    borderRadius: '20px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
+    backdropFilter: 'blur(20px)',
   },
   stepIcon: {
     width: '64px',
@@ -77,6 +107,7 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'center',
     color: '#ffffff',
     margin: '0 auto 20px',
+    boxShadow: '0 8px 24px rgba(34, 197, 94, 0.4)',
   },
   stepTitle: {
     fontSize: 'clamp(22px, 5vw, 28px)',
@@ -84,12 +115,17 @@ const styles: Record<string, CSSProperties> = {
     color: '#ffffff',
     margin: '0 0 8px 0',
     textAlign: 'center',
+    letterSpacing: '-0.5px',
   },
   stepSubtitle: {
     fontSize: '16px',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.6)',
     margin: 0,
   },
+
+  // ---------------------------------------------------------------------------
+  // BADGES
+  // ---------------------------------------------------------------------------
   categoryBadge: {
     display: 'inline-block',
     padding: '8px 18px',
@@ -99,28 +135,42 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '14px',
     fontWeight: '600',
     marginBottom: '12px',
-    border: '1px solid rgba(34,197,94,0.3)',
+    border: '1px solid rgba(34,197,94,0.4)',
+    boxShadow: '0 0 20px rgba(34, 197, 94, 0.2)',
   },
   modelBadge: {
     display: 'inline-block',
     padding: '8px 16px',
-    background: 'rgba(37, 99, 235, 0.2)',
+    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.2) 100%)',
     borderRadius: '20px',
     color: '#60a5fa',
     fontSize: '14px',
     fontWeight: '600',
     marginBottom: '12px',
+    border: '1px solid rgba(59, 130, 246, 0.4)',
+    boxShadow: '0 0 20px rgba(59, 130, 246, 0.2)',
   },
+
+  // ---------------------------------------------------------------------------
+  // CATEGORY GRID - Dark glass container
+  // ---------------------------------------------------------------------------
   categoryGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-    gap: '12px',
+    gap: '16px',
     width: '100%',
-    padding: '24px',
+    padding: '28px',
     paddingBottom: '40px',
-    background: 'rgba(241, 245, 249, 0.7)',
-    borderRadius: '16px',
+    background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%)',
+    borderRadius: '20px',
+    border: '1px solid rgba(255,255,255,0.08)',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+    backdropFilter: 'blur(10px)',
   },
+
+  // ---------------------------------------------------------------------------
+  // START OVER
+  // ---------------------------------------------------------------------------
   startOverContainer: {
     display: 'flex',
     justifyContent: 'center',
@@ -131,311 +181,468 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    background: 'rgba(30, 41, 59, 0.95)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: '8px',
-    padding: '12px 24px',
+    background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: '12px',
+    padding: '14px 28px',
     color: '#ffffff',
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
   },
+
+  // ---------------------------------------------------------------------------
+  // CATEGORY CARD - Gradient with glow on hover (via JS)
+  // ---------------------------------------------------------------------------
   categoryCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '14px',
+    padding: '28px 20px',
+    background: 'linear-gradient(145deg, rgba(51, 65, 85, 0.7) 0%, rgba(30, 41, 59, 0.9) 100%)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '20px',
+    cursor: 'pointer',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+    backdropFilter: 'blur(10px)',
+  },
+  categoryIcon: { 
+    fontSize: '40px',
+    filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
+  },
+  categoryName: { 
+    fontSize: '16px', 
+    fontWeight: '700', 
+    color: '#ffffff', 
+    textAlign: 'center',
+    letterSpacing: '-0.3px',
+  },
+  categoryCount: { 
+    fontSize: '13px', 
+    color: 'rgba(148, 163, 184, 0.9)',
+    fontWeight: '500',
+  },
+
+  // ---------------------------------------------------------------------------
+  // MODEL GRID
+  // ---------------------------------------------------------------------------
+  modelGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    gap: '16px',
+    width: '100%',
+    padding: '28px',
+    background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%)',
+    borderRadius: '20px',
+    border: '1px solid rgba(255,255,255,0.08)',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+    backdropFilter: 'blur(10px)',
+  },
+
+  // ---------------------------------------------------------------------------
+  // MODEL CARD
+  // ---------------------------------------------------------------------------
+  modelCard: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
     padding: '24px 18px',
-    background: '#ffffff',
-    border: '1px solid rgba(0,0,0,0.1)',
+    background: 'linear-gradient(145deg, rgba(51, 65, 85, 0.7) 0%, rgba(30, 41, 59, 0.9) 100%)',
+    border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: '20px',
     cursor: 'pointer',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-  },
-  categoryIcon: { fontSize: '36px' },
-  categoryName: { fontSize: '15px', fontWeight: '600', color: '#1e293b', textAlign: 'center' },
-  categoryCount: { fontSize: '12px', color: 'rgba(0,0,0,0.5)' },
-  modelGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-    gap: '12px',
-    width: '100%',
-    padding: '24px',
-    background: 'rgba(241, 245, 249, 0.6)',
-    borderRadius: '16px',
-  },
-  modelCard: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '22px 18px',
-    background: '#ffffff',
-    border: '1px solid rgba(0,0,0,0.1)',
-    borderRadius: '20px',
-    cursor: 'pointer',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+    backdropFilter: 'blur(10px)',
   },
   modelInitial: {
-    width: '52px',
-    height: '52px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    width: '56px',
+    height: '56px',
+    borderRadius: '14px',
+    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '20px',
+    fontSize: '22px',
     fontWeight: '700',
     color: '#ffffff',
+    boxShadow: '0 8px 24px rgba(59, 130, 246, 0.4)',
   },
-  modelName: { fontSize: '15px', fontWeight: '600', color: '#1e293b', textAlign: 'center' },
-  modelCount: { fontSize: '12px', color: '#4ade80', fontWeight: '600' },
-  modelConfig: { fontSize: '11px', color: 'rgba(0,0,0,0.5)' },
+  modelName: { 
+    fontSize: '16px', 
+    fontWeight: '700', 
+    color: '#ffffff', 
+    textAlign: 'center',
+    letterSpacing: '-0.3px',
+  },
+  modelCount: { 
+    fontSize: '13px', 
+    color: '#4ade80', 
+    fontWeight: '600',
+    textShadow: '0 0 10px rgba(74, 222, 128, 0.5)',
+  },
+  modelConfig: { 
+    fontSize: '12px', 
+    color: 'rgba(148, 163, 184, 0.8)',
+  },
+
+  // ---------------------------------------------------------------------------
+  // CAB SELECTION
+  // ---------------------------------------------------------------------------
   cabGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '12px',
+    gap: '16px',
     width: '100%',
   },
   cabCard: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '10px',
-    padding: '24px 16px',
-    background: 'rgba(255,255,255,0.12)',
+    gap: '12px',
+    padding: '28px 20px',
+    background: 'linear-gradient(145deg, rgba(51, 65, 85, 0.6) 0%, rgba(30, 41, 59, 0.8) 100%)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: '16px',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.3s ease',
+    backdropFilter: 'blur(10px)',
   },
-  cabIcon: { fontSize: '36px' },
-  cabName: { fontSize: '16px', fontWeight: '600', color: '#ffffff' },
-  cabDesc: { fontSize: '12px', color: 'rgba(255,255,255,0.5)', textAlign: 'center' },
-  formSection: {
-    width: '100%',
-    padding: '20px',
-    background: 'rgba(255,255,255,0.12)',
-    borderRadius: '16px',
-    border: '1px solid rgba(255,255,255,0.1)',
-    boxSizing: 'border-box',
+  cabIcon: { 
+    fontSize: '40px',
+    filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
   },
-  formIntro: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: '20px',
+  cabName: { 
+    fontSize: '17px', 
+    fontWeight: '700', 
+    color: '#ffffff',
+  },
+  cabDesc: { 
+    fontSize: '13px', 
+    color: 'rgba(148, 163, 184, 0.8)', 
     textAlign: 'center',
   },
+
+  // ---------------------------------------------------------------------------
+  // FORM SECTIONS
+  // ---------------------------------------------------------------------------
+  formSection: {
+    width: '100%',
+    padding: '24px',
+    background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)',
+    borderRadius: '20px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    boxSizing: 'border-box',
+    backdropFilter: 'blur(10px)',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+  },
+  formIntro: {
+    fontSize: '15px',
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: '24px',
+    textAlign: 'center',
+    lineHeight: '1.6',
+  },
+
+  // ---------------------------------------------------------------------------
+  // COLOR SELECTION
+  // ---------------------------------------------------------------------------
   colorSelects: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '16px',
-    marginBottom: '24px',
+    gap: '20px',
+    marginBottom: '28px',
   },
   colorSelectGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '10px',
   },
   inputLabel: {
     fontSize: '12px',
-    fontWeight: '600',
-    color: '#ffffff',
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.9)',
     textTransform: 'uppercase',
-    letterSpacing: '0.5px',
+    letterSpacing: '1px',
   },
   downPaymentDisclaimer: {
     fontSize: '10px',
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.6)',
     textTransform: 'none',
     letterSpacing: '0',
     marginLeft: '8px',
   },
   selectInput: {
-    padding: '14px 16px',
-    background: 'rgba(0,0,0,0.3)',
+    padding: '16px 18px',
+    background: 'rgba(15, 23, 42, 0.8)',
     border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: '10px',
+    borderRadius: '12px',
     color: '#ffffff',
     fontSize: '15px',
     cursor: 'pointer',
     width: '100%',
     boxSizing: 'border-box',
+    transition: 'all 0.2s ease',
   },
   colorPreview: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
-    padding: '8px 12px',
-    background: 'rgba(0,0,0,0.2)',
-    borderRadius: '8px',
-    fontSize: '13px',
-    color: 'rgba(255,255,255,0.8)',
+    gap: '12px',
+    padding: '10px 14px',
+    background: 'rgba(15, 23, 42, 0.6)',
+    borderRadius: '10px',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.85)',
   },
   colorSwatch: {
-    width: '24px',
-    height: '24px',
-    borderRadius: '6px',
+    width: '28px',
+    height: '28px',
+    borderRadius: '8px',
     border: '2px solid rgba(255,255,255,0.3)',
     flexShrink: 0,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
   },
+
+  // ---------------------------------------------------------------------------
+  // BUTTONS
+  // ---------------------------------------------------------------------------
   continueButton: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '10px',
     width: '100%',
-    padding: '16px',
-    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+    padding: '18px',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     border: 'none',
-    borderRadius: '12px',
+    borderRadius: '14px',
     color: '#ffffff',
     fontSize: '16px',
-    fontWeight: '600',
+    fontWeight: '700',
     cursor: 'pointer',
+    boxShadow: '0 8px 24px rgba(37, 99, 235, 0.4)',
+    transition: 'all 0.3s ease',
   },
+  searchButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    width: '100%',
+    padding: '18px',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+    border: 'none',
+    borderRadius: '14px',
+    color: '#ffffff',
+    fontSize: '17px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    boxShadow: '0 8px 24px rgba(34, 197, 94, 0.4)',
+    transition: 'all 0.3s ease',
+    letterSpacing: '-0.3px',
+  },
+
+  // ---------------------------------------------------------------------------
+  // BUDGET DISPLAY
+  // ---------------------------------------------------------------------------
   budgetDisplay: {
     display: 'flex',
     alignItems: 'baseline',
     justifyContent: 'center',
-    gap: '8px',
-    marginBottom: '28px',
+    gap: '12px',
+    marginBottom: '32px',
     flexWrap: 'wrap',
   },
-  budgetValue: { fontSize: 'clamp(28px, 6vw, 36px)', fontWeight: '700', color: '#4ade80' },
-  budgetSeparator: { fontSize: '16px', color: 'rgba(255,255,255,0.9)' },
-  budgetLabel: { fontSize: '14px', color: 'rgba(255,255,255,0.9)' },
+  budgetValue: { 
+    fontSize: 'clamp(32px, 7vw, 42px)', 
+    fontWeight: '800', 
+    color: '#4ade80',
+    textShadow: '0 0 30px rgba(74, 222, 128, 0.5)',
+    letterSpacing: '-1px',
+  },
+  budgetSeparator: { 
+    fontSize: '18px', 
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '500',
+  },
+  budgetLabel: { 
+    fontSize: '15px', 
+    color: 'rgba(255,255,255,0.8)',
+  },
+
+  // ---------------------------------------------------------------------------
+  // SLIDERS
+  // ---------------------------------------------------------------------------
   sliderGroup: {
-    marginBottom: '20px',
+    marginBottom: '24px',
   },
   sliderLabel: {
     display: 'block',
-    fontSize: '13px',
-    color: '#ffffff',
-    marginBottom: '8px',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: '12px',
+    fontWeight: '500',
   },
   slider: {
     width: '100%',
-    height: '8px',
-    borderRadius: '4px',
+    height: '10px',
+    borderRadius: '5px',
     appearance: 'none',
-    background: 'rgba(255,255,255,0.1)',
+    background: 'linear-gradient(90deg, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.3) 100%)',
     cursor: 'pointer',
   },
+
+  // ---------------------------------------------------------------------------
+  // DOWN PAYMENT
+  // ---------------------------------------------------------------------------
   downPaymentSection: {
-    marginTop: '24px',
-    marginBottom: '24px',
+    marginTop: '28px',
+    marginBottom: '28px',
   },
   downPaymentOptions: {
     display: 'flex',
-    gap: '8px',
-    marginTop: '10px',
+    gap: '10px',
+    marginTop: '14px',
     flexWrap: 'wrap',
   },
   optionButton: {
-    padding: '10px 14px',
-    background: 'rgba(255,255,255,0.12)',
+    padding: '12px 18px',
+    background: 'rgba(30, 41, 59, 0.8)',
     border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: '10px',
-    color: '#ffffff',
-    fontSize: '13px',
+    borderRadius: '12px',
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
     flex: '1 1 auto',
     minWidth: '70px',
     textAlign: 'center',
+    transition: 'all 0.2s ease',
   },
   optionButtonActive: {
-    background: 'rgba(27, 115, 64, 0.3)',
+    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(22, 163, 74, 0.4) 100%)',
     borderColor: '#22c55e',
     color: '#4ade80',
+    boxShadow: '0 0 20px rgba(34, 197, 94, 0.3)',
   },
+
+  // ---------------------------------------------------------------------------
+  // TRADE-IN
+  // ---------------------------------------------------------------------------
   tradeOptions: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '12px',
-    marginBottom: '24px',
+    gap: '16px',
+    marginBottom: '28px',
   },
   tradeCard: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '10px',
-    padding: '24px 16px',
-    background: 'rgba(255,255,255,0.12)',
+    gap: '12px',
+    padding: '28px 20px',
+    background: 'linear-gradient(145deg, rgba(51, 65, 85, 0.6) 0%, rgba(30, 41, 59, 0.8) 100%)',
     border: '2px solid rgba(255,255,255,0.1)',
-    borderRadius: '16px',
+    borderRadius: '18px',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.3s ease',
+    backdropFilter: 'blur(10px)',
   },
   tradeCardActive: {
-    background: 'rgba(27, 115, 64, 0.15)',
+    background: 'linear-gradient(145deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.15) 100%)',
     borderColor: '#22c55e',
+    boxShadow: '0 0 30px rgba(34, 197, 94, 0.3)',
   },
-  tradeIcon: { fontSize: '28px', color: '#4ade80' },
-  tradeName: { fontSize: '16px', fontWeight: '600', color: '#ffffff', textAlign: 'center' },
-  tradeDesc: { fontSize: '12px', color: 'rgba(255,255,255,0.5)', textAlign: 'center' },
+  tradeIcon: { 
+    fontSize: '32px', 
+    color: '#4ade80',
+    filter: 'drop-shadow(0 0 10px rgba(74, 222, 128, 0.5))',
+  },
+  tradeName: { 
+    fontSize: '17px', 
+    fontWeight: '700', 
+    color: '#ffffff', 
+    textAlign: 'center',
+  },
+  tradeDesc: { 
+    fontSize: '13px', 
+    color: 'rgba(148, 163, 184, 0.8)', 
+    textAlign: 'center',
+    lineHeight: '1.5',
+  },
+
+  // ---------------------------------------------------------------------------
+  // PAYOFF SECTION
+  // ---------------------------------------------------------------------------
   payoffSection: {
-    padding: '16px',
-    background: 'rgba(0,0,0,0.2)',
-    borderRadius: '12px',
+    padding: '20px',
+    background: 'rgba(15, 23, 42, 0.6)',
+    borderRadius: '16px',
     marginBottom: '24px',
+    border: '1px solid rgba(255,255,255,0.08)',
   },
   payoffTitle: {
-    fontSize: '15px',
-    fontWeight: '600',
+    fontSize: '16px',
+    fontWeight: '700',
     color: '#ffffff',
-    marginBottom: '16px',
+    marginBottom: '18px',
   },
   payoffOptions: {
     display: 'flex',
     gap: '12px',
-    marginBottom: '16px',
+    marginBottom: '18px',
     flexWrap: 'wrap',
   },
   payoffAmountGroup: {
-    marginTop: '16px',
+    marginTop: '18px',
   },
   payoffFieldsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '16px',
-    marginTop: '16px',
+    gap: '18px',
+    marginTop: '18px',
   },
   tradeVehicleGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: '12px',
-    marginBottom: '16px',
+    gap: '14px',
+    marginBottom: '18px',
   },
   payoffFieldGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '10px',
   },
+
+  // ---------------------------------------------------------------------------
+  // INPUTS
+  // ---------------------------------------------------------------------------
   inputWrapper: {
     display: 'flex',
     alignItems: 'center',
-    background: 'rgba(0,0,0,0.3)',
+    background: 'rgba(15, 23, 42, 0.8)',
     border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: '10px',
-    marginTop: '8px',
+    borderRadius: '12px',
+    marginTop: '10px',
     overflow: 'hidden',
+    transition: 'all 0.2s ease',
   },
   inputPrefix: {
-    padding: '14px 12px',
-    background: 'rgba(255,255,255,0.12)',
+    padding: '16px 14px',
+    background: 'rgba(255,255,255,0.08)',
     color: 'rgba(255,255,255,0.5)',
     fontSize: '16px',
     fontWeight: '600',
   },
   textInput: {
     flex: 1,
-    padding: '14px 16px',
+    padding: '16px 18px',
     background: 'transparent',
     border: 'none',
     color: '#ffffff',
@@ -445,7 +652,7 @@ const styles: Record<string, CSSProperties> = {
   },
   textInputFull: {
     flex: 1,
-    padding: '14px 16px',
+    padding: '16px 18px',
     background: 'transparent',
     border: 'none',
     color: '#ffffff',
@@ -455,140 +662,144 @@ const styles: Record<string, CSSProperties> = {
     width: '100%',
   },
   textInputStandalone: {
-    padding: '14px 16px',
-    background: 'rgba(0,0,0,0.3)',
+    padding: '16px 18px',
+    background: 'rgba(15, 23, 42, 0.8)',
     border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: '10px',
+    borderRadius: '12px',
     color: '#ffffff',
     fontSize: '15px',
     width: '100%',
     boxSizing: 'border-box',
     outline: 'none',
-    marginTop: '8px',
+    marginTop: '10px',
+    transition: 'all 0.2s ease',
   },
-  searchButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '12px',
-    width: '100%',
-    padding: '16px',
-    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-    border: 'none',
-    borderRadius: '12px',
-    color: '#ffffff',
-    fontSize: '16px',
-    fontWeight: '700',
-    cursor: 'pointer',
-  },
+
+  // ---------------------------------------------------------------------------
+  // PROGRESS BAR
+  // ---------------------------------------------------------------------------
   progressBar: {
     display: 'flex',
     justifyContent: 'center',
-    gap: '10px',
-    marginTop: '32px',
+    gap: '12px',
+    marginTop: '36px',
     marginBottom: '40px',
     paddingBottom: 'env(safe-area-inset-bottom, 20px)',
   },
   progressDot: {
-    width: '10px',
-    height: '10px',
+    width: '12px',
+    height: '12px',
     borderRadius: '50%',
-    background: 'rgba(0,0,0,0.2)',
+    background: 'rgba(255,255,255,0.2)',
+    transition: 'all 0.3s ease',
   },
   progressDotActive: {
-    background: '#22c55e',
-    transform: 'scale(1.2)',
+    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+    transform: 'scale(1.3)',
+    boxShadow: '0 0 16px rgba(34, 197, 94, 0.6)',
   },
   progressDotComplete: {
     background: '#4ade80',
+    boxShadow: '0 0 10px rgba(74, 222, 128, 0.4)',
   },
+
+  // ---------------------------------------------------------------------------
+  // BUYING POWER SECTION
+  // ---------------------------------------------------------------------------
   buyingPowerSection: {
-    marginTop: '24px',
-    padding: '16px',
-    background: 'rgba(0,0,0,0.3)',
-    borderRadius: '12px',
+    marginTop: '28px',
+    padding: '20px',
+    background: 'rgba(15, 23, 42, 0.6)',
+    borderRadius: '16px',
     marginBottom: '24px',
+    border: '1px solid rgba(255,255,255,0.08)',
   },
   buyingPowerIntro: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: '16px',
+    fontSize: '15px',
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: '18px',
+    lineHeight: '1.6',
   },
   buyingPowerCard: {
-    padding: '16px',
-    background: 'rgba(255,255,255,0.12)',
-    borderRadius: '10px',
-    marginBottom: '16px',
+    padding: '18px',
+    background: 'rgba(30, 41, 59, 0.6)',
+    borderRadius: '14px',
+    marginBottom: '18px',
+    border: '1px solid rgba(255,255,255,0.08)',
   },
   buyingPowerTitle: {
-    fontSize: '15px',
-    fontWeight: '600',
+    fontSize: '16px',
+    fontWeight: '700',
     color: '#ffffff',
-    marginBottom: '12px',
+    marginBottom: '14px',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '10px',
   },
   buyingPowerList: {
     listStyle: 'disc',
-    paddingLeft: '20px',
-    marginBottom: '16px',
-    color: 'rgba(255,255,255,0.95)',
+    paddingLeft: '22px',
+    marginBottom: '18px',
+    color: 'rgba(255,255,255,0.9)',
     fontSize: '14px',
-    lineHeight: '1.8',
+    lineHeight: '2',
   },
   buyingPowerText: {
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: '12px',
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: '14px',
+    lineHeight: '1.6',
   },
   buyingPowerResult: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
-    padding: '12px 16px',
-    background: 'rgba(74, 222, 128, 0.1)',
-    borderRadius: '8px',
-    marginBottom: '16px',
-    fontSize: '14px',
+    gap: '6px',
+    padding: '14px 18px',
+    background: 'linear-gradient(135deg, rgba(74, 222, 128, 0.15) 0%, rgba(34, 197, 94, 0.1) 100%)',
+    borderRadius: '12px',
+    marginBottom: '18px',
+    fontSize: '15px',
     color: '#4ade80',
+    border: '1px solid rgba(74, 222, 128, 0.3)',
   },
   buyingPowerTotal: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
-    padding: '12px 16px',
-    background: 'rgba(37, 99, 235, 0.15)',
-    borderRadius: '8px',
-    fontSize: '15px',
+    gap: '6px',
+    padding: '14px 18px',
+    background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.15) 0%, rgba(59, 130, 246, 0.1) 100%)',
+    borderRadius: '12px',
+    fontSize: '16px',
     color: '#60a5fa',
+    border: '1px solid rgba(96, 165, 250, 0.3)',
   },
   mathBreakdown: {
-    padding: '16px',
-    background: 'rgba(255,255,255,0.03)',
-    borderRadius: '10px',
+    padding: '18px',
+    background: 'rgba(15, 23, 42, 0.4)',
+    borderRadius: '14px',
+    border: '1px solid rgba(255,255,255,0.05)',
   },
   mathTitle: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.95)',
-    marginBottom: '10px',
+    fontSize: '15px',
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: '12px',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '10px',
   },
   mathList: {
     listStyle: 'disc',
-    paddingLeft: '20px',
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: '13px',
-    lineHeight: '1.8',
+    paddingLeft: '22px',
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: '14px',
+    lineHeight: '2',
   },
   disclaimer: {
-    marginTop: '16px',
+    marginTop: '18px',
     textAlign: 'center',
-    fontSize: '12px',
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: '13px',
+    color: 'rgba(148, 163, 184, 0.7)',
     fontStyle: 'italic',
   },
 };
