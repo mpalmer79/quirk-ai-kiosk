@@ -7,6 +7,7 @@ export const SUGGESTED_PROMPTS = [
   "I have a long commute. I need a fuel efficient vehicle.",
   "I want a sporty car with good tech features.",
   "What do you have for electric vehicles?",
+  "I drive under 20K miles per year. What are the benefits of leasing my next vehicle?",
 ];
 
 export const OBJECTION_CATEGORIES: ObjectionCategory[] = [
