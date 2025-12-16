@@ -39,7 +39,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           ref={inputRef}
           type="text"
           style={styles.input}
-          placeholder="Type your message..."
+          placeholder="Type your message or tap the microphone next to the blue arrow to talk to me..."
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyPress={handleKeyPress}
