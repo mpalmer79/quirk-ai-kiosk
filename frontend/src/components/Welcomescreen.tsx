@@ -263,8 +263,8 @@ const s: Record<string, CSSProperties> = {
   bgOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(15,25,20,0.85) 100%)', zIndex: 1 },
   
   // Two Column Layout for Phase 1
-  twoColumnLayout: { display: 'flex', gap: '40px', maxWidth: '1100px', width: '100%', alignItems: 'stretch', justifyContent: 'center', position: 'relative', zIndex: 2, transition: 'all 0.6s ease' },
-  columnCard: { flex: '1 1 500px', maxWidth: '520px', minHeight: '480px', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+  twoColumnLayout: { display: 'flex', gap: '40px', maxWidth: '1150px', width: '100%', alignItems: 'stretch', justifyContent: 'center', position: 'relative', zIndex: 2, transition: 'all 0.6s ease' },
+  columnCard: { flex: '1 1 520px', maxWidth: '540px', minHeight: '480px', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
   nameCaptureInner: { background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.2)', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' },
   
   titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '8px', flexWrap: 'wrap' },
