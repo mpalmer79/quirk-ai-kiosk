@@ -1,22 +1,77 @@
+# =============================================================================
+# QUIRK AI KIOSK - Backend Dependencies
+# =============================================================================
+
+# Core Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic[email]==2.5.2
 pydantic-settings==2.1.0
 python-multipart==0.0.6
+python-dotenv==1.0.0
+
+# HTTP Client
 httpx==0.25.2
+
+# Data Processing
 openpyxl==3.1.2
 pandas==2.1.3
-python-dotenv==1.0.0
+numpy==1.26.2
+
+# Validation
 email-validator==2.1.0
 
-# PostgreSQL
+# =============================================================================
+# DATABASE
+# =============================================================================
+
+# PostgreSQL async driver
 asyncpg==0.29.0
 sqlalchemy[asyncio]==2.0.23
 psycopg2-binary==2.9.9
 
-# Rate Limiting
+# Database migrations
+alembic==1.13.1
+
+# =============================================================================
+# AUTHENTICATION & SECURITY
+# =============================================================================
+
+# JWT tokens
+python-jose[cryptography]==3.3.0
+
+# Password hashing
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
+
+# =============================================================================
+# RATE LIMITING & CACHING
+# =============================================================================
+
 slowapi==0.1.9
 
-# Testing
+# =============================================================================
+# MONITORING & OBSERVABILITY (Optional)
+# =============================================================================
+
+# Error tracking
+sentry-sdk[fastapi]==1.39.1
+
+# Structured logging
+python-json-logger==2.0.7
+
+# =============================================================================
+# ML/SEARCH (Lightweight)
+# =============================================================================
+
+# For potential future TF-IDF improvements
+scikit-learn==1.3.2
+
+# =============================================================================
+# TESTING
+# =============================================================================
+
 pytest==7.4.3
 pytest-asyncio==0.23.2
+pytest-cov==4.1.0
+httpx==0.25.2
