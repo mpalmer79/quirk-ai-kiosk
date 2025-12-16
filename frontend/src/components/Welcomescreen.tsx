@@ -122,12 +122,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
         
         <div className="welcome-two-column" style={{ ...s.twoColumnLayout, opacity: isVisible ? 1 : 0, transform: isVisible ? 'translateY(0)' : 'translateY(20px)' }}>
           
-          {/* Left Column - Google Reviews */}
-          <div className="welcome-reviews-column" style={s.columnCard}>
-            <GoogleReviews rotationInterval={10000} />
-          </div>
-          
-          {/* Right Column - Name Capture */}
+          {/* Left Column - Name Capture */}
           <div className="welcome-capture-column" style={s.columnCard}>
             <div style={s.nameCaptureInner}>
               <div style={s.titleRow}>
@@ -156,6 +151,11 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
               </p>
             </div>
           </div>
+          
+          {/* Right Column - Google Reviews */}
+          <div className="welcome-reviews-column" style={s.columnCard}>
+            <GoogleReviews rotationInterval={10000} />
+          </div>
         </div>
         
         <style>{`
@@ -165,7 +165,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
           /* Mobile Portrait - Stack vertically with name capture on top */
           @media (max-width: 768px) and (orientation: portrait) {
             .welcome-two-column {
-              flex-direction: column-reverse !important;
+              flex-direction: column !important;
               gap: 24px !important;
               padding: 20px !important;
             }
@@ -195,7 +195,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
           /* Tablet Portrait */
           @media (min-width: 769px) and (max-width: 1024px) and (orientation: portrait) {
             .welcome-two-column {
-              flex-direction: column-reverse !important;
+              flex-direction: column !important;
               gap: 30px !important;
             }
             .welcome-two-column > div {
