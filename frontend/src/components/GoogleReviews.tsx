@@ -171,8 +171,8 @@ const GoogleReviews: React.FC<GoogleReviewsProps> = ({
 
   const currentReview = REVIEWS[currentIndex];
 
-  // Truncate review text to first ~150 characters at word boundary
-  const truncateText = (text: string, maxLength: number = 150): string => {
+  // Truncate review text to first ~200 characters at word boundary
+  const truncateText = (text: string, maxLength: number = 200): string => {
     if (text.length <= maxLength) return text;
     const truncated = text.substring(0, maxLength);
     return truncated.substring(0, truncated.lastIndexOf(' ')) + '...';
@@ -198,11 +198,11 @@ const GoogleReviews: React.FC<GoogleReviewsProps> = ({
   };
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className="google-reviews-card">
       {/* Header with overall rating */}
       <div style={styles.header}>
         <div style={styles.googleLogo}>
-          <svg width="24" height="24" viewBox="0 0 24 24">
+          <svg width="28" height="28" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -215,7 +215,7 @@ const GoogleReviews: React.FC<GoogleReviewsProps> = ({
           <span style={styles.ratingNumber}>4.3</span>
           <div style={styles.ratingDetails}>
             {renderStars(4)}
-            <span style={styles.reviewCount}>1,425 reviews</span>
+            <span style={styles.reviewCount}>1,426 reviews</span>
           </div>
         </div>
       </div>
@@ -258,6 +258,33 @@ const GoogleReviews: React.FC<GoogleReviewsProps> = ({
           />
         </div>
       </div>
+
+      <style>{`
+        /* Mobile Portrait */
+        @media (max-width: 768px) and (orientation: portrait) {
+          .google-reviews-card {
+            padding: 24px 20px !important;
+            min-height: 280px !important;
+            border-radius: 20px !important;
+          }
+        }
+        
+        /* Mobile Landscape */
+        @media (max-width: 900px) and (orientation: landscape) {
+          .google-reviews-card {
+            padding: 20px 24px !important;
+            min-height: 320px !important;
+          }
+        }
+        
+        /* Tablet */
+        @media (min-width: 769px) and (max-width: 1024px) {
+          .google-reviews-card {
+            padding: 28px 32px !important;
+            min-height: 360px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };
@@ -265,123 +292,131 @@ const GoogleReviews: React.FC<GoogleReviewsProps> = ({
 const styles: Record<string, CSSProperties> = {
   container: {
     background: '#ffffff',
-    borderRadius: '16px',
-    padding: '24px',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+    borderRadius: '24px',
+    padding: '32px 36px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
     border: '1px solid #e0e0e0',
-    maxWidth: '500px',
+    maxWidth: '520px',
     width: '100%',
+    minHeight: '380px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '20px',
-    paddingBottom: '16px',
+    marginBottom: '28px',
+    paddingBottom: '20px',
     borderBottom: '1px solid #f0f0f0',
   },
   googleLogo: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '10px',
   },
   googleText: {
-    fontSize: '14px',
+    fontSize: '18px',
     fontWeight: '600',
     color: '#5f6368',
   },
   overallRating: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '14px',
   },
   ratingNumber: {
-    fontSize: '32px',
+    fontSize: '42px',
     fontWeight: '700',
     color: '#1a1a1a',
   },
   ratingDetails: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: '4px',
   },
   stars: {
     display: 'flex',
-    gap: '2px',
+    gap: '3px',
   },
   star: {
-    fontSize: '18px',
+    fontSize: '22px',
   },
   reviewCount: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: '#5f6368',
   },
   reviewCard: {
     transition: 'all 0.5s ease',
-    minHeight: '120px',
+    minHeight: '160px',
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
   },
   reviewHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    marginBottom: '12px',
+    gap: '14px',
+    marginBottom: '16px',
   },
   avatar: {
-    width: '40px',
-    height: '40px',
+    width: '52px',
+    height: '52px',
     borderRadius: '50%',
     background: 'linear-gradient(135deg, #0077b6 0%, #005a8c 100%)',
     color: '#ffffff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '16px',
+    fontSize: '20px',
     fontWeight: '600',
   },
   reviewerInfo: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: '4px',
   },
   authorName: {
-    fontSize: '14px',
+    fontSize: '17px',
     fontWeight: '600',
     color: '#1a1a1a',
   },
   reviewDate: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: '#5f6368',
   },
   reviewText: {
-    fontSize: '15px',
-    lineHeight: '1.6',
+    fontSize: '17px',
+    lineHeight: '1.7',
     color: '#333',
     margin: 0,
     fontStyle: 'italic',
+    flex: 1,
   },
   progressContainer: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    marginTop: '20px',
+    gap: '14px',
+    marginTop: '24px',
   },
   progressText: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: '#5f6368',
-    minWidth: '60px',
+    minWidth: '65px',
   },
   progressBar: {
     flex: 1,
-    height: '4px',
+    height: '6px',
     background: '#E0E0E0',
-    borderRadius: '2px',
+    borderRadius: '3px',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     background: 'linear-gradient(90deg, #0077b6 0%, #00a8e8 100%)',
-    borderRadius: '2px',
+    borderRadius: '3px',
     transition: 'width 0.5s ease',
   },
 };
