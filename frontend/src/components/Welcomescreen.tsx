@@ -231,7 +231,7 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
             cardBoxShadow = isHovered 
               ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(168,85,247,0.4), 0 0 60px rgba(255,255,255,0.4)' 
               : '0 8px 32px rgba(0,0,0,0.3), 0 0 50px rgba(255,255,255,0.35), 0 0 25px rgba(168,85,247,0.25)';
-            cardBorder = '2px solid rgba(255,255,255,0.6)';
+            cardBorder = '1px solid rgba(0,0,0,0.6)';
             cardTransform = isHovered ? 'scale(1.05) translateY(-10px)' : 'scale(1.02)';
           } else {
             // Regular card styling
