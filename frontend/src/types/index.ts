@@ -65,6 +65,7 @@ export interface CabOptions {
 export interface BaseCategory {
   name: string;
   icon: string;
+  image?: string;  // Path to category image (e.g., '/images/categories/trucks.jpg')
   modelNames: string[];
   cabOptions?: CabOptions;
 }
@@ -73,11 +74,13 @@ export interface AvailableModel {
   name: string;
   count: number;
   cabOptions?: string[];
+  image?: string;  // Path to model image
 }
 
 export interface VehicleCategory {
   name: string;
   icon: string;
+  image?: string;  // Path to category image
   models: AvailableModel[];
 }
 
