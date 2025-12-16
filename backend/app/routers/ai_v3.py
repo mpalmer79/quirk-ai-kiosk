@@ -8,9 +8,10 @@ Key Features:
 - Claude tool use for real actions
 - Dynamic context building
 - Outcome tracking for learning
+- Rate limiting (30 requests/minute per session)
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import httpx
@@ -21,6 +22,10 @@ import asyncio
 import random
 from datetime import datetime
 from enum import Enum
+
+# Rate limiting
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 # Core services
 from app.services.conversation_state import (
@@ -61,6 +66,33 @@ MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
 MAX_RETRIES = 3
 BASE_DELAY = 1.0  # seconds
 MAX_DELAY = 10.0  # seconds
+
+# =============================================================================
+# RATE LIMITER SETUP
+# =============================================================================
+
+def get_session_identifier(request: Request) -> str:
+    """
+    Get session ID for rate limiting AI chat requests.
+    
+    Uses X-Session-ID header if available, falls back to IP.
+    This ensures rate limits are per-kiosk-session, not per-IP.
+    """
+    # Try to get session from header
+    session_id = request.headers.get("X-Session-ID", "")
+    if session_id:
+        return f"session:{session_id}"
+    
+    # Fall back to IP
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return f"ip:{forwarded.split(',')[0].strip()}"
+    
+    return f"ip:{request.client.host if request.client else 'unknown'}"
+
+
+# Create limiter instance for AI endpoints
+ai_limiter = Limiter(key_func=get_session_identifier)
 
 
 async def call_with_retry(
@@ -773,12 +805,16 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
 # =============================================================================
 
 @router.post("/chat", response_model=IntelligentChatResponse)
+@ai_limiter.limit("30/minute")
 async def intelligent_chat(
     request: IntelligentChatRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    req: Request  # Required for rate limiter
 ):
     """
     Intelligent chat endpoint with persistent memory and tool use.
+    
+    Rate limited to 30 requests per minute per session to prevent API abuse.
     
     Features:
     - Persistent conversation state
