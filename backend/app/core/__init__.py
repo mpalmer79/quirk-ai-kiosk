@@ -13,6 +13,16 @@ from .exceptions import (
 from .security import get_key_manager, APIKeyManager
 from .logging import setup_logging, get_logger
 from .cache import CacheService, get_cache
+from .settings import get_settings, Settings, validate_settings
+from .auth import (
+    require_admin,
+    require_auth,
+    require_api_key,
+    get_current_user,
+    create_access_token,
+    decode_token,
+)
+from .middleware import setup_middleware
 
 __all__ = [
     # Exceptions
@@ -31,4 +41,17 @@ __all__ = [
     # Cache
     "CacheService",
     "get_cache",
+    # Settings
+    "get_settings",
+    "Settings",
+    "validate_settings",
+    # Auth
+    "require_admin",
+    "require_auth",
+    "require_api_key",
+    "get_current_user",
+    "create_access_token",
+    "decode_token",
+    # Middleware
+    "setup_middleware",
 ]
