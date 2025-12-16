@@ -221,23 +221,34 @@ const WelcomeScreen: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
           const isAICard = path.id === 'aiAssistant';
           const isHovered = hoveredPath === path.id;
           
-          // Special styling for AI card - white glow effect
-          const aiCardStyle = isAICard ? {
-            boxShadow: isHovered 
-              ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(168,85,247,0.4), 0 0 60px rgba(255,255,255,0.3)' 
-              : '0 8px 32px rgba(0,0,0,0.3), 0 0 40px rgba(255,255,255,0.25), 0 0 20px rgba(168,85,247,0.2)',
-            border: '2px solid rgba(255,255,255,0.5)',
-            transform: isHovered ? 'scale(1.05) translateY(-10px)' : 'scale(1.02)',
-          } : {};
+          // Build card styles based on card type and hover state
+          let cardBoxShadow: string;
+          let cardBorder: string;
+          let cardTransform: string;
+          
+          if (isAICard) {
+            // Special styling for AI card - white glow effect
+            cardBoxShadow = isHovered 
+              ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(168,85,247,0.4), 0 0 60px rgba(255,255,255,0.4)' 
+              : '0 8px 32px rgba(0,0,0,0.3), 0 0 50px rgba(255,255,255,0.35), 0 0 25px rgba(168,85,247,0.25)';
+            cardBorder = '2px solid rgba(255,255,255,0.6)';
+            cardTransform = isHovered ? 'scale(1.05) translateY(-10px)' : 'scale(1.02)';
+          } else {
+            // Regular card styling
+            cardBoxShadow = isHovered 
+              ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(74,222,128,0.2)' 
+              : '0 8px 32px rgba(0,0,0,0.3)';
+            cardBorder = `1px solid ${isHovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)'}`;
+            cardTransform = isHovered ? 'scale(1.03) translateY(-8px)' : 'scale(1)';
+          }
           
           return (
             <div key={path.id} style={{ 
               ...s.pathCard, 
-              background: isHovered ? path.gradient : 'rgba(255,255,255,0.1)', 
-              transform: isHovered ? 'scale(1.03) translateY(-8px)' : 'scale(1)', 
-              borderColor: isHovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)', 
-              boxShadow: isHovered ? '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(74,222,128,0.2)' : '0 8px 32px rgba(0,0,0,0.3)',
-              ...aiCardStyle,
+              background: isHovered ? path.gradient : 'rgba(255,255,255,0.1)',
+              border: cardBorder,
+              boxShadow: cardBoxShadow,
+              transform: cardTransform,
             }}
               onMouseEnter={() => setHoveredPath(path.id)} onMouseLeave={() => setHoveredPath(null)} onClick={() => handlePathSelect(path.id)}>
               <div style={{ ...s.pathIcon, background: isHovered ? 'rgba(255,255,255,0.2)' : path.gradient, boxShadow: isHovered ? 'none' : '0 8px 24px rgba(0,0,0,0.3)' }}>
