@@ -1,10 +1,12 @@
 import type { BaseCategories } from '../types';
 
 // Base category definitions - models will be filtered by actual inventory
+// Images are stored in public/images/categories/
 export const BASE_CATEGORIES: BaseCategories = {
   trucks: {
     name: 'Trucks',
     icon: '🚛',
+    image: '/images/categories/trucks.png',
     modelNames: ['Silverado 1500', 'Silverado 2500HD', 'Silverado 3500HD', 'Colorado', 'Silverado MD'],
     cabOptions: {
       'Silverado 1500': ['Regular Cab', 'Double Cab', 'Crew Cab'],
@@ -16,21 +18,25 @@ export const BASE_CATEGORIES: BaseCategories = {
   suvs: {
     name: 'SUVs & Crossovers',
     icon: '🚙',
+    image: '/images/categories/suv_and_crossovers.png',
     modelNames: ['Trax', 'Trailblazer', 'Equinox', 'Blazer', 'Traverse', 'Tahoe', 'Suburban'],
   },
   sports: {
     name: 'Sports Cars',
     icon: '🏎️',
+    image: '/images/categories/sportscar.png',
     modelNames: ['Corvette', 'Camaro'],
   },
   sedans: {
     name: 'Sedans',
     icon: '🚗',
+    // No image provided - will use emoji fallback
     modelNames: ['Malibu'],
   },
   electric: {
     name: 'Electric',
     icon: '⚡',
+    image: '/images/categories/electric.png',
     modelNames: ['Bolt EV', 'Bolt EUV', 'Equinox EV', 'Blazer EV', 'Silverado EV'],
   },
 };
