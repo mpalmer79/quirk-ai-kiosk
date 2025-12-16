@@ -163,10 +163,10 @@ describe('AIAssistant Component', () => {
       });
     });
 
-    test('displays Spanish prompt', async () => {
+    test('displays continue conversation prompt', async () => {
       renderAIAssistant();
       await waitFor(() => {
-        expect(screen.getByText(/Bienvenido a Quirk Chevrolet/i)).toBeInTheDocument();
+        expect(screen.getByText(/Let's pick up where we left off/i)).toBeInTheDocument();
       });
     });
 
