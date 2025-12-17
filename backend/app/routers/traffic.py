@@ -5,11 +5,10 @@ Logs customer interactions for internal dashboard
 All timestamps stored and displayed in Eastern Time (America/New_York)
 Supports PostgreSQL (primary) with JSON file fallback.
 
-Admin endpoints (stats, log, active sessions) require authentication:
-- X-Admin-Key header with valid admin API key
-- Or Bearer token with admin role
+BETA MODE: Authentication disabled for easier testing.
+To re-enable auth, add `admin: dict = Depends(require_admin)` back to endpoints.
 """
-from fastapi import APIRouter, Query, Depends, HTTPException
+from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
@@ -19,9 +18,6 @@ import uuid
 import json
 import os
 import logging
-
-# Auth dependencies
-from app.core.auth import require_admin, optional_api_key
 
 router = APIRouter()
 logger = logging.getLogger("quirk_kiosk.traffic")
@@ -533,13 +529,12 @@ async def log_session(session_data: SessionCreate):
 
 @router.get("/active")
 async def get_active_sessions(
-    timeout_minutes: int = Query(ACTIVE_SESSION_TIMEOUT, ge=1, le=120),
-    admin: dict = Depends(require_admin)
+    timeout_minutes: int = Query(ACTIVE_SESSION_TIMEOUT, ge=1, le=120)
 ):
     """
     Get active kiosk sessions for Sales Manager Dashboard.
     
-    Requires admin authentication via X-Admin-Key header or Bearer token.
+    BETA: No authentication required.
     """
     # Try PostgreSQL first
     if database.is_database_configured() and database.async_session_factory and TrafficSession:
@@ -598,13 +593,12 @@ async def get_traffic_log(
     offset: int = Query(0, ge=0),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    filter_today: bool = Query(False),
-    admin: dict = Depends(require_admin)
+    filter_today: bool = Query(False)
 ):
     """
     Get traffic log entries for admin dashboard.
     
-    Requires admin authentication via X-Admin-Key header or Bearer token.
+    BETA: No authentication required.
     """
     # Try PostgreSQL first
     if database.is_database_configured() and database.async_session_factory and TrafficSession:
@@ -669,14 +663,11 @@ async def get_traffic_log(
 
 
 @router.get("/log/{session_id}")
-async def get_session_detail(
-    session_id: str,
-    admin: dict = Depends(require_admin)
-):
+async def get_session_detail(session_id: str):
     """
     Get details for a specific session including chat history.
     
-    Requires admin authentication via X-Admin-Key header or Bearer token.
+    BETA: No authentication required.
     """
     # Try PostgreSQL first
     if database.is_database_configured() and database.async_session_factory and TrafficSession:
@@ -700,29 +691,24 @@ async def get_session_detail(
 
 
 @router.get("/dashboard/{session_id}")
-async def get_session_for_dashboard(
-    session_id: str,
-    admin: dict = Depends(require_admin)
-):
+async def get_session_for_dashboard(session_id: str):
     """
     Get a single session formatted for the 4-square dashboard view.
     
-    Requires admin authentication via X-Admin-Key header or Bearer token.
+    BETA: No authentication required.
     """
-    session = await get_session_detail(session_id, admin)
+    session = await get_session_detail(session_id)
     if "error" in session:
         return session
     return format_session_for_dashboard(session)
 
 
 @router.get("/stats")
-async def get_traffic_stats(
-    admin: dict = Depends(require_admin)
-):
+async def get_traffic_stats():
     """
     Get traffic statistics for dashboard.
     
-    Requires admin authentication via X-Admin-Key header or Bearer token.
+    BETA: No authentication required.
     """
     # Try PostgreSQL first
     if database.is_database_configured() and database.async_session_factory and TrafficSession:
@@ -805,14 +791,11 @@ async def get_traffic_stats(
 
 
 @router.delete("/log/{session_id}")
-async def delete_session(
-    session_id: str,
-    admin: dict = Depends(require_admin)
-):
+async def delete_session(session_id: str):
     """
-    Delete a session (admin only).
+    Delete a session.
     
-    Requires admin authentication via X-Admin-Key header or Bearer token.
+    BETA: No authentication required.
     """
     # Try PostgreSQL first
     if database.is_database_configured() and database.async_session_factory and TrafficSession:
@@ -839,13 +822,11 @@ async def delete_session(
 
 
 @router.delete("/log")
-async def clear_traffic_log(
-    admin: dict = Depends(require_admin)
-):
+async def clear_traffic_log():
     """
-    Clear all traffic log entries (admin only).
+    Clear all traffic log entries.
     
-    Requires admin authentication via X-Admin-Key header or Bearer token.
+    BETA: No authentication required.
     """
     # Try PostgreSQL first
     if database.is_database_configured() and database.async_session_factory and TrafficSession:
