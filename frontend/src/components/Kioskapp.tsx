@@ -474,7 +474,7 @@ const KioskApp: React.FC = () => {
     <div style={{
       ...styles.container,
       ...(currentScreen === 'aiAssistant' ? {
-        backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.3)), url(/showroom3.jfif)',
+        backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.4)), url(/showroom3.jfif)',
         backgroundSize: 'cover',
         backgroundPosition: 'center top',
         backgroundRepeat: 'no-repeat',
