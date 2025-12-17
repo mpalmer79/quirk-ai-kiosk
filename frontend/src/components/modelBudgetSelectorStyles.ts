@@ -281,6 +281,10 @@ const styles: Record<string, CSSProperties> = {
     gap: '16px',
     width: '100%',
     padding: '28px',
+    background: 'rgba(15, 23, 42, 0.75)',
+    borderRadius: '20px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    backdropFilter: 'blur(12px)',
   },
 
   // ---------------------------------------------------------------------------
@@ -314,23 +318,28 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: '0 8px 24px rgba(59, 130, 246, 0.4)',
   },
   modelName: { 
+    display: 'block',
     fontSize: '15px', 
     fontWeight: '700', 
     color: '#ffffff', 
     textAlign: 'center',
     letterSpacing: '-0.3px',
-    marginBottom: '4px',
+    marginBottom: '6px',
   },
   modelCount: { 
+    display: 'block',
     fontSize: '13px', 
     color: '#4ade80', 
     fontWeight: '600',
+    textAlign: 'center',
     textShadow: '0 0 10px rgba(74, 222, 128, 0.5)',
   },
   modelConfig: { 
+    display: 'block',
     fontSize: '12px', 
     color: 'rgba(148, 163, 184, 0.8)',
-    marginTop: '2px',
+    textAlign: 'center',
+    marginTop: '4px',
   },
 
   // ---------------------------------------------------------------------------
