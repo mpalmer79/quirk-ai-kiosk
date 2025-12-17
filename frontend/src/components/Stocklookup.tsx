@@ -282,7 +282,7 @@ const StockLookup: React.FC<KioskComponentProps> = ({ navigateTo, updateCustomer
                     <circle cx="11" cy="11" r="8"/>
                     <path d="M21 21l-4.35-4.35"/>
                   </svg>
-                  Search for M{stockNumber || '...'}
+                  Search
                 </>
               )}
             </button>
@@ -369,9 +369,9 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     padding: '20px 24px',
-    background: 'rgba(255,255,255,0.12)',
+    background: 'rgba(50, 50, 50, 0.7)',
     borderRadius: '16px',
-    border: '2px solid rgba(255,255,255,0.1)',
+    border: '2px solid rgba(255,255,255,0.2)',
     fontSize: '32px',
     fontWeight: '700',
     fontFamily: 'monospace',
@@ -446,6 +446,10 @@ const styles: Record<string, CSSProperties> = {
     gap: '12px',
     width: '100%',
     maxWidth: '360px',
+    padding: '20px',
+    background: 'rgba(50, 50, 50, 0.7)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.2)',
   },
   keypadRow: {
     display: 'flex',
@@ -456,8 +460,8 @@ const styles: Record<string, CSSProperties> = {
     width: '100px',
     height: '70px',
     borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.1)',
-    background: 'rgba(255,255,255,0.12)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    background: 'rgba(255,255,255,0.15)',
     color: '#ffffff',
     fontSize: '28px',
     fontWeight: '600',
@@ -485,8 +489,8 @@ const styles: Record<string, CSSProperties> = {
     width: '100%',
     maxWidth: '360px',
     padding: '20px 32px',
-    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-    border: 'none',
+    background: 'rgba(50, 50, 50, 0.7)',
+    border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '12px',
     color: '#ffffff',
     fontSize: '18px',
