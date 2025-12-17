@@ -10,25 +10,22 @@ const styles: Record<string, CSSProperties> = {
   // MAIN CONTAINER - Dark gradient background
   // ---------------------------------------------------------------------------
   container: {
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  padding: '20px',
-  paddingTop: '80px',
-  paddingBottom: '40px',
-  overflow: 'auto',
-  overflowX: 'hidden',
-  WebkitOverflowScrolling: 'touch',
-  minHeight: 0,
-  boxSizing: 'border-box',
-  backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.85)), url(/showroom3.jfif)',
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  backgroundAttachment: 'fixed',
-},
-  
-backgroundPosition: 'center',
-backgroundAttachment: 'fixed',
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '20px',
+    paddingTop: '80px',
+    paddingBottom: '40px',
+    overflow: 'auto',
+    overflowX: 'hidden',
+    WebkitOverflowScrolling: 'touch',
+    minHeight: 0,
+    boxSizing: 'border-box',
+    backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.85)), url(/showroom3.jfif)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed',
+  },
 
   // ---------------------------------------------------------------------------
   // LOADING STATE
