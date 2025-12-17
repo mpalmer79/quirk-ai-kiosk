@@ -756,7 +756,13 @@ async def get_models_by_make(make: str, year: Optional[str] = None):
 async def get_inventory_stats():
     """Get inventory statistics"""
     if not INVENTORY:
-        return {"total": 0}
+        return {
+            "total": 0,
+            "byBodyStyle": {},
+            "byStatus": {},
+            "byCabStyle": {},
+            "priceRange": {"min": 0, "max": 0, "avg": 0}
+        }
     
     by_body = {}
     by_status = {}
