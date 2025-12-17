@@ -22,7 +22,7 @@ const styles: Record<string, CSSProperties> = {
     minHeight: 0,
     boxSizing: 'border-box',
     // Deep dark gradient with subtle blue undertones
-    background: 'linear-gradient(rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.85)), url(/showroom2.png)',
+    background: 'linear-gradient(rgba(15, 23, 42, 0.65), rgba(15, 23, 42, 0.75)), url(/showroom2.png)',
 backgroundSize: 'cover',
 backgroundPosition: 'center',
 backgroundAttachment: 'fixed',
