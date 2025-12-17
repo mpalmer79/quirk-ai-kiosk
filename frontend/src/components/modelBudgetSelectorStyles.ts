@@ -21,8 +21,10 @@ const styles: Record<string, CSSProperties> = {
   WebkitOverflowScrolling: 'touch',
   minHeight: 0,
   boxSizing: 'border-box',
-  // Deep dark gradient with subtle blue undertones
-  background: 'linear-gradient(165deg, #0f172a 0%, #1e1b4b 35%, #0f172a 70%, #020617 100%)',
+  backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.85)), url(/showroom3.jfif)',
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  backgroundAttachment: 'fixed',
 },
   
 backgroundPosition: 'center',
