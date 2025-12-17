@@ -44,6 +44,18 @@ const COMMON_MAKES = [
   'Volkswagen', 'Volvo', 'Other'
 ];
 
+// Model name to image mapping
+const MODEL_IMAGES: Record<string, string> = {
+  // SUVs & Crossovers
+  'Trax': '/images/models/trax.webp',
+  'Equinox': '/images/models/equinox.avif',
+  'Equinox EV': '/images/models/equinox.avif',
+  'Traverse': '/images/models/traverse.avif',
+  'Tahoe': '/images/models/tahoe.png',
+  'Suburban': '/images/models/suburban.avif',
+  // Add more models as needed (Trucks, Sports Cars, Electric, etc.)
+};
+
 const ModelBudgetSelector: React.FC<KioskComponentProps> = ({ 
   navigateTo, 
   updateCustomerData, 
@@ -368,7 +380,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     </div>
   );
 
-  // Step 2: Model Selection
+  // Step 2: Model Selection - Now with image-based cards like categories
   const renderModelSelection = (): JSX.Element | null => {
     const category = selectedCategory ? VEHICLE_CATEGORIES[selectedCategory] : null;
     if (!category) {
@@ -389,14 +401,57 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
           <p style={styles.stepSubtitle}>Select a model to see available options</p>
         </div>
         <div style={styles.modelGrid}>
-          {category.models.map((model) => (
-            <button key={model.name} style={styles.modelCard} onClick={() => handleModelSelect(model)}>
-              <div style={styles.modelInitial}>{model.name.charAt(0)}</div>
-              <span style={styles.modelName}>{model.name}</span>
-              <span style={styles.modelCount}>{model.count} in stock</span>
-              {model.cabOptions && <span style={styles.modelConfig}>{model.cabOptions.length} configurations</span>}
-            </button>
-          ))}
+          {category.models.map((model) => {
+            const modelImage = MODEL_IMAGES[model.name];
+            return (
+              <button key={model.name} style={styles.modelCard} onClick={() => handleModelSelect(model)}>
+                {/* Image container with fallback to initial */}
+                {modelImage ? (
+                  <div style={styles.categoryImageContainer as React.CSSProperties}>
+                    <img 
+                      src={modelImage} 
+                      alt={model.name}
+                      style={styles.categoryImage as React.CSSProperties}
+                      onError={(e) => {
+                        // Hide broken image, show fallback
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        const parent = (e.target as HTMLImageElement).parentElement;
+                        if (parent) {
+                          const fallback = parent.querySelector('[data-fallback]') as HTMLElement;
+                          if (fallback) fallback.style.display = 'flex';
+                        }
+                      }}
+                    />
+                    <div 
+                      data-fallback
+                      style={{ 
+                        ...styles.categoryImagePlaceholder as React.CSSProperties, 
+                        display: 'none',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                      }}
+                    >
+                      <div style={styles.modelInitial}>{model.name.charAt(0)}</div>
+                    </div>
+                    <div style={styles.categoryImageOverlay as React.CSSProperties} />
+                  </div>
+                ) : (
+                  <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
+                    <div style={styles.modelInitial}>{model.name.charAt(0)}</div>
+                  </div>
+                )}
+                {/* Text content below image */}
+                <div style={styles.categoryContent as React.CSSProperties}>
+                  <span style={styles.modelName}>{model.name}</span>
+                  <span style={styles.modelCount}>{model.count} in stock</span>
+                  {model.cabOptions && <span style={styles.modelConfig}>{model.cabOptions.length} configurations</span>}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     );
