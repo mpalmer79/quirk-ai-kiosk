@@ -163,11 +163,6 @@ const styles: Record<string, CSSProperties> = {
     width: '100%',
     padding: '28px',
     paddingBottom: '40px',
-    background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%)',
-    borderRadius: '20px',
-    border: '1px solid rgba(255,255,255,0.08)',
-    boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
-    backdropFilter: 'blur(10px)',
   },
 
   // ---------------------------------------------------------------------------
@@ -208,7 +203,7 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '16px',
     cursor: 'pointer',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+    boxShadow: '0 0 20px rgba(255, 255, 255, 0.15), 0 4px 20px rgba(0,0,0,0.3)',
     overflow: 'hidden',
     position: 'relative',
   },
