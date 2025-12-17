@@ -21,7 +21,7 @@ const styles: Record<string, CSSProperties> = {
     WebkitOverflowScrolling: 'touch',
     minHeight: 0,
     boxSizing: 'border-box',
-    backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.5)), url(/showroom3.jfif)',
+    backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.5)), url(/showroom5.jfif)',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundAttachment: 'fixed',
@@ -281,11 +281,6 @@ const styles: Record<string, CSSProperties> = {
     gap: '16px',
     width: '100%',
     padding: '28px',
-    background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%)',
-    borderRadius: '20px',
-    border: '1px solid rgba(255,255,255,0.08)',
-    boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
-    backdropFilter: 'blur(10px)',
   },
 
   // ---------------------------------------------------------------------------
@@ -295,15 +290,15 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '12px',
-    padding: '24px 18px',
+    padding: '0',
     background: 'linear-gradient(145deg, rgba(51, 65, 85, 0.7) 0%, rgba(30, 41, 59, 0.9) 100%)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '20px',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: '16px',
     cursor: 'pointer',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
-    backdropFilter: 'blur(10px)',
+    boxShadow: '0 0 20px rgba(255, 255, 255, 0.15), 0 4px 20px rgba(0,0,0,0.3)',
+    overflow: 'hidden',
+    position: 'relative',
   },
   modelInitial: {
     width: '56px',
@@ -319,11 +314,12 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: '0 8px 24px rgba(59, 130, 246, 0.4)',
   },
   modelName: { 
-    fontSize: '16px', 
+    fontSize: '15px', 
     fontWeight: '700', 
     color: '#ffffff', 
     textAlign: 'center',
     letterSpacing: '-0.3px',
+    marginBottom: '4px',
   },
   modelCount: { 
     fontSize: '13px', 
@@ -334,6 +330,7 @@ const styles: Record<string, CSSProperties> = {
   modelConfig: { 
     fontSize: '12px', 
     color: 'rgba(148, 163, 184, 0.8)',
+    marginTop: '2px',
   },
 
   // ---------------------------------------------------------------------------
