@@ -323,6 +323,10 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     padding: '40px',
     overflow: 'auto',
+    backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.5)), url(/showroom3.jfif)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center top',
+    backgroundAttachment: 'fixed',
   },
   content: {
     width: '100%',
