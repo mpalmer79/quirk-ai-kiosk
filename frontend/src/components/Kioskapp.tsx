@@ -487,6 +487,10 @@ const KioskApp: React.FC = () => {
           background: '#ffffff',
           borderBottom: '1px solid rgba(0,0,0,0.1)',
         } : {}),
+        ...(currentScreen === 'modelBudget' ? {
+          background: 'transparent',
+          borderBottom: 'none',
+        } : {}),
         ...(currentScreen === 'aiAssistant' ? {
           background: 'rgba(0,0,0,0.5)',
           backdropFilter: 'blur(10px)',
