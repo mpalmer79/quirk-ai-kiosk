@@ -21,7 +21,7 @@ const styles: Record<string, CSSProperties> = {
     WebkitOverflowScrolling: 'touch',
     minHeight: 0,
     boxSizing: 'border-box',
-    backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.85)), url(/showroom3.jfif)',
+    backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.5)), url(/showroom3.jfif)',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundAttachment: 'fixed',
