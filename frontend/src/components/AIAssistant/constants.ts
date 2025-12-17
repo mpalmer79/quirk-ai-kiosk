@@ -2,11 +2,11 @@ import type { ObjectionCategory } from './types';
 
 export const SUGGESTED_PROMPTS = [
   "Let's pick up where we left off.",
-  "What's the best family SUV under $50K?",
+  "I want to sell my vehicle.",
   "I'm in for service today and am curious about what's new with Chevrolet.",
   "I have a long commute. I need a fuel efficient vehicle.",
+  "What's the best family SUV under $50K?",
   "I want a sporty car with good tech features.",
-  "What do you have for electric vehicles?",
   "I drive under 20K miles per year. What are the benefits of leasing my next vehicle?",
   "Bienvenido a Quirk Chevrolet. ¿Qué puedo ayudarle a lograr hoy?",
   "Bienvenue chez Quirk Chevrolet. Que puis-je vous aider à accomplir aujourd'hui ?",
