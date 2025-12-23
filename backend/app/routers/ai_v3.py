@@ -179,7 +179,7 @@ TOOLS = [
                 },
                 "max_price": {
                     "type": "number",
-                    "description": "Maximum price filter"
+                    "description": "REQUIRED when customer mentions budget. Maximum vehicle price filter. Extract from phrases like 'under $50K' (50000), 'below $40,000' (40000), 'budget is $35K' (35000). ALWAYS pass this when a price limit is mentioned - do NOT rely on semantic search for budget filtering."
                 },
                 "min_seating": {
                     "type": "integer",
@@ -355,24 +355,29 @@ YOUR CAPABILITIES (Use these tools!):
 - lookup_conversation: Retrieve a customer's previous conversation by phone
 - save_customer_phone: Save customer's phone to their conversation
 
-💰 BUDGET QUALIFICATION (MANDATORY - DO THIS FIRST!):
-⚠️ STOP! When a customer mentions BOTH a down payment AND monthly payment:
-1. You MUST use calculate_budget tool FIRST - before ANY other tool
-2. You MUST wait for the result before calling search_inventory
-3. You MUST use the calculated max_price when searching - NO EXCEPTIONS
-4. You MUST NOT show vehicles above their budget - this wastes their time
+💰 BUDGET QUALIFICATION (MANDATORY!):
 
-Example: Customer says "$10,000 down, $600/month" or "10 grand down, 600 a month"
-- FIRST: Call calculate_budget(down_payment=10000, monthly_payment=600)
-- Result shows: max vehicle price ~$49,750
-- THEN: Call search_inventory with max_price=49750
-- Show ONLY vehicles under $50k
+SCENARIO A - Customer gives DOWN PAYMENT + MONTHLY PAYMENT:
+⚠️ STOP! You MUST use calculate_budget tool FIRST:
+1. Call calculate_budget(down_payment=X, monthly_payment=Y)
+2. Wait for result showing max vehicle price
+3. Call search_inventory with that max_price
+4. Show ONLY vehicles under budget
 
-WRONG: Showing $80k trucks to someone who can afford $50k
-WRONG: Notifying sales before qualifying the customer's budget
-WRONG: Searching inventory without using calculate_budget first
+Example: "$10,000 down, $600/month"
+- FIRST: calculate_budget(down_payment=10000, monthly_payment=600) → ~$49,750 max
+- THEN: search_inventory(query="...", max_price=49750)
 
-RIGHT: "With $10,000 down and $600/month at 7% APR for 84 months, you can look at vehicles up to about $49,750. Let me find Silverado 1500s in that range..."
+SCENARIO B - Customer states DIRECT BUDGET ("under $50K", "below $40,000"):
+⚠️ ALWAYS extract and pass max_price to search_inventory:
+- "under $50K" → search_inventory(query="...", max_price=50000)
+- "below $40,000" → search_inventory(query="...", max_price=40000)
+- "budget is $35K" → search_inventory(query="...", max_price=35000)
+
+CRITICAL: Do NOT rely on semantic search to filter by budget. The max_price parameter MUST be passed explicitly.
+
+WRONG: search_inventory(query="family SUV under 50K") ← Budget in query only, NO max_price
+RIGHT: search_inventory(query="family SUV", max_price=50000) ← Budget as parameter
 
 ALWAYS DISCLOSE: "Taxes and fees are separate. NH doesn't tax vehicle payments, but other states may add tax on top of the monthly payment."
 
