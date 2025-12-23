@@ -635,7 +635,7 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
         scored_vehicles = retriever.retrieve(
             query=query,
             conversation_state=state,
-            limit=6
+            limit=12  # Get more initially, filter by budget after
         )
         
         if tool_input.get("body_style"):
@@ -644,18 +644,49 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
                 if (sv.vehicle.get('bodyStyle') or '').lower() == tool_input['body_style'].lower()
             ]
         
-        # Apply max_price filter from tool input OR from calculated budget
+        # Apply max_price filter from tool input OR from calculated budget OR from query
         max_price = tool_input.get("max_price")
         if not max_price and state.budget_max:
             # Use budget from calculate_budget tool if no explicit max_price given
             max_price = state.budget_max
             logger.info(f"Using calculated budget max: ${max_price:,.0f}")
         
+        # FALLBACK: Extract budget from query if not explicitly provided
+        # Handles "under $50K", "under $50,000", "below 50000", etc.
+        if not max_price:
+            budget_patterns = [
+                r'under\s*\$?([\d,]+)\s*k\b',  # under $50K, under 50k
+                r'under\s*\$?([\d,]+)\b',       # under $50,000, under 50000
+                r'below\s*\$?([\d,]+)\s*k\b',   # below $50K
+                r'below\s*\$?([\d,]+)\b',       # below $50,000
+                r'less\s*than\s*\$?([\d,]+)\s*k\b',  # less than $50K
+                r'less\s*than\s*\$?([\d,]+)\b',  # less than $50,000
+                r'max\s*\$?([\d,]+)\s*k\b',      # max $50K
+                r'max\s*\$?([\d,]+)\b',          # max $50,000
+                r'\$?([\d,]+)\s*k?\s*budget',    # $50K budget, 50000 budget
+            ]
+            for pattern in budget_patterns:
+                match = re.search(pattern, query.lower())
+                if match:
+                    amount_str = match.group(1).replace(',', '')
+                    amount = float(amount_str)
+                    # Check if it's in thousands (K notation)
+                    if 'k' in pattern or amount < 1000:
+                        amount *= 1000
+                    max_price = int(amount)
+                    logger.info(f"Extracted budget from query: ${max_price:,.0f}")
+                    break
+        
         if max_price:
+            original_count = len(scored_vehicles)
             scored_vehicles = [
                 sv for sv in scored_vehicles
                 if (sv.vehicle.get('MSRP') or sv.vehicle.get('price', 0)) <= max_price
             ]
+            logger.info(f"Budget filter ${max_price:,}: {original_count} -> {len(scored_vehicles)} vehicles")
+        
+        # Limit to top 6 after filtering
+        scored_vehicles = scored_vehicles[:6]
         
         # CRITICAL: Filter out vehicles matching trade-in model
         # Customer is trading IN this model, not looking to BUY it
@@ -857,6 +888,32 @@ async def intelligent_chat(
         chat_request.session_id,
         chat_request.customer_name
     )
+    
+    # Extract budget from user message if mentioned (e.g., "under $50K")
+    # This ensures budget filtering even if AI doesn't pass max_price to tools
+    user_msg_lower = chat_request.message.lower()
+    budget_patterns = [
+        r'under\s*\$?([\d,]+)\s*k\b',  # under $50K, under 50k
+        r'under\s*\$?([\d,]+)\b',       # under $50,000, under 50000
+        r'below\s*\$?([\d,]+)\s*k\b',   # below $50K
+        r'below\s*\$?([\d,]+)\b',       # below $50,000
+        r'less\s*than\s*\$?([\d,]+)\s*k\b',  # less than $50K
+        r'less\s*than\s*\$?([\d,]+)\b',  # less than $50,000
+        r'budget\s*(?:is|of)?\s*\$?([\d,]+)\s*k\b',  # budget is $50K
+        r'budget\s*(?:is|of)?\s*\$?([\d,]+)\b',  # budget is $50,000
+        r'\$?([\d,]+)\s*k?\s*(?:or\s*less|max|maximum)',  # $50K or less, $50K max
+    ]
+    for pattern in budget_patterns:
+        match = re.search(pattern, user_msg_lower)
+        if match:
+            amount_str = match.group(1).replace(',', '')
+            amount = float(amount_str)
+            # Check if it's in thousands (K notation or small number)
+            if 'k' in pattern or amount < 1000:
+                amount *= 1000
+            state.budget_max = int(amount)
+            logger.info(f"Extracted budget from user message: ${state.budget_max:,.0f}")
+            break
     
     # Build dynamic system prompt
     conversation_context = build_dynamic_context(state)
