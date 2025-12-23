@@ -1,6 +1,6 @@
 """
-Tests for Enhanced AI Router
-Covers structured output parsing, retry logic, and fallback behavior
+Tests for Intelligent AI Router (V3)
+Covers tool execution, fallback behavior, and system prompt configuration
 """
 
 import pytest
@@ -10,137 +10,22 @@ import sys
 
 sys.path.insert(0, '/home/runner/work/quirk-ai-kiosk/quirk-ai-kiosk/backend')
 
-from app.routers.ai_v2 import (
-    parse_structured_response,
-    extract_stock_numbers,
+from app.routers.ai_v3 import (
     generate_fallback_response,
-    AIStructuredResponse,
-    VehicleSuggestion,
-    RetryConfig,
+    SYSTEM_PROMPT_TEMPLATE,
+    TOOLS,
+    MODEL_NAME,
+    build_dynamic_context,
+    format_vehicles_for_tool_result,
 )
+from app.services.conversation_state import ConversationState, ConversationStage, InterestLevel
+from app.services.vehicle_retriever import ScoredVehicle
 
 
-# Structured Response Parsing Tests
-class TestStructuredResponseParsing:
-    
-    def test_parse_valid_json_response(self):
-        """Parse a well-formatted JSON response"""
-        raw = '''{
-    "message": "I found some great trucks for you!",
-    "suggestedVehicles": [
-        {"stockNumber": "M12345", "confidence": 0.9, "reason": "Perfect match for towing"}
-    ],
-    "intent": "browse",
-    "nextAction": "View inventory",
-    "shouldNotifyStaff": false,
-    "staffNotificationType": null
-}'''
-        
-        result = parse_structured_response(raw)
-        
-        assert result is not None
-        assert result.message == "I found some great trucks for you!"
-        assert len(result.suggestedVehicles) == 1
-        assert result.suggestedVehicles[0].stockNumber == "M12345"
-        assert result.suggestedVehicles[0].confidence == 0.9
-        assert result.intent == "browse"
-        assert result.shouldNotifyStaff == False
-    
-    def test_parse_multiple_suggestions(self):
-        """Parse response with multiple vehicle suggestions"""
-        raw = '''{
-    "message": "I have several options",
-    "suggestedVehicles": [
-        {"stockNumber": "M12345", "confidence": 0.95, "reason": "Best match"},
-        {"stockNumber": "M12346", "confidence": 0.85, "reason": "Great alternative"},
-        {"stockNumber": "M12347", "confidence": 0.75, "reason": "Budget option"}
-    ],
-    "intent": "compare"
-}'''
-        
-        result = parse_structured_response(raw)
-        
-        assert len(result.suggestedVehicles) == 3
-        assert result.suggestedVehicles[0].confidence > result.suggestedVehicles[1].confidence
-        assert result.intent == "compare"
-    
-    def test_parse_staff_notification_trigger(self):
-        """Parse response that should notify staff"""
-        raw = '''{
-    "message": "I will have someone come help with your trade-in",
-    "suggestedVehicles": [],
-    "intent": "trade-in",
-    "shouldNotifyStaff": true,
-    "staffNotificationType": "appraisal"
-}'''
-        
-        result = parse_structured_response(raw)
-        
-        assert result.shouldNotifyStaff == True
-        assert result.staffNotificationType == "appraisal"
-        assert result.intent == "trade-in"
-    
-    def test_parse_invalid_json_returns_none(self):
-        """Invalid JSON should return None"""
-        raw = "This is just plain text with no JSON"
-        
-        result = parse_structured_response(raw)
-        
-        assert result is None
-    
-    def test_parse_missing_optional_fields(self):
-        """Missing optional fields should use defaults"""
-        raw = '{"message": "Hello"}'
-        
-        result = parse_structured_response(raw)
-        
-        assert result is not None
-        assert result.message == "Hello"
-        assert result.suggestedVehicles == []
-        assert result.intent is None
-        assert result.shouldNotifyStaff == False
-
-
-# Stock Number Extraction Tests
-class TestStockNumberExtraction:
-    
-    def test_extract_single_stock_number(self):
-        """Extract a single stock number"""
-        text = "Check out the Silverado with stock number M12345"
-        
-        result = extract_stock_numbers(text)
-        
-        assert "M12345" in result
-    
-    def test_extract_multiple_stock_numbers(self):
-        """Extract multiple stock numbers"""
-        text = "Compare M12345 with M67890 and M11111"
-        
-        result = extract_stock_numbers(text)
-        
-        assert len(result) == 3
-        assert "M12345" in result
-        assert "M67890" in result
-        assert "M11111" in result
-    
-    def test_extract_deduplicated(self):
-        """Duplicate stock numbers should be removed"""
-        text = "M12345 is great. Did I mention M12345?"
-        
-        result = extract_stock_numbers(text)
-        
-        assert len(result) == 1
-    
-    def test_extract_no_matches(self):
-        """No stock numbers should return empty list"""
-        text = "We have many great vehicles available!"
-        
-        result = extract_stock_numbers(text)
-        
-        assert result == []
-
-
+# =============================================================================
 # Fallback Response Tests
+# =============================================================================
+
 class TestFallbackResponses:
     
     def test_fallback_truck_keywords(self):
@@ -161,6 +46,18 @@ class TestFallbackResponses:
         
         assert "EV" in response or "electric" in response.lower()
     
+    def test_fallback_sports_car_keywords(self):
+        """Sports car queries should get performance response"""
+        response = generate_fallback_response("I want something fast and fun")
+        
+        assert "Corvette" in response or "Camaro" in response or "performance" in response.lower()
+    
+    def test_fallback_budget_keywords(self):
+        """Budget queries should get price response"""
+        response = generate_fallback_response("What's your cheapest vehicle?")
+        
+        assert "Trax" in response or "price" in response.lower() or "$" in response
+    
     def test_fallback_with_customer_name(self):
         """Response should include customer name if provided"""
         response = generate_fallback_response("Hi", customer_name="John")
@@ -172,146 +69,209 @@ class TestFallbackResponses:
         response = generate_fallback_response("Hi", customer_name=None)
         
         assert len(response) > 0
-
-
-# Retry Configuration Tests
-class TestRetryConfig:
     
-    def test_default_retry_config(self):
-        """Default retry configuration"""
-        config = RetryConfig()
+    def test_fallback_spanish_detection(self):
+        """Spanish queries should get Spanish response"""
+        response = generate_fallback_response("Busco una camioneta")
         
-        assert config.max_retries == 3
-        assert config.base_delay > 0
-        assert config.max_delay >= config.base_delay
+        # Should contain Spanish words
+        assert any(word in response.lower() for word in ["busca", "camioneta", "vehículo", "silverado", "hola"])
     
-    def test_custom_retry_config(self):
-        """Custom retry configuration"""
-        config = RetryConfig(max_retries=5, base_delay=2.0, max_delay=20.0)
+    def test_fallback_spanish_with_name(self):
+        """Spanish response should include customer name"""
+        response = generate_fallback_response("Hola, busco un carro", customer_name="María")
         
-        assert config.max_retries == 5
-        assert config.base_delay == 2.0
-        assert config.max_delay == 20.0
+        assert "María" in response
 
 
-# VehicleSuggestion Model Tests
-class TestVehicleSuggestionModel:
+# =============================================================================
+# System Prompt Tests
+# =============================================================================
+
+class TestSystemPrompt:
+    """Tests to verify system prompt contains required sections"""
     
-    def test_valid_suggestion(self):
-        """Valid suggestion should be created"""
-        suggestion = VehicleSuggestion(
-            stockNumber="M12345",
-            confidence=0.85,
-            reason="Great match"
-        )
-        
-        assert suggestion.stockNumber == "M12345"
-        assert suggestion.confidence == 0.85
-        assert suggestion.reason == "Great match"
+    def test_system_prompt_contains_showroom_context(self):
+        """System prompt should emphasize customer is already in showroom"""
+        assert "SHOWROOM" in SYSTEM_PROMPT_TEMPLATE.upper()
+        assert "already here" in SYSTEM_PROMPT_TEMPLATE.lower() or "right now" in SYSTEM_PROMPT_TEMPLATE.lower()
+    
+    def test_system_prompt_contains_language_detection(self):
+        """System prompt should contain Spanish language detection"""
+        assert "Spanish" in SYSTEM_PROMPT_TEMPLATE or "español" in SYSTEM_PROMPT_TEMPLATE.lower()
+    
+    def test_system_prompt_contains_budget_qualification(self):
+        """System prompt should contain budget qualification section"""
+        assert "BUDGET" in SYSTEM_PROMPT_TEMPLATE.upper()
+        assert "calculate_budget" in SYSTEM_PROMPT_TEMPLATE
+    
+    def test_system_prompt_contains_trade_in_policy(self):
+        """System prompt should contain trade-in policy"""
+        assert "TRADE-IN" in SYSTEM_PROMPT_TEMPLATE.upper()
+        assert "appraisal" in SYSTEM_PROMPT_TEMPLATE.lower()
+    
+    def test_system_prompt_contains_spouse_handling(self):
+        """System prompt should contain spouse objection handling"""
+        assert "SPOUSE" in SYSTEM_PROMPT_TEMPLATE.upper() or "spouse" in SYSTEM_PROMPT_TEMPLATE.lower()
+        assert "wife" in SYSTEM_PROMPT_TEMPLATE.lower() or "husband" in SYSTEM_PROMPT_TEMPLATE.lower()
+    
+    def test_system_prompt_contains_acknowledge_validate(self):
+        """System prompt should contain acknowledgment step"""
+        assert "Acknowledge" in SYSTEM_PROMPT_TEMPLATE
+        assert "Validate" in SYSTEM_PROMPT_TEMPLATE
+    
+    def test_system_prompt_contains_call_spouse_option(self):
+        """System prompt should propose calling the spouse"""
+        assert "call" in SYSTEM_PROMPT_TEMPLATE.lower()
+        assert "speaker" in SYSTEM_PROMPT_TEMPLATE.lower()
+    
+    def test_system_prompt_contains_test_drive_option(self):
+        """System prompt should propose test drive take-home"""
+        assert "test drive" in SYSTEM_PROMPT_TEMPLATE.lower() or "take it home" in SYSTEM_PROMPT_TEMPLATE.lower()
+    
+    def test_system_prompt_contains_followup_requirement(self):
+        """System prompt should require specific follow-up time"""
+        assert "follow-up" in SYSTEM_PROMPT_TEMPLATE.lower() or "followup" in SYSTEM_PROMPT_TEMPLATE.lower()
+    
+    def test_system_prompt_never_say_come_in(self):
+        """System prompt should explicitly say never to say 'come in'"""
+        assert "never say" in SYSTEM_PROMPT_TEMPLATE.lower()
+        assert "come in" in SYSTEM_PROMPT_TEMPLATE.lower()
 
 
-# AIStructuredResponse Model Tests
-class TestAIStructuredResponseModel:
+# =============================================================================
+# Tool Configuration Tests
+# =============================================================================
+
+class TestToolConfiguration:
+    """Tests for Claude tool definitions"""
     
-    def test_full_response(self):
-        """Full response with all fields"""
-        response = AIStructuredResponse(
-            message="Here are your options",
-            suggestedVehicles=[
-                VehicleSuggestion(stockNumber="M123", confidence=0.9, reason="Best match")
-            ],
-            intent="browse",
-            nextAction="View inventory",
-            shouldNotifyStaff=True,
-            staffNotificationType="sales"
-        )
-        
-        assert response.message == "Here are your options"
-        assert len(response.suggestedVehicles) == 1
-        assert response.intent == "browse"
-        assert response.shouldNotifyStaff == True
+    def test_tools_list_not_empty(self):
+        """Tools list should contain tools"""
+        assert len(TOOLS) > 0
     
-    def test_minimal_response(self):
-        """Response with only required fields"""
-        response = AIStructuredResponse(message="Hello!")
+    def test_calculate_budget_tool_exists(self):
+        """calculate_budget tool should exist"""
+        tool_names = [t["name"] for t in TOOLS]
+        assert "calculate_budget" in tool_names
+    
+    def test_search_inventory_tool_exists(self):
+        """search_inventory tool should exist"""
+        tool_names = [t["name"] for t in TOOLS]
+        assert "search_inventory" in tool_names
+    
+    def test_get_vehicle_details_tool_exists(self):
+        """get_vehicle_details tool should exist"""
+        tool_names = [t["name"] for t in TOOLS]
+        assert "get_vehicle_details" in tool_names
+    
+    def test_notify_staff_tool_exists(self):
+        """notify_staff tool should exist"""
+        tool_names = [t["name"] for t in TOOLS]
+        assert "notify_staff" in tool_names
+    
+    def test_calculate_budget_has_required_params(self):
+        """calculate_budget tool should have required parameters"""
+        budget_tool = next(t for t in TOOLS if t["name"] == "calculate_budget")
+        required = budget_tool["input_schema"]["required"]
         
-        assert response.message == "Hello!"
-        assert response.suggestedVehicles == []
-        assert response.intent is None
-        assert response.shouldNotifyStaff == False
+        assert "down_payment" in required
+        assert "monthly_payment" in required
+    
+    def test_search_inventory_has_query_param(self):
+        """search_inventory tool should have query parameter"""
+        search_tool = next(t for t in TOOLS if t["name"] == "search_inventory")
+        required = search_tool["input_schema"]["required"]
+        
+        assert "query" in required
+    
+    def test_notify_staff_has_notification_type(self):
+        """notify_staff tool should have notification_type parameter"""
+        notify_tool = next(t for t in TOOLS if t["name"] == "notify_staff")
+        props = notify_tool["input_schema"]["properties"]
+        
+        assert "notification_type" in props
+        assert "enum" in props["notification_type"]
+        assert "sales" in props["notification_type"]["enum"]
+        assert "appraisal" in props["notification_type"]["enum"]
+        assert "finance" in props["notification_type"]["enum"]
+
+
+# =============================================================================
+# Model Configuration Tests
+# =============================================================================
+
+class TestModelConfiguration:
+    """Tests for model configuration"""
+    
+    def test_model_name_is_sonnet_4_5(self):
+        """Model should be Claude Sonnet 4.5"""
+        assert "claude-sonnet-4-5" in MODEL_NAME
+    
+    def test_model_has_version_date(self):
+        """Model should have a specific version date"""
+        assert "20250929" in MODEL_NAME
+
+
+# =============================================================================
+# Context Building Tests
+# =============================================================================
+
+class TestContextBuilding:
+    """Tests for dynamic context building"""
+    
+    def test_build_context_new_customer(self):
+        """New customer should show 'no information gathered'"""
+        state = ConversationState(session_id="test123")
+        state.message_count = 0
+        
+        context = build_dynamic_context(state)
+        
+        assert "New customer" in context or "no information" in context.lower()
+    
+    def test_build_context_with_trade_in(self):
+        """Context should warn about trade-in exclusion"""
+        state = ConversationState(session_id="test123")
+        state.message_count = 5
+        state.trade_model = "Equinox"
+        
+        context = build_dynamic_context(state)
+        
+        assert "Equinox" in context
+        assert "TRADE-IN" in context.upper() or "trade" in context.lower()
+
+
+# =============================================================================
+# Vehicle Formatting Tests
+# =============================================================================
+
+class TestVehicleFormatting:
+    """Tests for vehicle result formatting"""
+    
+    def test_format_empty_vehicles(self):
+        """Empty list should return no vehicles message"""
+        result = format_vehicles_for_tool_result([])
+        
+        assert "No vehicles found" in result
+    
+    def test_format_vehicles_includes_stock_number(self):
+        """Formatted result should include stock numbers"""
+        vehicle = {
+            "Stock Number": "M12345",
+            "Year": 2024,
+            "Model": "Silverado",
+            "Trim": "LT",
+            "MSRP": 55000,
+            "exteriorColor": "Red"
+        }
+        scored = ScoredVehicle(vehicle=vehicle, score=0.9, match_reasons=["Great truck"])
+        
+        result = format_vehicles_for_tool_result([scored])
+        
+        assert "M12345" in result
+        assert "Silverado" in result
+        assert "55,000" in result
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-
-
-# =============================================================================
-# AI Router v1 (ai.py) - Spouse Objection Handling Tests
-# =============================================================================
-
-from app.routers.ai import SYSTEM_PROMPT, generate_fallback_response as v1_fallback
-
-
-class TestSpouseObjectionSystemPrompt:
-    """Tests to verify spouse/partner objection handling is configured in system prompt"""
-    
-    def test_system_prompt_contains_spouse_section(self):
-        """System prompt should contain spouse objection handling section"""
-        assert "SPOUSE/PARTNER OBJECTION HANDLING" in SYSTEM_PROMPT
-    
-    def test_system_prompt_contains_step_1_acknowledge(self):
-        """System prompt should contain Step 1 - Acknowledge & Validate"""
-        assert "Acknowledge & Validate" in SYSTEM_PROMPT
-        assert "major decision" in SYSTEM_PROMPT.lower()
-    
-    def test_system_prompt_contains_step_2_urgency(self):
-        """System prompt should contain Step 2 - Introduce Urgency & Incentive"""
-        assert "Urgency" in SYSTEM_PROMPT
-        assert "incentive" in SYSTEM_PROMPT.lower()
-    
-    def test_system_prompt_contains_step_3_call_spouse(self):
-        """System prompt should contain Step 3 - Propose Calling the Spouse"""
-        assert "call" in SYSTEM_PROMPT.lower()
-        assert "speaker" in SYSTEM_PROMPT.lower()
-    
-    def test_system_prompt_contains_step_4_test_drive(self):
-        """System prompt should contain Step 4 - Propose Test Drive/Take-Home"""
-        assert "test drive" in SYSTEM_PROMPT.lower() or "take it home" in SYSTEM_PROMPT.lower()
-        assert "temporary plates" in SYSTEM_PROMPT.lower()
-    
-    def test_system_prompt_contains_step_5_commitment(self):
-        """System prompt should contain Step 5 - Isolate & Confirm Commitment"""
-        assert "Confirm Commitment" in SYSTEM_PROMPT or "commitment" in SYSTEM_PROMPT.lower()
-        assert "finalize" in SYSTEM_PROMPT.lower()
-    
-    def test_system_prompt_contains_step_6_followup(self):
-        """System prompt should contain Step 6 - Provide Information & Set Follow-up"""
-        assert "follow-up" in SYSTEM_PROMPT.lower() or "followup" in SYSTEM_PROMPT.lower()
-        assert "VIN" in SYSTEM_PROMPT
-    
-    def test_system_prompt_contains_key_principles(self):
-        """System prompt should contain key principles section"""
-        assert "KEY PRINCIPLES" in SYSTEM_PROMPT
-        assert "validate" in SYSTEM_PROMPT.lower()
-        assert "INVOLVE" in SYSTEM_PROMPT
-    
-    def test_system_prompt_handles_wife_reference(self):
-        """System prompt should reference wife"""
-        assert "wife" in SYSTEM_PROMPT.lower()
-    
-    def test_system_prompt_handles_husband_reference(self):
-        """System prompt should reference husband"""
-        assert "husband" in SYSTEM_PROMPT.lower()
-    
-    def test_system_prompt_handles_partner_reference(self):
-        """System prompt should reference partner"""
-        assert "partner" in SYSTEM_PROMPT.lower()
-    
-    def test_system_prompt_no_ultimatums_principle(self):
-        """System prompt should emphasize no ultimatums"""
-        assert "ultimatum" in SYSTEM_PROMPT.lower()
-    
-    def test_system_prompt_specific_followup_time(self):
-        """System prompt should emphasize getting specific follow-up time"""
-        assert "specific" in SYSTEM_PROMPT.lower()
-        assert "time" in SYSTEM_PROMPT.lower()
