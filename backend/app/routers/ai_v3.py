@@ -845,11 +845,10 @@ async def intelligent_chat(
     # Ensure retriever is fitted with inventory
     if not retriever._is_fitted:
         try:
-            # Load inventory (you'll need to import/inject this based on your setup)
-            from app.routers.inventory import load_inventory
-            inventory = load_inventory()
-            retriever.fit(inventory)
-            logger.info(f"Fitted retriever with {len(inventory)} vehicles")
+            # Load inventory from the already-loaded global inventory
+            from app.routers.inventory import INVENTORY
+            retriever.fit(INVENTORY)
+            logger.info(f"Fitted retriever with {len(INVENTORY)} vehicles")
         except Exception as e:
             logger.error(f"Failed to load inventory for retriever: {e}")
     
