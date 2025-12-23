@@ -58,8 +58,9 @@ logger = logging.getLogger("quirk_ai.intelligent")
 # =============================================================================
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-PROMPT_VERSION = "3.3.1"
-MODEL_NAME = "claude-sonnet-4-20250514"
+PROMPT_VERSION = "3.4.0"
+# Updated to Claude Sonnet 4.5 (released September 2025) - previous Sonnet 4 may be deprecated
+MODEL_NAME = "claude-sonnet-4-5-20250929"
 MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
 
 # Retry configuration (from V2)
@@ -900,8 +901,9 @@ async def intelligent_chat(
             )
             
             if response.status_code != 200:
-                logger.error(f"Anthropic API error: {response.status_code}")
-                raise Exception(f"API error: {response.status_code}")
+                error_body = response.text
+                logger.error(f"Anthropic API error: {response.status_code} - {error_body}")
+                raise Exception(f"API error: {response.status_code} - {error_body[:200]}")
             
             result = response.json()
         
@@ -985,7 +987,8 @@ async def intelligent_chat(
                 )
                 
                 if response.status_code != 200:
-                    logger.error(f"Anthropic API error in tool loop: {response.status_code}")
+                    error_body = response.text
+                    logger.error(f"Anthropic API error in tool loop: {response.status_code} - {error_body}")
                     break
                 
                 result = response.json()
