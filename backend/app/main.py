@@ -33,11 +33,11 @@ LOG_LEVEL = logging.DEBUG if os.getenv("ENVIRONMENT") == "development" else logg
 logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT)
 logger = logging.getLogger("quirk_kiosk")
 
-# Import routers - the original working routers
-from app.routers import inventory, recommendations, leads, analytics, traffic, ai
+# Import routers
+from app.routers import inventory, recommendations, leads, analytics, traffic
 
-# Import v2 routers
-from app.routers import recommendations_v2, ai_v2
+# Import v2 recommendations (enhanced filtering)
+from app.routers import recommendations_v2
 
 # Import v3 routers (smart recommendations + intelligent AI with tools/memory/RAG)
 from app.routers import smart_recommendations, ai_v3
@@ -245,76 +245,40 @@ async def lifespan(app: FastAPI):
 
 
 # =============================================================================
-# CREATE FASTAPI APPLICATION
+# APPLICATION SETUP
 # =============================================================================
 
 app = FastAPI(
     title="Quirk AI Kiosk API",
-    description="""
-## Quirk AI Kiosk Backend API
-
-Backend API for Quirk AI Kiosk customer journey with AI-powered recommendations.
-
-### Features
-- **V1**: Core inventory, recommendations, leads, analytics, traffic, AI chat
-- **V2**: Enhanced recommendations with structured AI responses
-- **V3**: Smart recommendations with entity extraction, conversation analysis, and intelligent AI with tools/memory
-
-### Rate Limits
-- AI Chat: 30 requests/minute
-- Inventory: 100 requests/minute
-- General: 200 requests/minute
-
-### Authentication
-Session-based identification via X-Session-ID header.
-    """,
-    version="2.4.0",
-    lifespan=lifespan,
-    docs_url="/docs" if IS_DEVELOPMENT else None,  # Disable docs in production
+    description="Backend API for Quirk Chevrolet interactive showroom kiosk",
+    version="3.0.0",
+    docs_url="/docs" if IS_DEVELOPMENT else None,
     redoc_url="/redoc" if IS_DEVELOPMENT else None,
-    contact={
-        "name": "Quirk IT Department",
-        "email": "it@quirkchevrolet.com"
-    },
+    lifespan=lifespan,
 )
 
-# Add rate limiter to app state
+# Add rate limiter
 app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Request-ID", "X-Process-Time"],
+)
 
 
 # =============================================================================
 # EXCEPTION HANDLERS
 # =============================================================================
 
-@app.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    """Handle rate limit exceeded errors"""
-    logger.warning(
-        f"Rate limit exceeded: {get_client_identifier(request)} on {request.url.path}"
-    )
-    return JSONResponse(
-        status_code=429,
-        content={
-            "error": "RATE_LIMIT_EXCEEDED",
-            "message": "Too many requests. Please slow down.",
-            "retry_after": 60
-        },
-        headers={"Retry-After": "60"}
-    )
-
-
 @app.exception_handler(AppException)
 async def app_exception_handler(request: Request, exc: AppException):
     """Handle custom application exceptions"""
-    logger.error(
-        f"AppException: {exc.code} - {exc.message}",
-        extra={
-            "path": request.url.path,
-            "method": request.method,
-            "code": exc.code,
-            "details": exc.details
-        }
-    )
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -327,35 +291,16 @@ async def app_exception_handler(request: Request, exc: AppException):
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
-    """Handle unexpected exceptions - don't leak internal details"""
-    logger.exception(
-        f"Unhandled exception on {request.method} {request.url.path}",
-        exc_info=exc
-    )
+    """Handle unexpected exceptions"""
+    logger.exception(f"Unexpected error: {exc}")
     return JSONResponse(
         status_code=500,
         content={
             "error": "INTERNAL_ERROR",
-            "message": "An unexpected error occurred. Please try again.",
-            # Only show details in development
-            "details": {"exception": str(exc)} if IS_DEVELOPMENT else {}
+            "message": "An unexpected error occurred",
+            "details": {"type": type(exc).__name__} if IS_DEVELOPMENT else {}
         }
     )
-
-
-# =============================================================================
-# MIDDLEWARE
-# =============================================================================
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=get_cors_origins(),
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["X-Request-ID", "X-RateLimit-Remaining"],
-)
 
 
 @app.middleware("http")
@@ -391,21 +336,19 @@ async def add_request_metadata(request: Request, call_next):
 # ROUTES
 # =============================================================================
 
-# V1 Routes (Original)
+# V1 Routes (Core functionality)
 app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["inventory"])
 app.include_router(recommendations.router, prefix="/api/v1/recommendations", tags=["recommendations"])
 app.include_router(leads.router, prefix="/api/v1/leads", tags=["leads"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(traffic.router, prefix="/api/v1/traffic", tags=["traffic"])
-app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
 
-# V2 Routes (Enhanced)
+# V2 Routes (Enhanced recommendations)
 app.include_router(recommendations_v2.router, prefix="/api/v2/recommendations", tags=["recommendations-v2"])
-app.include_router(ai_v2.router, prefix="/api/v2/ai", tags=["ai-v2"])
 
 # V3 Routes (Smart Recommendations + Intelligent AI with Tools/Memory/RAG)
 app.include_router(smart_recommendations.router, prefix="/api/v3/smart", tags=["smart-recommendations"])
-app.include_router(ai_v3.router, prefix="/api/v3/ai", tags=["ai-v3-intelligent"])
+app.include_router(ai_v3.router, prefix="/api/v3/ai", tags=["ai"])
 
 # Photo analysis router
 app.include_router(photo_analysis.router, prefix="/api/v1/trade-in-photos", tags=["photo-analysis"])
@@ -427,13 +370,13 @@ async def root():
     return {
         "service": "Quirk AI Kiosk API",
         "status": "running",
-        "version": "2.4.0",
+        "version": "3.0.0",
         "environment": ENVIRONMENT,
         "docs": "/docs" if IS_DEVELOPMENT else "disabled",
         "features": {
-            "v1": ["inventory", "recommendations", "leads", "analytics", "traffic", "ai"],
-            "v2": ["enhanced-recommendations", "structured-ai"],
-            "v3": ["smart-recommendations", "entity-extraction", "conversation-analysis", "intelligent-ai-tools-memory"]
+            "v1": ["inventory", "recommendations", "leads", "analytics", "traffic", "trade-in", "tts"],
+            "v2": ["enhanced-recommendations"],
+            "v3": ["smart-recommendations", "intelligent-ai-chat"]
         },
         "storage": "postgresql" if is_database_configured() else "json"
     }
@@ -451,7 +394,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "service": "quirk-kiosk-api",
-        "version": "2.4.0",
+        "version": "3.0.0",
         "environment": ENVIRONMENT,
         "checks": {}
     }
@@ -485,7 +428,8 @@ async def health_check():
     anthropic_configured = bool(os.getenv("ANTHROPIC_API_KEY"))
     health_status["checks"]["ai_service"] = {
         "status": "configured" if anthropic_configured else "fallback_mode",
-        "provider": "anthropic"
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-5-20250929"
     }
     
     # Inventory check
