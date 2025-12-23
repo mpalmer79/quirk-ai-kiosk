@@ -808,9 +808,9 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
 @router.post("/chat", response_model=IntelligentChatResponse)
 @ai_limiter.limit("30/minute")
 async def intelligent_chat(
-    request: IntelligentChatRequest,
+    chat_request: IntelligentChatRequest,
     background_tasks: BackgroundTasks,
-    req: Request  # Required for rate limiter
+    request: Request  # Required for rate limiter - MUST be named 'request'
 ):
     """
     Intelligent chat endpoint with persistent memory and tool use.
@@ -838,7 +838,7 @@ async def intelligent_chat(
     # Check API key
     if not api_key:
         return IntelligentChatResponse(
-            message=generate_fallback_response(request.message, request.customer_name),
+            message=generate_fallback_response(chat_request.message, chat_request.customer_name),
             metadata={"fallback": True, "reason": "no_api_key"}
         )
     
@@ -855,8 +855,8 @@ async def intelligent_chat(
     
     # Get or create conversation state
     state = state_manager.get_or_create_state(
-        request.session_id,
-        request.customer_name
+        chat_request.session_id,
+        chat_request.customer_name
     )
     
     # Build dynamic system prompt
@@ -870,13 +870,13 @@ async def intelligent_chat(
     
     # Build messages
     messages = []
-    for msg in request.conversation_history[-10:]:
+    for msg in chat_request.conversation_history[-10:]:
         messages.append({"role": msg.role, "content": msg.content})
     
     # Add current message with context hints
-    user_message = request.message
-    if request.customer_name and not request.conversation_history:
-        user_message = f"(Customer's name is {request.customer_name}) {request.message}"
+    user_message = chat_request.message
+    if chat_request.customer_name and not chat_request.conversation_history:
+        user_message = f"(Customer's name is {chat_request.customer_name}) {chat_request.message}"
     
     messages.append({"role": "user", "content": user_message})
     
@@ -996,17 +996,17 @@ async def intelligent_chat(
         # Update conversation state
         mentioned_vehicles = [sv.vehicle for sv in all_vehicles] if all_vehicles else None
         state = state_manager.update_state(
-            session_id=request.session_id,
-            user_message=request.message,
+            session_id=chat_request.session_id,
+            user_message=chat_request.message,
             assistant_response=final_response,
             mentioned_vehicles=mentioned_vehicles,
-            customer_name=request.customer_name
+            customer_name=chat_request.customer_name
         )
         
         # Record quality signal
         if tools_used:
             outcome_tracker.record_signal(
-                request.session_id,
+                chat_request.session_id,
                 "positive",
                 f"Used tools: {', '.join(tools_used)}"
             )
@@ -1045,16 +1045,16 @@ async def intelligent_chat(
         
     except httpx.TimeoutException:
         logger.error("API timeout")
-        outcome_tracker.record_signal(request.session_id, "negative", "API timeout")
+        outcome_tracker.record_signal(chat_request.session_id, "negative", "API timeout")
         return IntelligentChatResponse(
-            message=generate_fallback_response(request.message, request.customer_name),
+            message=generate_fallback_response(chat_request.message, chat_request.customer_name),
             metadata={"fallback": True, "reason": "timeout"}
         )
     except Exception as e:
         logger.exception(f"Intelligent chat error: {e}")
-        outcome_tracker.record_signal(request.session_id, "negative", f"Error: {str(e)[:50]}")
+        outcome_tracker.record_signal(chat_request.session_id, "negative", f"Error: {str(e)[:50]}")
         return IntelligentChatResponse(
-            message=generate_fallback_response(request.message, request.customer_name),
+            message=generate_fallback_response(chat_request.message, chat_request.customer_name),
             metadata={"fallback": True, "reason": "error", "error": str(e)[:100]}
         )
 
