@@ -264,7 +264,12 @@ class TestVehicleFormatting:
             "MSRP": 55000,
             "exteriorColor": "Red"
         }
-        scored = ScoredVehicle(vehicle=vehicle, score=0.9, match_reasons=["Great truck"])
+        scored = ScoredVehicle(
+            vehicle=vehicle, 
+            score=0.9, 
+            match_reasons=["Great truck"],
+            preference_matches={"body_style": True}
+        )
         
         result = format_vehicles_for_tool_result([scored])
         
