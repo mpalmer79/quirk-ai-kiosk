@@ -431,7 +431,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
           Back
         </button>
         <div style={styles.stepHeader}>
-          <span style={styles.categoryBadge}>{category.icon} {category.name}</span>
           <h1 style={styles.stepTitle}>Which model interests you?</h1>
           <p style={styles.stepSubtitle}>Select a model to see available options</p>
         </div>
@@ -516,7 +515,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
           Back
         </button>
         <div style={styles.stepHeader}>
-          <span style={styles.modelBadge}>{selectedModel.name}</span>
           <h1 style={styles.stepTitle}>What cab configuration?</h1>
           <p style={styles.stepSubtitle}>Select the cab style that fits your needs</p>
         </div>
@@ -606,8 +604,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
           Back
         </button>
         <div style={styles.stepHeader}>
-          <span style={styles.modelBadge}>{selectedModel.name} {selectedCab && `• ${selectedCab}`}</span>
-          <h1 style={styles.stepTitle}>🎨 Color Preferences</h1>
+          <h1 style={styles.stepTitle}>Color Preferences</h1>
           <p style={styles.stepSubtitle}>
             {inventoryCount !== null && `We have ${inventoryCount} ${selectedModel.name} vehicles in stock`}
           </p>
