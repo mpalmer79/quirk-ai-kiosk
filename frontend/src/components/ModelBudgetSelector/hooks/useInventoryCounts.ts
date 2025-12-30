@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react';
 import api from '../../api';
 import { BASE_CATEGORIES, modelMatches } from '../../../types/vehicleCategories';
-import type { Vehicle } from '../../../types';
+import type { Vehicle, VehicleCategories } from '../../../types';
 
 // Inventory count by model name
 type InventoryByModel = Record<string, number>;
 
-interface UseInventoryCountsResult {
+export interface UseInventoryCountsResult {
   inventoryByModel: InventoryByModel;
-  loadingInventory: boolean;
+  vehicleCategories: VehicleCategories;
+  loading: boolean;
+  error: string | null;
 }
 
 const INVENTORY_TIMEOUT_MS = 5000;
 
 export const useInventoryCounts = (): UseInventoryCountsResult => {
   const [inventoryByModel, setInventoryByModel] = useState<InventoryByModel>({});
-  const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
+  const [vehicleCategories, setVehicleCategories] = useState<VehicleCategories>({});
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadInventoryCounts = async (): Promise<void> => {
@@ -50,20 +54,73 @@ export const useInventoryCounts = (): UseInventoryCountsResult => {
         });
 
         setInventoryByModel(counts);
+
+        // Build vehicleCategories from BASE_CATEGORIES and inventory counts
+        const categories: VehicleCategories = {};
+        Object.entries(BASE_CATEGORIES).forEach(([key, category]) => {
+          const categoryCount = category.modelNames.reduce(
+            (sum, modelName) => sum + (counts[modelName] || 0),
+            0
+          );
+          
+          // Only include categories with inventory (or all if no inventory data)
+          if (categoryCount > 0 || Object.keys(counts).length === 0) {
+            categories[key] = {
+              name: category.name,
+              icon: category.icon,
+              image: category.image,
+              count: categoryCount,
+              models: category.modelNames.map((modelName) => ({
+                name: modelName,
+                image: `/images/models/${modelName.toLowerCase().replace(/\s+/g, '-')}.webp`,
+                cabOptions: category.cabOptions?.[modelName] || null,
+                towingCapacity: category.towingCapacity?.[modelName] || null,
+              })),
+            };
+          }
+        });
+
+        setVehicleCategories(categories);
+        setError(null);
       } catch (err) {
         // Log warning but don't block UI - allow component to render with empty inventory
         console.warn('Failed to load inventory counts:', err);
         setInventoryByModel({});
+        
+        // Still build categories from BASE_CATEGORIES even on error
+        const categories: VehicleCategories = {};
+        Object.entries(BASE_CATEGORIES).forEach(([key, category]) => {
+          categories[key] = {
+            name: category.name,
+            icon: category.icon,
+            image: category.image,
+            count: 0,
+            models: category.modelNames.map((modelName) => ({
+              name: modelName,
+              image: `/images/models/${modelName.toLowerCase().replace(/\s+/g, '-')}.webp`,
+              cabOptions: category.cabOptions?.[modelName] || null,
+              towingCapacity: category.towingCapacity?.[modelName] || null,
+            })),
+          };
+        });
+        setVehicleCategories(categories);
+        
+        // Don't set error for timeout - just show empty counts
+        if (err instanceof Error && err.message === 'Inventory load timeout') {
+          setError(null);
+        } else {
+          setError('Failed to load inventory');
+        }
       } finally {
         // Always set loading to false so UI can render
-        setLoadingInventory(false);
+        setLoading(false);
       }
     };
 
     loadInventoryCounts();
   }, []);
 
-  return { inventoryByModel, loadingInventory };
+  return { inventoryByModel, vehicleCategories, loading, error };
 };
 
 export default useInventoryCounts;
