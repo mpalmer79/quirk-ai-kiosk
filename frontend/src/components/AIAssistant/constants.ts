@@ -6,6 +6,7 @@ export const SUGGESTED_PROMPTS = [
   "I'm in for service today and am curious about what's new with Chevrolet.",
   "I have a long commute. I need a fuel efficient vehicle.",
   "What's the best family SUV under $50K?",
+  "I need a truck that can tow 10,000 pounds and carry 5 people. What are my options?",
   "I want a sporty car with good tech features.",
   "I drive under 20K miles per year. What are the benefits of leasing my next vehicle?",
   "Bienvenido a Quirk Chevrolet. ¿Qué puedo ayudarle a lograr hoy?",
