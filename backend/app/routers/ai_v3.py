@@ -474,6 +474,39 @@ CONVERSATION GUIDELINES:
 6. Keep responses conversational and concise (2-3 paragraphs max)
 7. VERIFY before you speak - search if uncertain, never guess on specs
 
+🎯 QUALIFYING QUESTIONS (CRITICAL FOR GOOD MATCHES):
+When showing 6 vehicles but MORE matches exist in inventory, you MUST ask qualifying questions to narrow down:
+
+INTRO PHRASE: "I found 6 examples that might match what you're looking for! To help narrow it down..."
+
+QUALIFYING QUESTIONS TO ASK (pick 2-3 relevant ones):
+
+For TRUCKS:
+- "What's your budget range?" (Silverado 1500: $43K-$84K, 2500HD: $57K-$87K, 3500HD: $54K-$75K)
+- "Are you looking for a Silverado 1500 or do you need a Heavy Duty (2500HD/3500HD)?"
+- "Do you prefer a Crew Cab (more passenger room) or Double Cab?"
+- "Any preference on trim level? Work Truck, LT, LTZ, High Country, or ZR2?"
+- "What color catches your eye?"
+
+For SUVs:
+- "What's your budget range?"
+- "Do you need third-row seating?"
+- "Preference between Equinox, Blazer, Traverse, Tahoe, or Suburban?"
+- "AWD or 4WD preference?"
+
+For ANY search with many results:
+- "What features are must-haves for you?"
+- "Is there a specific color you're looking for?"
+- "New or would you consider pre-owned?"
+
+EXAMPLE RESPONSE:
+Customer: "I need a truck that can tow 10,000 pounds and carry 5 people."
+AI: "I found 6 examples that might match what you're looking for! Take a look below.
+
+To help narrow down your options: What's your budget range? And are you looking for a Silverado 1500 (tows up to 13,300 lbs) or would you prefer the Heavy Duty 2500HD (tows up to 18,500 lbs) for extra capability? Also, do you prefer a Crew Cab or Double Cab?"
+
+NEVER just show 6 vehicles and stop - ALWAYS engage to find the PERFECT match!
+
 CONTINUE CONVERSATION FLOW:
 When customer says "continue our conversation" or similar:
 1. Ask for their 10-digit phone number (be friendly about it)
@@ -680,12 +713,21 @@ def format_vehicle_for_response(vehicle: Dict[str, Any], reasons: List[str] = No
     }
 
 
-def format_vehicles_for_tool_result(vehicles: List[ScoredVehicle]) -> str:
+def format_vehicles_for_tool_result(vehicles: List[ScoredVehicle], total_matches: int = None) -> str:
     """Format vehicle list for tool result to Claude"""
     if not vehicles:
         return "No vehicles found matching the criteria."
     
-    result_parts = [f"Found {len(vehicles)} matching vehicles:\n"]
+    # Determine if more matches exist beyond what we're showing
+    shown_count = len(vehicles)
+    total = total_matches if total_matches else shown_count
+    more_exist = total > shown_count
+    
+    if more_exist:
+        result_parts = [f"Found {shown_count} examples from {total}+ matching vehicles:\n"]
+        result_parts.append("⚠️ MORE MATCHES EXIST - ASK QUALIFYING QUESTIONS to narrow down!\n")
+    else:
+        result_parts = [f"Found {shown_count} matching vehicles:\n"]
     
     for idx, sv in enumerate(vehicles, 1):
         v = sv.vehicle
@@ -697,6 +739,7 @@ def format_vehicles_for_tool_result(vehicles: List[ScoredVehicle]) -> str:
         color = v.get('exteriorColor') or v.get('Exterior Color', '')
         towing = v.get('towingCapacity') or 0
         seating = v.get('seatingCapacity') or 5
+        body = v.get('Body') or v.get('body', '')
         
         # Include towing/seating info when relevant
         specs = f"Price: ${price:,.0f} | Color: {color}"
@@ -705,11 +748,24 @@ def format_vehicles_for_tool_result(vehicles: List[ScoredVehicle]) -> str:
         if seating != 5:
             specs += f" | Seats: {seating}"
         
+        # Extract cab type from Body field if available
+        cab_type = ""
+        if 'Crew Cab' in body:
+            cab_type = " (Crew Cab)"
+        elif 'Double Cab' in body:
+            cab_type = " (Double Cab)"
+        elif 'Reg Cab' in body:
+            cab_type = " (Regular Cab)"
+        
         result_parts.append(
-            f"{idx}. Stock #{stock}: {year} {model} {trim}\n"
+            f"{idx}. Stock #{stock}: {year} {model} {trim}{cab_type}\n"
             f"   {specs}\n"
             f"   Why it matches: {', '.join(sv.match_reasons[:3])}\n"
         )
+    
+    # Add reminder to ask qualifying questions if more matches exist
+    if more_exist:
+        result_parts.append(f"\n📋 IMPORTANT: Showing {shown_count} of {total}+ matches. Ask about: budget range, model preference (1500 vs 2500HD), cab type (Crew vs Double), trim level, or color to help narrow down the perfect vehicle!")
     
     return '\n'.join(result_parts)
 
@@ -808,11 +864,11 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
     elif tool_name == "search_inventory":
         query = tool_input.get("query", "")
         
-        # Use semantic retrieval
+        # Use semantic retrieval - get more initially to count total matches
         scored_vehicles = retriever.retrieve(
             query=query,
             conversation_state=state,
-            limit=12  # Get more initially, filter by budget after
+            limit=50  # Get more initially to count total matches before filtering to 6
         )
         
         if tool_input.get("body_style"):
@@ -893,6 +949,9 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
             ]
             logger.info(f"Budget filter ${max_price:,}: {original_count} -> {len(scored_vehicles)} vehicles")
         
+        # Track total matches BEFORE limiting (for qualifying questions prompt)
+        total_matches = len(scored_vehicles)
+        
         # Limit to top 6 after filtering
         scored_vehicles = scored_vehicles[:6]
         
@@ -908,7 +967,7 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
                 logger.info(f"Filtered out {state.trade_model} vehicles (trade-in model)")
         
         vehicles_to_show = scored_vehicles
-        result = format_vehicles_for_tool_result(scored_vehicles)
+        result = format_vehicles_for_tool_result(scored_vehicles, total_matches=total_matches)
         
     elif tool_name == "get_vehicle_details":
         stock = tool_input.get("stock_number", "")
