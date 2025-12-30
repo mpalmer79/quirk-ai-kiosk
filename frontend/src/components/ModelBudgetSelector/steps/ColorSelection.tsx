@@ -34,7 +34,20 @@ const ColorSelection: React.FC<ColorSelectionProps> = ({
     }
   }
 
-  // If model not found, redirect
+  // MOVED: useEffect MUST be called before any early returns
+  // Sync local state with parent state
+  useEffect(() => {
+    if (foundModel) {
+      updateState({ 
+        selectedModel: foundModel,
+        selectedCab: cabSlug ? cabSlug.split('-').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ') : null,
+      });
+    }
+  }, [foundModel, cabSlug, updateState]);
+
+  // If model not found, redirect (AFTER all hooks)
   if (!foundModel) {
     setTimeout(() => navigateTo('modelBudget/category'), 0);
     return null;
@@ -43,16 +56,6 @@ const ColorSelection: React.FC<ColorSelectionProps> = ({
   const inventoryCount = inventoryByModel[foundModel.name] || 0;
   const colors: GMColor[] = GM_COLORS[foundModel.name] || GM_COLORS['Equinox'];
   const availableForSecond = colors.filter(c => c.name !== colorChoices.first);
-
-  // Sync local state with parent state
-  useEffect(() => {
-    updateState({ 
-      selectedModel: foundModel,
-      selectedCab: cabSlug ? cabSlug.split('-').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-      ).join(' ') : null,
-    });
-  }, [foundModel, cabSlug, updateState]);
 
   const handleColorChange = (choice: keyof ColorChoices, value: string): void => {
     const newChoices = { ...colorChoices, [choice]: value };
