@@ -1,420 +1,956 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import api from '../api';
-import type { Vehicle, KioskComponentProps } from '../../types';
-import type { Message, ExtractedData } from './types';
-import { styles } from './styles';
-import { INITIAL_EXTRACTED_DATA } from './constants';
-import { useSpeechRecognition, useTextToSpeech, useDataExtraction } from './hooks';
-import {
-  Header,
-  MessageBubble,
-  SuggestionChips,
-  ObjectionPanel,
-  ChatInput,
-  LoadingIndicator,
-} from './components';
+/**
+ * Quirk AI Kiosk - API Service Layer
+ * Handles all communication between frontend components and FastAPI backend
+ */
 
-const AIAssistant: React.FC<KioskComponentProps> = ({ 
-  navigateTo, 
-  updateCustomerData, 
-  customerData,
-  resetJourney 
-}) => {
-  // State
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [inventory, setInventory] = useState<Vehicle[]>([]);
-  const [audioEnabled, setAudioEnabled] = useState(false);
-  const [extractedData, setExtractedData] = useState<ExtractedData>(INITIAL_EXTRACTED_DATA);
-  const [showObjectionPanel, setShowObjectionPanel] = useState(false);
-  const [suggestedFollowups, setSuggestedFollowups] = useState<string[]>([]);
+import type { Vehicle, InventoryResponse } from '../types';
+
+// Base API URL - configure based on environment
+const API_BASE_URL: string = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+interface RequestOptions extends RequestInit {
+  headers?: Record<string, string>;
+}
+
+interface InventoryFilters {
+  model?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  bodyType?: string;
+  drivetrain?: string;
+  cabType?: string;
+  condition?: string;
+  sortBy?: string;
+  limit?: number;
+}
+
+interface TradeInVehicleData {
+  vin?: string;
+  year: number;
+  make: string;
+  model: string;
+  trim?: string;
+  mileage: number;
+  condition: 'excellent' | 'good' | 'fair' | 'poor';
+}
+
+interface TradeInEstimate {
+  estimatedValue: number;
+  range: { low: number; high: number };
+  adjustments: Record<string, number>;
+}
+
+interface LeaseParams {
+  vehiclePrice: number;
+  downPayment: number;
+  tradeInValue?: number;
+  term: number;
+  moneyFactor: number;
+  residualPercent: number;
+}
+
+interface FinanceParams {
+  vehiclePrice: number;
+  downPayment: number;
+  tradeInValue?: number;
+  term: number;
+  apr: number;
+}
+
+interface PaymentResult {
+  monthlyPayment: number;
+  totalCost: number;
+  downPayment: number;
+  term: number;
+}
+
+interface LeadData {
+  customerName: string;
+  phone: string;
+  email?: string;
+  vehicleInterest?: Vehicle;
+  tradeIn?: TradeInVehicleData;
+  paymentPreference?: PaymentResult;
+  notes?: string;
+}
+
+interface TestDriveData {
+  customerName: string;
+  phone: string;
+  email?: string;
+  vehicleStockNumber: string;
+  preferredDate?: string;
+  preferredTime?: string;
+}
+
+interface AnalyticsData {
+  event: string;
+  data: Record<string, unknown>;
+  timestamp: string;
+  sessionId: string;
+}
+
+// Chat message for AI conversation history
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: string;
+}
+
+// Enhanced trade-in vehicle info
+interface TradeInVehicleInfo {
+  year: string | null;
+  make: string | null;
+  model: string | null;
+  mileage: number | null;
+}
+
+// Enhanced trade-in data
+interface TradeInData {
+  hasTrade: boolean | null;
+  vehicle: TradeInVehicleInfo | null;
+  hasPayoff: boolean | null;
+  payoffAmount: number | null;
+  monthlyPayment: number | null;
+  financedWith: string | null;
+}
+
+// Vehicle interest from ModelBudgetSelector
+interface VehicleInterestData {
+  model: string | null;
+  cab: string | null;
+  colors: string[];
+}
+
+// Budget info
+interface BudgetData {
+  min: number | null;
+  max: number | null;
+  downPaymentPercent: number | null;
+}
+
+interface TrafficSessionData {
+  sessionId?: string;
+  customerName?: string | null;
+  phone?: string;
+  path?: string | null;
+  currentStep?: string | null;
+  vehicleInterest?: VehicleInterestData;
+  budget?: BudgetData;
+  vehicleRequested?: boolean;
+  actions?: string[];
+  vehicle?: Partial<Vehicle>;
+  tradeIn?: TradeInData | Partial<TradeInVehicleData & { estimatedValue?: number }>;
+  payment?: {
+    type?: string;
+    monthly?: number;
+    term?: number;
+    downPayment?: number;
+  };
+  chatHistory?: ChatMessage[];  // AI chat conversation history
+  managerNotes?: string;  // Notes added by sales manager
+}
+
+interface TrafficLogEntry {
+  sessionId: string;
+  createdAt: string;
+  updatedAt: string;
+  customerName?: string;
+  phone?: string;
+  path?: string;
+  currentStep?: string;
+  vehicle?: Partial<Vehicle>;
+  vehicleInterest?: VehicleInterestData;
+  budget?: BudgetData;
+  tradeIn?: Partial<TradeInVehicleData & { estimatedValue?: number }>;
+  payment?: {
+    type?: string;
+    monthly?: number;
+    term?: number;
+    downPayment?: number;
+  };
+  vehicleRequested?: boolean;
+  actions: string[];
+  chatHistory?: ChatMessage[];  // AI chat conversation history
+}
+
+interface TrafficLogResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  sessions: TrafficLogEntry[];
+  timezone: string;
+  server_time: string;
+}
+
+interface TrafficStats {
+  total_sessions: number;
+  active_now: number;
+  today: number;
+  today_date: string;
+  by_path: Record<string, number>;
+  with_vehicle_selected: number;
+  with_trade_in: number;
+  vehicle_requests: number;
+  completed_handoffs: number;
+  with_ai_chat: number;
+  conversion_rate: number;
+  timezone: string;
+  server_time: string;
+}
+
+// Active session for Sales Manager Dashboard
+interface ActiveSession {
+  sessionId: string;
+  customerName: string | null;
+  phone: string | null;
+  startTime: string;
+  lastActivity: string;
+  currentStep: string;
+  vehicleInterest: {
+    model: string | null;
+    cab: string | null;
+    colors: string[];
+  };
+  budget: {
+    min: number | null;
+    max: number | null;
+    downPaymentPercent: number | null;
+  };
+  tradeIn: {
+    hasTrade: boolean | null;
+    vehicle: {
+      year: string | null;
+      make: string | null;
+      model: string | null;
+      mileage: number | null;
+    } | null;
+    hasPayoff: boolean | null;
+    payoffAmount: number | null;
+    monthlyPayment: number | null;
+    financedWith: string | null;
+  };
+  selectedVehicle: {
+    stockNumber: string | null;
+    year: number | null;
+    make: string | null;
+    model: string | null;
+    trim: string | null;
+    price: number | null;
+  } | null;
+}
+
+interface ActiveSessionsResponse {
+  sessions: ActiveSession[];
+  count: number;
+  timeout_minutes: number;
+  server_time: string;
+  timezone: string;
+}
+
+interface AIChatRequest {
+  message: string;
+  inventoryContext?: string;
+  conversationHistory: Array<{ role: string; content: string }>;
+  customerName?: string;
+}
+
+interface AIChatResponse {
+  message: string;
+  suggestedVehicles?: string[];
+  vehicles?: Array<{
+    stock_number: string;
+    model: string;
+    price?: number;
+    match_reasons: string[];
+    score: number;
+  }>;
+  conversation_state?: Record<string, unknown>;
+  tools_used?: string[];
+  staff_notified?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+// Helper function for API requests
+const apiRequest = async <T = unknown>(endpoint: string, options: RequestOptions = {}): Promise<T> => {
+  const url = `${API_BASE_URL}${endpoint}`;
   
-  // Refs
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const sendMessageRef = useRef<(content: string) => void>();
+  const defaultHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
 
-  // Custom hooks
-  const { extractDataFromMessage, detectObjection, detectHoursQuery } = useDataExtraction();
-  const { isSpeaking, ttsAvailable, speakText, stopSpeaking } = useTextToSpeech({ enabled: audioEnabled });
-  const { isListening, toggleListening } = useSpeechRecognition({
-    onResult: (transcript) => {
-      setInputValue(transcript);
-      setTimeout(() => sendMessageRef.current?.(transcript), 100);
+  const config: RequestInit = {
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...options.headers,
     },
-  });
-
-  // Load inventory on mount
-  useEffect(() => {
-    const loadInventory = async () => {
-      try {
-        const response = await api.getInventory({});
-        const vehicles = Array.isArray(response) ? response : response.vehicles || [];
-        setInventory(vehicles);
-      } catch (error) {
-        console.error('Failed to load inventory:', error);
-      }
-    };
-    loadInventory();
-  }, []);
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Log chat history to traffic session
-  useEffect(() => {
-    if (messages.length === 0) return;
-    
-    const logChatHistory = async () => {
-      try {
-        // Convert messages to chat history format
-        const chatHistory = messages.map(m => ({
-          role: m.role,
-          content: m.content,
-          timestamp: m.timestamp?.toISOString()
-        }));
-        
-        await api.logTrafficSession({
-          path: 'aiAssistant',
-          currentStep: 'ai_chat',
-          customerName: customerData?.customerName || undefined,
-          chatHistory,
-          actions: [`ai_chat_${messages.length}_messages`]
-        });
-      } catch (error) {
-        // Don't throw on traffic log failures
-        console.warn('Failed to log chat history:', error);
-      }
-    };
-    
-    logChatHistory();
-  }, [messages, customerData?.customerName]);
-
-  // Search inventory helper
-  const searchInventory = useCallback((query: string): Vehicle[] => {
-    const lowerQuery = query.toLowerCase();
-    
-    // Color keywords mapping
-    const colorKeywords: Record<string, string[]> = {
-      'red': ['red', 'cherry', 'crimson', 'radiant'],
-      'blue': ['blue', 'navy', 'glacier', 'lakeshore'],
-      'black': ['black', 'onyx', 'midnight'],
-      'white': ['white', 'summit', 'pearl', 'arctic'],
-      'silver': ['silver', 'metallic', 'sterling'],
-      'gray': ['gray', 'grey', 'graphite', 'shadow'],
-      'green': ['green', 'evergreen'],
-    };
-    
-    // Model keywords mapping
-    const modelKeywords: Record<string, string[]> = {
-      'silverado': ['silverado', 'truck', 'pickup'],
-      'colorado': ['colorado', 'midsize truck'],
-      'tahoe': ['tahoe', 'full size suv'],
-      'suburban': ['suburban', 'large suv'],
-      'traverse': ['traverse', 'family suv', '3 row'],
-      'equinox': ['equinox', 'compact suv'],
-      'blazer': ['blazer', 'sporty suv'],
-      'trax': ['trax', 'small suv'],
-      'trailblazer': ['trailblazer'],
-    };
-
-    let results = inventory.filter(vehicle => {
-      const searchText = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim} ${vehicle.exteriorColor}`.toLowerCase();
-      
-      // Check for color matches
-      for (const [colorKey, keywords] of Object.entries(colorKeywords)) {
-        if (keywords.some(k => lowerQuery.includes(k))) {
-          // Check if vehicle has any of the color keywords
-          if (!keywords.some(k => searchText.includes(k)) && !searchText.includes(colorKey)) {
-            return false;
-          }
-        }
-      }
-      
-      // Check for model matches
-      for (const [modelKey, keywords] of Object.entries(modelKeywords)) {
-        if (keywords.some(k => lowerQuery.includes(k))) {
-          if (searchText.includes(modelKey)) {
-            return true;
-          }
-        }
-      }
-      
-      // General search
-      return lowerQuery.split(' ').some(word => 
-        word.length > 2 && searchText.includes(word)
-      );
-    });
-
-    return results.slice(0, 6);
-  }, [inventory]);
-
-  // Build inventory context for AI
-  const buildInventoryContext = useCallback(() => {
-    const models = Array.from(new Set(inventory.map(v => v.model)));
-    const priceRange = inventory.length > 0 
-      ? { min: Math.min(...inventory.map(v => v.price || 0)), max: Math.max(...inventory.map(v => v.price || 0)) }
-      : { min: 0, max: 0 };
-    
-    return {
-      totalVehicles: inventory.length,
-      models: models.slice(0, 10),
-      priceRange,
-    };
-  }, [inventory]);
-
-  // Send message handler
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || isLoading) return;
-
-    stopSpeaking();
-
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: content.trim(),
-      timestamp: new Date(),
-    };
-
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    setInputValue('');
-    setIsLoading(true);
-
-    // Extract data from user message
-    const newExtractedData = extractDataFromMessage(content, extractedData);
-    setExtractedData(newExtractedData);
-    
-    // Detect objections
-    const objectionResult = detectObjection(content);
-    if (objectionResult.category) {
-      setSuggestedFollowups(objectionResult.followups);
-    } else {
-      setSuggestedFollowups([]);
-    }
-
-    try {
-      const response = await api.chatWithAI({
-        message: content,
-        inventoryContext: JSON.stringify(buildInventoryContext()),
-        conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
-        customerName: customerData?.customerName,
-      });
-
-      // Use vehicles from V3 API response if available, otherwise fall back to local search
-      let matchingVehicles: Vehicle[] = [];
-      
-      if (response.vehicles && response.vehicles.length > 0) {
-        // V3 API returned vehicles - use these (they're already budget-qualified)
-        // Map from API format to frontend Vehicle format
-        matchingVehicles = response.vehicles.map((v: any) => {
-          // Find full vehicle data from inventory by stock number
-          const fullVehicle = inventory.find(
-            inv => (inv.stockNumber || inv.stock_number) === v.stock_number
-          );
-          return fullVehicle || {
-            stockNumber: v.stock_number,
-            stock_number: v.stock_number,
-            model: v.model,
-            price: v.price,
-            salePrice: v.price,
-          } as Vehicle;
-        }).filter(Boolean);
-      }
-      
-      // Fall back to local search only if V3 didn't return vehicles
-      if (matchingVehicles.length === 0) {
-        matchingVehicles = searchInventory(content);
-      }
-      
-      const isHoursQuery = detectHoursQuery(content);
-
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: response.message,
-        vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
-        showDealerInfo: isHoursQuery,
-        timestamp: new Date(),
-      };
-
-      setMessages([...newMessages, assistantMessage]);
-      speakText(response.message);
-      
-    } catch (error) {
-      console.error('AI Chat error:', error);
-      
-      const matchingVehicles = searchInventory(content);
-      
-      // Detect if user is speaking Spanish
-      const spanishPatterns = /español|busco|quiero|necesito|camioneta|carro|¿|á|é|í|ó|ú|ñ/i;
-      const isSpanish = spanishPatterns.test(content);
-      
-      let fallbackContent: string;
-      if (matchingVehicles.length > 0) {
-        fallbackContent = isSpanish
-          ? `¡Encontré ${matchingVehicles.length} vehículos que podrían ser lo que busca! Écheles un vistazo.`
-          : `I found ${matchingVehicles.length} vehicles that might match what you're looking for! Take a look below.`;
-      } else {
-        fallbackContent = isSpanish
-          ? `¡Estaré encantado de ayudarle a encontrar el vehículo perfecto! ¿Podría contarme más sobre lo que está buscando?`
-          : `I'd be happy to help you find the perfect vehicle. Could you tell me more about what you're looking for?`;
-      }
-      
-      const fallbackMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: fallbackContent,
-        vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
-        timestamp: new Date(),
-      };
-      
-      setMessages([...newMessages, fallbackMessage]);
-    }
-
-    setIsLoading(false);
-  }, [messages, isLoading, extractedData, customerData, extractDataFromMessage, detectObjection, detectHoursQuery, searchInventory, buildInventoryContext, speakText, stopSpeaking, inventory]);
-
-  // Store sendMessage in ref for speech recognition callback
-  useEffect(() => {
-    sendMessageRef.current = sendMessage;
-  }, [sendMessage]);
-
-  // Handle vehicle click
-  const handleVehicleClick = (vehicle: Vehicle) => {
-    updateCustomerData({ selectedVehicle: vehicle });
-    navigateTo('vehicleDetail');
   };
 
-  // Handle start over
-  const handleStartOver = () => {
-    setMessages([]);
-    setExtractedData(INITIAL_EXTRACTED_DATA);
-    setSuggestedFollowups([]);
-    resetJourney?.();
-    navigateTo('welcome');
-  };
-
-  // Handle request for sales consultant (triggers Slack notification)
-  const handleRequestConsultant = async () => {
-    try {
-      // Call the notify_staff endpoint
-      const response = await api.notifyStaff({
-        notification_type: 'sales',
-        message: 'Customer at kiosk requested to speak with a sales consultant',
-        vehicle_stock: customerData?.selectedVehicle?.stockNumber
-      });
-      
-      // Add a message to the chat confirming the request
-      const confirmMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: '✅ I\'ve notified our sales team that you\'d like to speak with someone. A sales consultant will be with you shortly! In the meantime, feel free to continue browsing or ask me any questions.',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, confirmMessage]);
-      
-      // Speak the confirmation if audio is enabled
-      if (audioEnabled && ttsAvailable) {
-        speakText(confirmMessage.content);
-      }
-    } catch (error) {
-      console.error('Failed to notify staff:', error);
-      // Still show a message even if notification fails
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: 'I\'m having trouble reaching our team right now. Please speak with any of our associates on the showroom floor, or I can continue helping you here!',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+  try {
+    const response = await fetch(url, config);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `API Error: ${response.status}`);
     }
-  };
-
-  // Toggle audio
-  const toggleAudio = () => {
-    if (audioEnabled) {
-      stopSpeaking();
-    }
-    setAudioEnabled(!audioEnabled);
-  };
-
-  return (
-    <div style={styles.container}>
-      <Header
-        customerName={customerData?.customerName}
-        audioEnabled={audioEnabled}
-        isSpeaking={isSpeaking}
-        ttsAvailable={ttsAvailable}
-        onToggleAudio={toggleAudio}
-      />
-      
-      {showObjectionPanel && (
-        <ObjectionPanel
-          onSelectPrompt={sendMessage}
-          onClose={() => setShowObjectionPanel(false)}
-        />
-      )}
-
-      {/* Messages */}
-      <div style={styles.messagesContainer}>
-        {messages.length === 0 && (
-          <SuggestionChips onSelect={sendMessage} />
-        )}
-
-        {messages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            onVehicleClick={handleVehicleClick}
-          />
-        ))}
-
-        {isLoading && <LoadingIndicator />}
-
-        {/* Suggested Followups */}
-        {suggestedFollowups.length > 0 && !isLoading && (
-          <div style={styles.followupsContainer}>
-            <p style={styles.followupsLabel}>You might also want to ask:</p>
-            <div style={styles.followupsGrid}>
-              {suggestedFollowups.map((followup, idx) => (
-                <button
-                  key={idx}
-                  style={styles.followupButton}
-                  onClick={() => sendMessage(followup)}
-                >
-                  {followup}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      <ChatInput
-        value={inputValue}
-        onChange={setInputValue}
-        onSend={() => sendMessage(inputValue)}
-        onMicClick={toggleListening}
-        isListening={isListening}
-        isLoading={isLoading}
-        onStartOver={handleStartOver}
-        onRequestConsultant={handleRequestConsultant}
-      />
-
-      {/* Animations */}
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 1; }
-        }
-      `}</style>
-    </div>
-  );
+    
+    return await response.json() as T;
+  } catch (error) {
+    console.error(`API Request Failed: ${endpoint}`, error);
+    throw error;
+  }
 };
 
-export default AIAssistant;
+/**
+ * Get or create session ID
+ */
+const getSessionId = (): string => {
+  let sessionId = sessionStorage.getItem('kiosk_session_id');
+  if (!sessionId) {
+    sessionId = `K${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    sessionStorage.setItem('kiosk_session_id', sessionId);
+  }
+  return sessionId;
+};
+
+// ============================================
+// INVENTORY ENDPOINTS
+// ============================================
+
+/**
+ * Get all inventory with optional filters
+ */
+export const getInventory = async (filters: InventoryFilters = {}): Promise<InventoryResponse | Vehicle[]> => {
+  const params = new URLSearchParams();
+  
+  if (filters.model) params.append('model', filters.model);
+  if (filters.minPrice) params.append('min_price', String(filters.minPrice));
+  if (filters.maxPrice) params.append('max_price', String(filters.maxPrice));
+  if (filters.bodyType) params.append('body_type', filters.bodyType);
+  if (filters.drivetrain) params.append('drivetrain', filters.drivetrain);
+  if (filters.cabType) params.append('cab_type', filters.cabType);
+  if (filters.condition) params.append('condition', filters.condition);
+  if (filters.sortBy) params.append('sort_by', filters.sortBy);
+  if (filters.limit) params.append('limit', String(filters.limit));
+  
+  const queryString = params.toString();
+  const endpoint = `/inventory${queryString ? `?${queryString}` : ''}`;
+  
+  return apiRequest<InventoryResponse | Vehicle[]>(endpoint);
+};
+
+/**
+ * Get vehicle by stock number
+ */
+export const getVehicleByStock = async (stockNumber: string): Promise<Vehicle> => {
+  return apiRequest<Vehicle>(`/inventory/stock/${stockNumber}`);
+};
+
+/**
+ * Get vehicle by VIN
+ */
+export const getVehicleByVin = async (vin: string): Promise<Vehicle> => {
+  return apiRequest<Vehicle>(`/inventory/vin/${vin}`);
+};
+
+/**
+ * Search inventory with quiz-based preferences
+ */
+export const searchByPreferences = async (preferences: Record<string, unknown>): Promise<Vehicle[]> => {
+  return apiRequest<Vehicle[]>('/inventory/search', {
+    method: 'POST',
+    body: JSON.stringify(preferences),
+  });
+};
+
+/**
+ * Get inventory statistics
+ */
+export const getInventoryStats = async (): Promise<Record<string, unknown>> => {
+  return apiRequest<Record<string, unknown>>('/inventory/stats');
+};
+
+// ============================================
+// INVENTORY SYNC STATUS
+// ============================================
+
+export interface SyncStatusResponse {
+  status: 'healthy' | 'error';
+  source: string;
+  vehicleCount: number;
+  lastLoadTime: string | null;
+  lastFileModified: string | null;
+  currentFileModified: string | null;
+  filePath: string | null;
+  fileExists: boolean;
+  fileSizeKb: number;
+  loadDurationMs: number;
+  freshnessStatus: 'fresh' | 'stale' | 'outdated' | 'unknown';
+  minutesSinceLoad: number | null;
+  needsRefresh: boolean;
+  lastError: string | null;
+  lastErrorTime: string | null;
+  breakdown: {
+    byStatus: Record<string, number>;
+    byBodyStyle: Record<string, number>;
+  };
+}
+
+export interface RefreshResponse {
+  success: boolean;
+  message: string;
+  previousCount: number;
+  newCount: number;
+  change: number;
+  loadDurationMs: number;
+  timestamp: string;
+}
+
+/**
+ * Get inventory sync status
+ */
+export const getSyncStatus = async (): Promise<SyncStatusResponse> => {
+  return apiRequest<SyncStatusResponse>('/inventory/sync/status');
+};
+
+/**
+ * Trigger manual inventory refresh
+ */
+export const refreshInventory = async (): Promise<RefreshResponse> => {
+  return apiRequest<RefreshResponse>('/inventory/sync/refresh', {
+    method: 'POST',
+  });
+};
+
+/**
+ * Get sync history
+ */
+export const getSyncHistory = async (): Promise<{ history: Array<Record<string, unknown>>; note: string }> => {
+  return apiRequest<{ history: Array<Record<string, unknown>>; note: string }>('/inventory/sync/history');
+};
+
+// ============================================
+// TRADE-IN ENDPOINTS
+// ============================================
+
+/**
+ * Get trade-in estimate
+ */
+export const getTradeInEstimate = async (vehicleData: TradeInVehicleData): Promise<TradeInEstimate> => {
+  return apiRequest<TradeInEstimate>('/trade-in/estimate', {
+    method: 'POST',
+    body: JSON.stringify(vehicleData),
+  });
+};
+
+/**
+ * Decode VIN for trade-in
+ */
+export const decodeTradeInVin = async (vin: string): Promise<Partial<TradeInVehicleData>> => {
+  return apiRequest<Partial<TradeInVehicleData>>(`/trade-in/decode/${vin}`);
+};
+
+/**
+ * Request in-person appraisal
+ */
+export const requestAppraisal = async (tradeInData: TradeInVehicleData & { customerPhone: string }): Promise<{ success: boolean; appointmentId?: string }> => {
+  return apiRequest<{ success: boolean; appointmentId?: string }>('/trade-in/appraisal', {
+    method: 'POST',
+    body: JSON.stringify(tradeInData),
+  });
+};
+
+// ============================================
+// TRADE-IN PHOTO ANALYSIS
+// ============================================
+
+interface PhotoItem {
+  id: string;
+  data: string;  // Base64 encoded image
+  mimeType?: string;
+}
+
+interface VehicleInfoForAnalysis {
+  year?: string;
+  make?: string;
+  model?: string;
+  mileage?: string;
+}
+
+interface ConditionIssue {
+  location: string;
+  severity: 'minor' | 'moderate' | 'severe';
+  description: string;
+  estimatedImpact?: string;
+}
+
+interface PhotoAnalysisResult {
+  photoId: string;
+  category: string;
+  issues: ConditionIssue[];
+  positives: string[];
+  notes: string;
+}
+
+export interface PhotoAnalysisResponse {
+  overallCondition: 'excellent' | 'good' | 'fair' | 'poor' | 'pending';
+  conditionScore: number;
+  confidenceLevel: 'high' | 'medium' | 'low';
+  summary: string;
+  detectedMileage?: string;
+  photoResults: PhotoAnalysisResult[];
+  recommendations: string[];
+  estimatedConditionAdjustment: string;
+}
+
+/**
+ * Analyze trade-in photos using AI vision
+ */
+export const analyzeTradeInPhotos = async (
+  photos: PhotoItem[],
+  vehicleInfo?: VehicleInfoForAnalysis
+): Promise<PhotoAnalysisResponse> => {
+  return apiRequest<PhotoAnalysisResponse>('/v1/trade-in-photos/analyze', {
+    method: 'POST',
+    body: JSON.stringify({
+      photos,
+      vehicleInfo,
+    }),
+  });
+};
+
+// ============================================
+// PAYMENT CALCULATION ENDPOINTS
+// ============================================
+
+/**
+ * Calculate lease payment
+ */
+export const calculateLease = async (params: LeaseParams): Promise<PaymentResult> => {
+  return apiRequest<PaymentResult>('/payments/lease', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+};
+
+/**
+ * Calculate finance payment
+ */
+export const calculateFinance = async (params: FinanceParams): Promise<PaymentResult> => {
+  return apiRequest<PaymentResult>('/payments/finance', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+};
+
+/**
+ * Get current rebates and incentives for a vehicle
+ */
+export const getRebates = async (vehicleId: string): Promise<Array<{ name: string; amount: number }>> => {
+  return apiRequest<Array<{ name: string; amount: number }>>(`/payments/rebates/${vehicleId}`);
+};
+
+// ============================================
+// LEAD / HANDOFF ENDPOINTS
+// ============================================
+
+/**
+ * Submit customer lead and notify sales team
+ */
+export const submitLead = async (leadData: LeadData): Promise<{ success: boolean; leadId?: string }> => {
+  return apiRequest<{ success: boolean; leadId?: string }>('/leads/handoff', {
+    method: 'POST',
+    body: JSON.stringify(leadData),
+  });
+};
+
+/**
+ * Schedule test drive
+ */
+export const scheduleTestDrive = async (appointmentData: TestDriveData): Promise<{ success: boolean; appointmentId?: string }> => {
+  return apiRequest<{ success: boolean; appointmentId?: string }>('/leads/test-drive', {
+    method: 'POST',
+    body: JSON.stringify(appointmentData),
+  });
+};
+
+/**
+ * Send deal summary to customer
+ */
+export const sendDealSummary = async (phone: string, dealData: Record<string, unknown>): Promise<{ success: boolean }> => {
+  return apiRequest<{ success: boolean }>('/leads/send-summary', {
+    method: 'POST',
+    body: JSON.stringify({ phone, dealData }),
+  });
+};
+
+// ============================================
+// VEHICLE DATA ENDPOINTS
+// ============================================
+
+/**
+ * Get available makes
+ */
+export const getMakes = async (): Promise<string[]> => {
+  return apiRequest<string[]>('/vehicles/makes');
+};
+
+/**
+ * Get models for a make (optionally filtered by year)
+ */
+export const getModels = async (make: string, year?: string): Promise<string[]> => {
+  const params = year ? `?year=${year}` : '';
+  return apiRequest<string[]>(`/inventory/models/${make}${params}`);
+};
+
+/**
+ * Get trims for a model
+ */
+export const getTrims = async (make: string, model: string, year: number): Promise<string[]> => {
+  return apiRequest<string[]>(`/vehicles/trims?make=${make}&model=${model}&year=${year}`);
+};
+
+// ============================================
+// KIOSK UTILITIES
+// ============================================
+
+/**
+ * Log kiosk analytics event
+ */
+export const logAnalytics = async (event: string, data: Record<string, unknown> = {}): Promise<void> => {
+  try {
+    await apiRequest<void>('/kiosk/analytics', {
+      method: 'POST',
+      body: JSON.stringify({
+        event,
+        data,
+        timestamp: new Date().toISOString(),
+        sessionId: getSessionId(),
+      } as AnalyticsData),
+    });
+  } catch (error) {
+    // Don't throw on analytics failures
+    console.warn('Analytics logging failed:', error);
+  }
+};
+
+/**
+ * Export session ID getter for components
+ */
+export const getKioskSessionId = getSessionId;
+
+/**
+ * Health check
+ */
+export const healthCheck = async (): Promise<{ status: string }> => {
+  return apiRequest<{ status: string }>('/health');
+};
+
+// ============================================
+// TRAFFIC LOG ENDPOINTS
+// ============================================
+
+/**
+ * Log or update a kiosk session
+ */
+export const logTrafficSession = async (sessionData: TrafficSessionData): Promise<void> => {
+  try {
+    await apiRequest<void>('/traffic/session', {
+      method: 'POST',
+      body: JSON.stringify({
+        sessionId: getSessionId(),
+        ...sessionData,
+      }),
+    });
+  } catch (error) {
+    // Don't throw on traffic log failures
+    console.warn('Traffic logging failed:', error);
+  }
+};
+
+/**
+ * Get traffic log entries (admin)
+ * @param limit - Number of entries to return
+ * @param offset - Pagination offset
+ * @param filterToday - If true, filter to today's sessions only
+ */
+export const getTrafficLog = async (
+  limit: number = 50, 
+  offset: number = 0,
+  filterToday: boolean = false
+): Promise<TrafficLogResponse> => {
+  const params = new URLSearchParams();
+  params.append('limit', String(limit));
+  params.append('offset', String(offset));
+  if (filterToday) {
+    params.append('filter_today', 'true');
+  }
+  return apiRequest<TrafficLogResponse>(`/traffic/log?${params.toString()}`);
+};
+
+/**
+ * Get traffic statistics (admin)
+ */
+export const getTrafficStats = async (): Promise<TrafficStats> => {
+  return apiRequest<TrafficStats>('/traffic/stats');
+};
+
+/**
+ * Get single session details (admin)
+ */
+export const getTrafficSession = async (sessionId: string): Promise<TrafficLogEntry> => {
+  return apiRequest<TrafficLogEntry>(`/traffic/log/${sessionId}`);
+};
+
+/**
+ * Get active kiosk sessions for Sales Manager Dashboard
+ * @param timeoutMinutes - Consider sessions active if updated within this many minutes (default 30)
+ */
+export const getActiveSessions = async (timeoutMinutes: number = 30): Promise<ActiveSessionsResponse> => {
+  return apiRequest<ActiveSessionsResponse>(`/traffic/active?timeout_minutes=${timeoutMinutes}`);
+};
+
+/**
+ * Get single session formatted for dashboard 4-square view
+ */
+export const getSessionForDashboard = async (sessionId: string): Promise<ActiveSession> => {
+  return apiRequest<ActiveSession>(`/traffic/dashboard/${sessionId}`);
+};
+
+// ============================================
+// AI ASSISTANT ENDPOINTS
+// ============================================
+
+/**
+ * Chat with AI assistant for vehicle recommendations
+ * Uses V3 intelligent AI with tools and persistent memory
+ */
+export const chatWithAI = async (request: AIChatRequest): Promise<AIChatResponse> => {
+  // Build V3-compatible request with session_id
+  const v3Request = {
+    message: request.message,
+    session_id: getSessionId(),
+    conversation_history: request.conversationHistory.map(m => ({
+      role: m.role,
+      content: m.content
+    })),
+    customer_name: request.customerName || null
+  };
+  
+  // V3 endpoint is at /api/v3/ai/chat (not under /v1)
+  // Get base URL without any version prefix
+  let baseUrl = API_BASE_URL;
+  
+  // Remove /v1 suffix if present (REACT_APP_API_URL may include it)
+  if (baseUrl.endsWith('/v1')) {
+    baseUrl = baseUrl.slice(0, -3); // Remove '/v1'
+  }
+  
+  const url = `${baseUrl}/v3/ai/chat`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(v3Request),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `API Error: ${response.status}`);
+  }
+  
+  return await response.json() as AIChatResponse;
+};
+
+/**
+ * Notify staff when customer requests assistance
+ * Triggers Slack/SMS/Email notifications
+ */
+export interface NotifyStaffRequest {
+  notification_type: 'sales' | 'appraisal' | 'finance';
+  message: string;
+  vehicle_stock?: string;
+}
+
+export interface NotifyStaffResponse {
+  success: boolean;
+  slack_sent?: boolean;
+  sms_sent?: boolean;
+  email_sent?: boolean;
+  errors?: string[];
+}
+
+export const notifyStaff = async (request: NotifyStaffRequest): Promise<NotifyStaffResponse> => {
+  // Get base URL without any version prefix
+  let baseUrl = API_BASE_URL;
+  
+  // Remove /v1 suffix if present
+  if (baseUrl.endsWith('/v1')) {
+    baseUrl = baseUrl.slice(0, -3);
+  }
+  
+  const url = `${baseUrl}/v3/ai/notify-staff`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Session-ID': getSessionId(),
+    },
+    body: JSON.stringify(request),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `API Error: ${response.status}`);
+  }
+  
+  return await response.json() as NotifyStaffResponse;
+};
+
+// ============================================
+// TEXT-TO-SPEECH (ELEVENLABS)
+// ============================================
+
+export interface TTSStatusResponse {
+  available: boolean;
+  provider: 'elevenlabs' | 'browser';
+  voice_id: string | null;
+  voices: Record<string, string>;
+}
+
+export interface TTSRequest {
+  text: string;
+  voice_id?: string;
+  stability?: number;
+  similarity_boost?: number;
+  style?: number;
+}
+
+/**
+ * Check if ElevenLabs TTS is available
+ */
+export const getTTSStatus = async (): Promise<TTSStatusResponse> => {
+  return apiRequest<TTSStatusResponse>('/tts/status');
+};
+
+/**
+ * Convert text to speech using ElevenLabs
+ * Returns audio blob or throws error with fallback flag
+ */
+export const textToSpeech = async (request: TTSRequest): Promise<Blob> => {
+  const response = await fetch(`${API_BASE_URL}/tts/speak`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error = new Error(errorData.detail?.message || 'TTS request failed') as Error & { fallback?: boolean };
+    error.fallback = errorData.detail?.fallback ?? true;
+    throw error;
+  }
+  
+  return response.blob();
+};
+
+/**
+ * Get available ElevenLabs voices
+ */
+export const getTTSVoices = async (): Promise<{
+  available: boolean;
+  voices: Array<{ voice_id: string; name: string; category: string; preview_url?: string }>;
+  presets: Record<string, string>;
+}> => {
+  return apiRequest('/tts/voices');
+};
+
+// ============================================
+// EXPORT DEFAULT API OBJECT
+// ============================================
+
+const api = {
+  // Generic HTTP methods
+  post: <T = unknown>(endpoint: string, data?: unknown): Promise<T> => {
+    return apiRequest<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  },
+  get: <T = unknown>(endpoint: string): Promise<T> => {
+    return apiRequest<T>(endpoint);
+  },
+  
+  // Inventory
+  getInventory,
+  getVehicleByStock,
+  getVehicleByVin,
+  searchByPreferences,
+  getInventoryStats,
+  
+  // Inventory Sync
+  getSyncStatus,
+  refreshInventory,
+  getSyncHistory,
+  
+  // Trade-In
+  getTradeInEstimate,
+  decodeTradeInVin,
+  requestAppraisal,
+  analyzeTradeInPhotos,
+  
+  // Payments
+  calculateLease,
+  calculateFinance,
+  getRebates,
+  
+  // Leads
+  submitLead,
+  scheduleTestDrive,
+  sendDealSummary,
+  
+  // Vehicle Data
+  getMakes,
+  getModels,
+  getTrims,
+  
+  // Utilities
+  logAnalytics,
+  healthCheck,
+  getKioskSessionId,
+  
+  // Traffic Log
+  logTrafficSession,
+  getTrafficLog,
+  getTrafficStats,
+  getTrafficSession,
+  
+  // Sales Manager Dashboard
+  getActiveSessions,
+  getSessionForDashboard,
+  
+  // AI Assistant
+  chatWithAI,
+  notifyStaff,
+  
+  // Text-to-Speech
+  getTTSStatus,
+  textToSpeech,
+  getTTSVoices,
+};
+
+export default api;
