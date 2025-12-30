@@ -176,6 +176,7 @@ class SessionCreate(BaseModel):
     quizAnswers: Optional[Dict[str, Any]] = None
     actions: Optional[List[str]] = None
     chatHistory: Optional[List[ChatMessage]] = None
+    managerNotes: Optional[str] = None  # Notes added by sales manager
 
 
 class SessionResponse(BaseModel):
@@ -235,6 +236,7 @@ def format_session_for_dashboard(session: Dict) -> Dict:
             'price': selected_vehicle.get('salePrice') or selected_vehicle.get('msrp'),
         } if selected_vehicle else None,
         'chatHistory': session.get('chatHistory'),
+        'managerNotes': session.get('managerNotes'),
     }
 
 
@@ -274,6 +276,7 @@ async def db_create_or_update_session(session: AsyncSession, data: Dict) -> str:
                     'vehicleRequested': 'vehicle_requested',
                     'chatHistory': 'chat_history',
                     'quizAnswers': 'quiz_answers',
+                    'managerNotes': 'manager_notes',
                     'createdAt': 'created_at',
                     'updatedAt': 'updated_at',
                 }.get(key, key)
@@ -308,6 +311,7 @@ async def db_create_or_update_session(session: AsyncSession, data: Dict) -> str:
             actions=data.get('actions', []),
             chat_history=data.get('chatHistory'),
             quiz_answers=data.get('quizAnswers'),
+            manager_notes=data.get('managerNotes'),
             created_at=now,
             updated_at=now,
         )
