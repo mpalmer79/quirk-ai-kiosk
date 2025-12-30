@@ -537,6 +537,54 @@ const KioskApp: React.FC = () => {
         </div>
       </header>
 
+      {/* Sales Consultant Button - shown on inventory and related screens */}
+      {['inventory', 'vehicleDetail', 'vehicleComparison', 'paymentCalculator'].includes(currentScreen) && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '12px 20px',
+          background: 'rgba(30, 41, 59, 0.95)',
+        }}>
+          <button
+            onClick={async () => {
+              try {
+                await api.notifyStaff({
+                  notification_type: 'sales',
+                  message: 'Customer at kiosk requested to speak with a sales consultant',
+                  vehicle_stock: customerData.selectedVehicle?.stockNumber
+                });
+                alert('✅ A sales consultant has been notified and will be with you shortly!');
+              } catch (error) {
+                console.error('Failed to notify staff:', error);
+                alert('Please speak with any of our associates on the showroom floor.');
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 24px',
+              backgroundColor: '#4b5563',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '15px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#374151')}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#4b5563')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            Speak with a sales consultant
+          </button>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <main style={{
         ...styles.main,
