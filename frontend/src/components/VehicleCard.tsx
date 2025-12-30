@@ -104,7 +104,8 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onClick }) => {
   const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || 'N/A';
   const bodyStyle = vehicle.bodyStyle || vehicle.body_style;
   const status = vehicle.status || 'In Stock';
-  const price = vehicle.price || vehicle.salePrice || vehicle.sale_price || 0;
+  // Show MSRP (not discounted sale price) on vehicle cards
+  const price = vehicle.msrp || vehicle.MSRP || vehicle.price || vehicle.salePrice || vehicle.sale_price || 0;
   const model = vehicle.model || '';
 
   // Get image URL - uses API image or local stock photo if available
