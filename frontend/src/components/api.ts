@@ -152,6 +152,7 @@ interface TrafficSessionData {
     downPayment?: number;
   };
   chatHistory?: ChatMessage[];  // AI chat conversation history
+  managerNotes?: string;  // Notes added by sales manager
 }
 
 interface TrafficLogEntry {
