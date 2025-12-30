@@ -46,6 +46,7 @@ from app.services.outcome_tracker import (
     get_outcome_tracker
 )
 from app.services.entity_extraction import get_entity_extractor
+from app.services.notifications import get_notification_service
 
 # Security
 from app.core.security import get_key_manager
@@ -869,9 +870,46 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
             state.test_drive_requested = True
         
         staff_notified = True
+        
+        # Build additional context for notification
+        additional_context = {}
+        if state.budget_max:
+            additional_context["budget"] = state.budget_max
+        if state.trade_model:
+            additional_context["trade_in"] = f"{state.trade_year or ''} {state.trade_make or ''} {state.trade_model}".strip()
+        if state.vehicle_preferences:
+            additional_context["preferences"] = state.vehicle_preferences
+        
+        # Send real notifications (Slack + SMS)
+        try:
+            notification_service = get_notification_service()
+            notification_result = await notification_service.notify_staff(
+                notification_type=notification_type,
+                message=message,
+                session_id=state.session_id,
+                vehicle_stock=vehicle_stock,
+                customer_name=state.customer_name,
+                additional_context=additional_context
+            )
+            
+            # Log notification status
+            if notification_result.get("slack_sent") or notification_result.get("sms_sent"):
+                channels = []
+                if notification_result.get("slack_sent"):
+                    channels.append("Slack")
+                if notification_result.get("sms_sent"):
+                    channels.append("SMS")
+                logger.info(f"Staff notified via: {', '.join(channels)}")
+            else:
+                logger.warning(f"Notification sent to dashboard only: {notification_result.get('errors', [])}")
+        except Exception as e:
+            logger.error(f"Notification service error: {e}")
+            # Continue even if notification fails - state is still updated
+        
         result = f"✓ {notification_type.title()} team has been notified: {message}"
         if vehicle_stock:
             result += f" (regarding Stock #{vehicle_stock})"
+        result += " A team member will be with you shortly!"
             
     elif tool_name == "mark_favorite":
         stock = tool_input.get("stock_number", "")
