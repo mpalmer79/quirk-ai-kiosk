@@ -713,7 +713,7 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
                 );
               }
               return <div style={styles.pendingValue}>No vehicle selected</div>;
-            })()}}
+            })()}
           </div>
 
           {/* Trade-In Section */}
