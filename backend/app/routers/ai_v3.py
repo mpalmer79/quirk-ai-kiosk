@@ -486,24 +486,26 @@ For TRUCKS:
 - "Are you looking for a Silverado 1500 or do you need a Heavy Duty (2500HD/3500HD)?"
 - "Do you prefer a Crew Cab (more passenger room) or Double Cab?"
 - "Any preference on trim level? Work Truck, LT, LTZ, High Country, or ZR2?"
-- "What color catches your eye?"
+- "Do you have a color preference? What is your second color choice?"
+- "General Motors has made significant progress with the LZ0 3.0L Duramax Turbo-Diesel. Are you looking for a gas or diesel powered truck?"
 
 For SUVs:
 - "What's your budget range?"
 - "Do you need third-row seating?"
 - "Preference between Equinox, Blazer, Traverse, Tahoe, or Suburban?"
 - "AWD or 4WD preference?"
+- "Do you have a color preference? What would be your second choice?"
 
 For ANY search with many results:
 - "What features are must-haves for you?"
-- "Is there a specific color you're looking for?"
+- "Do you have a color preference? What is your second color choice?"
 - "New or would you consider pre-owned?"
 
 EXAMPLE RESPONSE:
 Customer: "I need a truck that can tow 10,000 pounds and carry 5 people."
 AI: "I found 6 examples that might match what you're looking for! Take a look below.
 
-To help narrow down your options: What's your budget range? And are you looking for a Silverado 1500 (tows up to 13,300 lbs) or would you prefer the Heavy Duty 2500HD (tows up to 18,500 lbs) for extra capability? Also, do you prefer a Crew Cab or Double Cab?"
+To help find your perfect truck: What's your budget range? Do you have a color preference - and what would be your second choice? Also, General Motors has made significant progress with the LZ0 3.0L Duramax Turbo-Diesel - are you looking for a gas or diesel powered truck?"
 
 NEVER just show 6 vehicles and stop - ALWAYS engage to find the PERFECT match!
 
@@ -765,7 +767,7 @@ def format_vehicles_for_tool_result(vehicles: List[ScoredVehicle], total_matches
     
     # Add reminder to ask qualifying questions if more matches exist
     if more_exist:
-        result_parts.append(f"\n📋 IMPORTANT: Showing {shown_count} of {total}+ matches. Ask about: budget range, model preference (1500 vs 2500HD), cab type (Crew vs Double), trim level, or color to help narrow down the perfect vehicle!")
+        result_parts.append(f"\n📋 IMPORTANT: Showing {shown_count} of {total}+ matches (sorted lowest to highest price). Ask about: budget range, color preference (+ second choice), gas vs diesel, model preference (1500 vs 2500HD), cab type (Crew vs Double), or trim level to help find the perfect vehicle!")
     
     return '\n'.join(result_parts)
 
@@ -952,7 +954,10 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
         # Track total matches BEFORE limiting (for qualifying questions prompt)
         total_matches = len(scored_vehicles)
         
-        # Limit to top 6 after filtering
+        # Sort by price ascending (least expensive first) before limiting
+        scored_vehicles.sort(key=lambda sv: sv.vehicle.get('MSRP') or sv.vehicle.get('price', 0) or 999999)
+        
+        # Limit to top 6 after filtering and sorting
         scored_vehicles = scored_vehicles[:6]
         
         # CRITICAL: Filter out vehicles matching trade-in model
@@ -988,7 +993,10 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
         source_vehicle = retriever.get_vehicle_by_stock(stock)
         
         if source_vehicle:
-            similar = retriever.retrieve_similar(source_vehicle, limit=4)
+            similar = retriever.retrieve_similar(source_vehicle, limit=6)
+            # Sort by price ascending (least expensive first)
+            similar.sort(key=lambda sv: sv.vehicle.get('MSRP') or sv.vehicle.get('price', 0) or 999999)
+            similar = similar[:4]  # Limit to 4 after sorting
             vehicles_to_show = similar
             result = f"Similar vehicles to Stock #{stock}:\n" + format_vehicles_for_tool_result(similar)
         else:
