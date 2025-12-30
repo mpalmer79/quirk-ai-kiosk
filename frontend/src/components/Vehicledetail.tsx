@@ -1,5 +1,5 @@
 import React, { useState, useEffect, CSSProperties } from 'react';
-import { logTrafficSession } from './api';
+import { logTrafficSession, notifyStaff } from './api';
 import type { Vehicle, KioskComponentProps } from '../types';
 import { getVehicleImageUrl, getColorCategory, getColorGradient } from '../utils/vehicleHelpers';
 import QRCodeModal from './QRCodeModal';
@@ -136,6 +136,22 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
     setRequestSending(true);
     
     try {
+      // Send Slack notification to bring vehicle up front
+      await notifyStaff({
+        notification_type: 'vehicle_request',
+        message: `🚗 Customer requests to have vehicle brought up front to view`,
+        vehicle_stock: stockNumber,
+        vehicle_info: {
+          year: vehicle.year,
+          make: vehicle.make,
+          model: vehicle.model,
+          trim: vehicle.trim,
+          exteriorColor: exteriorColor,
+          msrp: msrp,
+          salePrice: quirkPrice,
+        },
+      });
+      
       // Log the vehicle request to traffic session
       await logTrafficSession({
         currentStep: 'vehicleRequest',
