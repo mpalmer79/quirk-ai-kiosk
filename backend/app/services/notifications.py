@@ -148,6 +148,7 @@ class NotificationService:
         # Emoji based on type
         emoji_map = {
             "sales": "🚗",
+            "vehicle_request": "🚙",
             "appraisal": "🔄",
             "finance": "💰"
         }
@@ -156,6 +157,7 @@ class NotificationService:
         # Title
         titles = {
             "sales": "Sales Assistance Requested",
+            "vehicle_request": "Vehicle Bring-Up Requested",
             "appraisal": "Trade-In Appraisal Requested",
             "finance": "Finance Help Requested"
         }
@@ -222,13 +224,46 @@ class NotificationService:
         
         # Add vehicle info if present
         if notification.get("vehicle_stock"):
-            slack_payload["blocks"].append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*Vehicle:* Stock #{notification['vehicle_stock']}"
-                }
-            })
+            context = notification.get("additional_context", {})
+            vehicle_info = context.get("vehicle_info", {})
+            
+            # Build vehicle description
+            if vehicle_info:
+                year = vehicle_info.get("year", "")
+                make = vehicle_info.get("make", "")
+                model = vehicle_info.get("model", "")
+                trim = vehicle_info.get("trim", "")
+                color = vehicle_info.get("exteriorColor", "")
+                msrp = vehicle_info.get("msrp")
+                sale_price = vehicle_info.get("salePrice")
+                
+                vehicle_desc = f"{year} {make} {model}"
+                if trim:
+                    vehicle_desc += f" {trim}"
+                
+                vehicle_text = f"*Vehicle:* {vehicle_desc}\n*Stock #:* {notification['vehicle_stock']}"
+                if color:
+                    vehicle_text += f"\n*Color:* {color}"
+                if sale_price:
+                    vehicle_text += f"\n*Price:* ${sale_price:,.0f}"
+                elif msrp:
+                    vehicle_text += f"\n*MSRP:* ${msrp:,.0f}"
+                
+                slack_payload["blocks"].append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": vehicle_text
+                    }
+                })
+            else:
+                slack_payload["blocks"].append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Vehicle:* Stock #{notification['vehicle_stock']}"
+                    }
+                })
         
         # Add additional context if present
         context = notification.get("additional_context", {})
