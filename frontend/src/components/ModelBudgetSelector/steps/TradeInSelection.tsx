@@ -41,20 +41,17 @@ const TradeInSelection: React.FC<TradeInSelectionProps> = ({
     }
   }
 
-  // If model not found, redirect
-  if (!foundModel) {
-    setTimeout(() => navigateTo('modelBudget/category'), 0);
-    return null;
-  }
-
+  // MOVED: ALL useEffect hooks MUST be called before any early returns
   // Sync with parent state
   useEffect(() => {
-    updateState({ 
-      selectedModel: foundModel,
-      selectedCab: cabSlug ? cabSlug.split('-').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-      ).join(' ') : null,
-    });
+    if (foundModel) {
+      updateState({ 
+        selectedModel: foundModel,
+        selectedCab: cabSlug ? cabSlug.split('-').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ') : null,
+      });
+    }
   }, [foundModel, cabSlug, updateState]);
 
   // Fetch trade-in models when year and make are selected
@@ -77,6 +74,12 @@ const TradeInSelection: React.FC<TradeInSelectionProps> = ({
     };
     fetchTradeModels();
   }, [tradeVehicle.year, tradeVehicle.make]);
+
+  // If model not found, redirect (AFTER all hooks)
+  if (!foundModel) {
+    setTimeout(() => navigateTo('modelBudget/category'), 0);
+    return null;
+  }
 
   // Currency input handlers
   const handlePayoffAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
