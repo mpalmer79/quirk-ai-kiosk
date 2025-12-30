@@ -124,10 +124,23 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const [loadingTradeModels, setLoadingTradeModels] = useState<boolean>(false);
 
   // Fetch inventory counts on mount to filter available models
+  // FIX: Added 5-second timeout to prevent blocking UI when backend is unavailable
   useEffect(() => {
+    const INVENTORY_TIMEOUT_MS = 5000;
+    
     const loadInventoryCounts = async (): Promise<void> => {
       try {
-        const data = await api.getInventory({});
+        // Create a timeout promise that rejects after 5 seconds
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Inventory load timeout')), INVENTORY_TIMEOUT_MS)
+        );
+        
+        // Race the API call against the timeout
+        const data = await Promise.race([
+          api.getInventory({}),
+          timeoutPromise
+        ]);
+        
         const vehicles: Vehicle[] = Array.isArray(data) ? data : (data as { vehicles?: Vehicle[] }).vehicles || [];
         
         const counts: InventoryByModel = {};
@@ -146,8 +159,11 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
         
         setInventoryByModel(counts);
       } catch (err) {
-        console.error('Error loading inventory counts:', err);
+        // Log warning but don't block UI - allow component to render with empty inventory
+        console.warn('Failed to load inventory counts:', err);
+        setInventoryByModel({});
       } finally {
+        // Always set loading to false so UI can render
         setLoadingInventory(false);
       }
     };
@@ -283,8 +299,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   };
 
   const handleFinancedWithChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    const value = e.target.value.slice(0, 25);
-    setFinancedWith(value);
+    setFinancedWith(e.target.value);
   };
 
   const handleTradeVehicleChange = (field: keyof TradeVehicleInfo, value: string): void => {
@@ -292,31 +307,51 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   };
 
   const handleSearch = (): void => {
-    updateCustomerData({
-      selectedModel: selectedModel?.name,
-      selectedCab: selectedCab || undefined,
-      colorPreferences: [colorChoices.first, colorChoices.second].filter(Boolean),
+    if (!selectedModel) return;
+    
+    // Build customer data object
+    const preferences = {
+      category: selectedCategory,
+      model: selectedModel.name,
+      cab: selectedCab,
+      colorPreferences: colorChoices,
       budgetRange,
       downPaymentPercent,
       hasTrade,
+      tradeVehicle: hasTrade ? tradeVehicle : null,
       hasPayoff,
-      payoffAmount: hasPayoff ? parseFloat(payoffAmount) : null,
-      monthlyPayment: hasPayoff ? parseFloat(monthlyPayment) : null,
+      payoffAmount: hasPayoff ? payoffAmount : null,
+      monthlyPayment: hasPayoff ? monthlyPayment : null,
       financedWith: hasPayoff ? financedWith : null,
-      tradeVehicle: hasTrade ? {
-        year: tradeVehicle.year,
-        make: tradeVehicle.make,
-        model: tradeVehicle.model,
-        mileage: tradeVehicle.mileage ? parseInt(tradeVehicle.mileage) : null,
-      } : null,
-      path: 'modelBudget',
-    });
-    navigateTo('inventory');
+    };
+    
+    // Update customer data context
+    if (updateCustomerData) {
+      updateCustomerData({
+        ...customerData,
+        selectedModel: selectedModel.name,
+        selectedCab: selectedCab,
+        budgetRange: budgetRange,
+        bodyStyleFilter: selectedCategory,
+        colorPreferences: colorChoices,
+        tradeInfo: hasTrade ? {
+          ...tradeVehicle,
+          hasPayoff,
+          payoffAmount: hasPayoff ? payoffAmount : null,
+          monthlyPayment: hasPayoff ? monthlyPayment : null,
+          financedWith: hasPayoff ? financedWith : null,
+        } : null,
+      });
+    }
+    
+    // Navigate to inventory with filters
+    navigateTo('inventory', preferences);
   };
 
+  // Back button logic
   const handleBack = (): void => {
     if (step === 6) setStep(5);
-    else if (step === 5) setStep(4);
+    else if (step === 5) setStep(selectedModel?.cabOptions ? 4 : 4);
     else if (step === 4 && selectedModel?.cabOptions) setStep(3);
     else if (step === 4) setStep(2);
     else if (step === 3) setStep(2);
@@ -448,7 +483,6 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                       alt={model.name}
                       style={styles.categoryImage as React.CSSProperties}
                       onError={(e) => {
-                        // Hide broken image, show fallback
                         (e.target as HTMLImageElement).style.display = 'none';
                         const parent = (e.target as HTMLImageElement).parentElement;
                         if (parent) {
@@ -469,20 +503,18 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                         bottom: 0,
                       }}
                     >
-                      <div style={styles.modelInitial}>{model.name.charAt(0)}</div>
+                      <span style={styles.categoryFallbackIcon as React.CSSProperties}>{model.name.charAt(0)}</span>
                     </div>
                     <div style={styles.categoryImageOverlay as React.CSSProperties} />
                   </div>
                 ) : (
                   <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
-                    <div style={styles.modelInitial}>{model.name.charAt(0)}</div>
+                    <span style={styles.categoryFallbackIcon as React.CSSProperties}>{model.name.charAt(0)}</span>
                   </div>
                 )}
-                {/* Text content below image */}
                 <div style={styles.categoryContent as React.CSSProperties}>
-                  <span style={styles.modelName}>{model.name}</span>
-                  <span style={styles.modelCount}>{model.count} in stock</span>
-                  {model.cabOptions && <span style={styles.modelConfig}>{model.cabOptions.length} configurations</span>}
+                  <div style={styles.categoryName}>{model.name}</div>
+                  <div style={styles.categoryCount}>{model.count} available</div>
                 </div>
               </button>
             );
@@ -493,19 +525,12 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
     );
   };
 
-  // Step 3: Cab Selection
+  // Step 3: Cab Selection (for trucks only) - Now with actual vehicle images
   const renderCabSelection = (): JSX.Element | null => {
-    if (!selectedModel?.cabOptions) return null;
-    
-    // Helper to get cab description
-    const getCabDescription = (cab: string): string => {
-      if (cab.includes('Regular')) return '2-door, 3 passengers';
-      if (cab.includes('Double')) return '4-door, 5-6 passengers';
-      if (cab.includes('Crew')) return '4-door, 5-6 passengers, most room';
-      if (cab.includes('Extended')) return '4-door, 5 passengers';
-      return '';
-    };
-    
+    if (!selectedModel?.cabOptions) {
+      setStep(4);
+      return null;
+    }
     return (
       <div style={styles.stepContainer}>
         <button style={styles.backButton} onClick={handleBack}>
@@ -515,26 +540,31 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
           Back
         </button>
         <div style={styles.stepHeader}>
-          <h1 style={styles.stepTitle}>What cab configuration?</h1>
-          <p style={styles.stepSubtitle}>Select the cab style that fits your needs</p>
+          <h1 style={styles.stepTitle}>Choose your cab configuration</h1>
+          <p style={styles.stepSubtitle}>Select the cab style for your {selectedModel.name}</p>
         </div>
         <div style={styles.categorySelectionCard}>
           <div style={styles.cabGrid}>
             {selectedModel.cabOptions.map((cab) => {
               const cabImageKey = `${selectedModel.name}-${cab}`;
               const cabImage = CAB_IMAGES[cabImageKey];
-              
               return (
-                <button key={cab} style={styles.modelCard} onClick={() => handleCabSelect(cab)}>
-                  {/* Image container with fallback to icon */}
+                <button
+                  key={cab}
+                  style={{
+                    ...styles.cabCard,
+                    ...(selectedCab === cab ? styles.cabCardActive : {}),
+                  }}
+                  onClick={() => handleCabSelect(cab)}
+                >
+                  {/* Image container with fallback */}
                   {cabImage ? (
-                    <div style={styles.categoryImageContainer as React.CSSProperties}>
+                    <div style={styles.cabImageContainer as React.CSSProperties}>
                       <img 
                         src={cabImage} 
                         alt={cab}
-                        style={styles.categoryImage as React.CSSProperties}
+                        style={styles.cabImage as React.CSSProperties}
                         onError={(e) => {
-                          // Hide broken image, show fallback
                           (e.target as HTMLImageElement).style.display = 'none';
                           const parent = (e.target as HTMLImageElement).parentElement;
                           if (parent) {
@@ -546,7 +576,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                       <div 
                         data-fallback
                         style={{ 
-                          ...styles.categoryImagePlaceholder as React.CSSProperties, 
+                          ...styles.cabImagePlaceholder as React.CSSProperties, 
                           display: 'none',
                           position: 'absolute',
                           top: 0,
@@ -555,29 +585,16 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
                           bottom: 0,
                         }}
                       >
-                        <div style={styles.cabIconLarge}>
-                          {cab.includes('Regular') && '🚗'}
-                          {cab.includes('Double') && '🚙'}
-                          {cab.includes('Crew') && '🛻'}
-                          {cab.includes('Extended') && '🚙'}
-                        </div>
+                        <span style={styles.cabFallbackIcon as React.CSSProperties}>🚗</span>
                       </div>
-                      <div style={styles.categoryImageOverlay as React.CSSProperties} />
                     </div>
                   ) : (
-                    <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
-                      <div style={styles.cabIconLarge}>
-                        {cab.includes('Regular') && '🚗'}
-                        {cab.includes('Double') && '🚙'}
-                        {cab.includes('Crew') && '🛻'}
-                        {cab.includes('Extended') && '🚙'}
-                      </div>
+                    <div style={styles.cabImagePlaceholder as React.CSSProperties}>
+                      <span style={styles.cabFallbackIcon as React.CSSProperties}>🚗</span>
                     </div>
                   )}
-                  {/* Text content below image */}
-                  <div style={styles.categoryContent as React.CSSProperties}>
-                    <span style={styles.modelName}>{cab}</span>
-                    <span style={styles.modelConfig}>{getCabDescription(cab)}</span>
+                  <div style={styles.cabContent as React.CSSProperties}>
+                    <span style={styles.cabName}>{cab}</span>
                   </div>
                 </button>
               );
@@ -589,12 +606,8 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   };
 
   // Step 4: Color Selection
-  const renderColorSelection = (): JSX.Element | null => {
-    if (!selectedModel) return null;
-    
+  const renderColorSelection = (): JSX.Element => {
     const colors = getModelColors();
-    const availableForSecond = colors.filter(c => c.name !== colorChoices.first);
-
     return (
       <div style={styles.stepContainer}>
         <button style={styles.backButton} onClick={handleBack}>
@@ -604,91 +617,96 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
           Back
         </button>
         <div style={styles.stepHeader}>
-          <h1 style={styles.stepTitle}>Color Preferences</h1>
-          <p style={styles.stepSubtitle}>
-            {inventoryCount !== null && `We have ${inventoryCount} ${selectedModel.name} vehicles in stock`}
-          </p>
+          <h1 style={styles.stepTitle}>🎨 Color Preferences</h1>
+          <p style={styles.stepSubtitle}>Choose your preferred exterior colors (optional)</p>
         </div>
-        <div style={styles.formSection}>
-          <p style={styles.formIntro}>Select up to 2 GM colors for {selectedModel.name} in order of preference:</p>
-          <div style={styles.colorSelects}>
-            <div style={styles.colorSelectGroup}>
-              <label style={styles.inputLabel}>First Choice</label>
-              <select 
-                style={styles.selectInput} 
-                value={colorChoices.first} 
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleColorChange('first', e.target.value)}
-              >
-                <option value="">Select a color...</option>
-                {colors.map((color) => (
-                  <option key={color.code} value={color.name}>
-                    {color.name} {color.premium && `(+$${color.price})`}
-                  </option>
-                ))}
-              </select>
-              {colorChoices.first && (
-                <div style={styles.colorPreview}>
-                  <div style={{...styles.colorSwatch, backgroundColor: colors.find(c => c.name === colorChoices.first)?.hex || '#666'}} />
-                  <span>{colorChoices.first}</span>
-                </div>
-              )}
+        <div style={styles.colorSection}>
+          <div style={styles.colorChoiceContainer}>
+            <label style={styles.colorLabel}>First Choice</label>
+            <div style={styles.colorGrid}>
+              {colors.map((color) => (
+                <button
+                  key={color.code}
+                  style={{
+                    ...styles.colorSwatch,
+                    background: color.hex.includes(',') 
+                      ? `linear-gradient(135deg, ${color.hex.split(',')[0]} 50%, ${color.hex.split(',')[1]} 50%)` 
+                      : color.hex,
+                    ...(colorChoices.first === color.code ? styles.colorSwatchActive : {}),
+                  }}
+                  onClick={() => handleColorChange('first', color.code)}
+                  title={color.name}
+                >
+                  {colorChoices.first === color.code && (
+                    <span style={styles.colorCheck}>✓</span>
+                  )}
+                </button>
+              ))}
             </div>
-            <div style={styles.colorSelectGroup}>
-              <label style={styles.inputLabel}>Second Choice</label>
-              <select 
-                style={{...styles.selectInput, opacity: colorChoices.first ? 1 : 0.5}} 
-                value={colorChoices.second} 
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleColorChange('second', e.target.value)} 
-                disabled={!colorChoices.first}
-              >
-                <option value="">Select a color...</option>
-                {availableForSecond.map((color) => (
-                  <option key={color.code} value={color.name}>
-                    {color.name} {color.premium && `(+$${color.price})`}
-                  </option>
-                ))}
-              </select>
-              {colorChoices.second && (
-                <div style={styles.colorPreview}>
-                  <div style={{...styles.colorSwatch, backgroundColor: colors.find(c => c.name === colorChoices.second)?.hex || '#666'}} />
-                  <span>{colorChoices.second}</span>
-                </div>
-              )}
-            </div>
+            {colorChoices.first && (
+              <p style={styles.selectedColorName}>
+                {colors.find(c => c.code === colorChoices.first)?.name}
+              </p>
+            )}
           </div>
-          <button style={styles.continueButton} onClick={() => setStep(5)}>
-            Continue to Budget
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
-          </button>
+          <div style={styles.colorChoiceContainer}>
+            <label style={styles.colorLabel}>Second Choice</label>
+            <div style={styles.colorGrid}>
+              {colors.map((color) => (
+                <button
+                  key={color.code}
+                  style={{
+                    ...styles.colorSwatch,
+                    background: color.hex.includes(',') 
+                      ? `linear-gradient(135deg, ${color.hex.split(',')[0]} 50%, ${color.hex.split(',')[1]} 50%)` 
+                      : color.hex,
+                    ...(colorChoices.second === color.code ? styles.colorSwatchActive : {}),
+                    opacity: colorChoices.first === color.code ? 0.3 : 1,
+                  }}
+                  onClick={() => handleColorChange('second', color.code)}
+                  title={color.name}
+                  disabled={colorChoices.first === color.code}
+                >
+                  {colorChoices.second === color.code && (
+                    <span style={styles.colorCheck}>✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {colorChoices.second && (
+              <p style={styles.selectedColorName}>
+                {colors.find(c => c.code === colorChoices.second)?.name}
+              </p>
+            )}
+          </div>
         </div>
+        <button 
+          style={styles.continueButton}
+          onClick={() => setStep(5)}
+        >
+          Continue
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
       </div>
     );
   };
 
   // Step 5: Budget Selection
-  const renderBudgetSelection = (): JSX.Element | null => {
-    if (!selectedModel) return null;
-    
-    const APR = 0.07;
-    const monthlyRate = APR / 12;
-    
-    const calculateLoanAmount = (payment: number, months: number): number => {
-      if (monthlyRate === 0) return payment * months;
-      return payment * ((1 - Math.pow(1 + monthlyRate, -months)) / monthlyRate);
+  const renderBudgetSelection = (): JSX.Element => {
+    // Calculate estimated vehicle price range based on monthly payment
+    const estimateVehiclePrice = (monthlyPayment: number, downPaymentPercent: number): number => {
+      const term = 72; // months
+      const rate = 0.069 / 12; // 6.9% APR
+      const loanAmount = monthlyPayment * ((1 - Math.pow(1 + rate, -term)) / rate);
+      const vehiclePrice = loanAmount / (1 - downPaymentPercent / 100);
+      return Math.round(vehiclePrice / 1000) * 1000;
     };
-    
-    const estimatedLoan = calculateLoanAmount(budgetRange.max, 84);
-    const term = estimatedLoan > 20000 ? 84 : 72;
-    const loanAmount = calculateLoanAmount(budgetRange.max, term);
-    
-    const downPaymentFraction = downPaymentPercent / 100;
-    const totalBuyingPower = downPaymentPercent === 0 
-      ? loanAmount 
-      : loanAmount / (1 - downPaymentFraction);
-    const downPaymentAmount = totalBuyingPower * downPaymentFraction;
-    
+
+    const minVehiclePrice = estimateVehiclePrice(budgetRange.min, downPaymentPercent);
+    const maxVehiclePrice = estimateVehiclePrice(budgetRange.max, downPaymentPercent);
+
     return (
       <div style={styles.stepContainer}>
         <button style={styles.backButton} onClick={handleBack}>
@@ -698,301 +716,251 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
           Back
         </button>
         <div style={styles.stepHeader}>
-          <span style={styles.modelBadge}>{selectedModel.name} {selectedCab && `• ${selectedCab}`}</span>
-          <h1 style={styles.stepTitle}>💰 Monthly Budget</h1>
-          <p style={styles.stepSubtitle}>What monthly payment range works for you?</p>
+          <h1 style={styles.stepTitle}>💰 Budget Range</h1>
+          <p style={styles.stepSubtitle}>What monthly payment works for you?</p>
         </div>
-        <div style={styles.formSection}>
+        <div style={styles.budgetCard}>
           <div style={styles.budgetDisplay}>
-            <span style={styles.budgetValue}>${budgetRange.min.toLocaleString()}</span>
+            <span style={styles.budgetAmount}>${budgetRange.min}</span>
             <span style={styles.budgetSeparator}>to</span>
-            <span style={styles.budgetValue}>${budgetRange.max.toLocaleString()}</span>
-            <span style={styles.budgetLabel}>/month</span>
+            <span style={styles.budgetAmount}>${budgetRange.max}</span>
+            <span style={styles.budgetPeriod}>/month</span>
           </div>
-          <div style={styles.sliderGroup}>
-            <label style={styles.sliderLabel}>Target Budget: ${budgetRange.min.toLocaleString()}/mo</label>
-            <input 
-              type="range" 
-              min="200" 
-              max="2000" 
-              step="50" 
-              value={budgetRange.min}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                const val = parseInt(e.target.value);
-                setBudgetRange(prev => ({ ...prev, min: val, max: Math.max(val + 100, prev.max) }));
-              }}
-              style={styles.slider}
-            />
-          </div>
-          <div style={styles.sliderGroup}>
-            <label style={styles.sliderLabel}>Maximum: ${budgetRange.max.toLocaleString()}/mo</label>
-            <input 
-              type="range" 
-              min="300" 
-              max="2500" 
-              step="50" 
-              value={budgetRange.max}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                const val = parseInt(e.target.value);
-                setBudgetRange(prev => ({ ...prev, max: val, min: Math.min(val - 100, prev.min) }));
-              }}
-              style={styles.slider}
-            />
-          </div>
-          <div style={styles.downPaymentSection}>
-            <label style={styles.inputLabel}>
-              Down Payment <span style={styles.downPaymentDisclaimer}>(MOST LENDERS PREFER AT LEAST 20% INITIAL INVESTMENT)</span>
-            </label>
-            <div style={styles.downPaymentOptions}>
-              {[0, 5, 10, 15, 20].map((percent) => (
-                <button 
-                  key={percent}
-                  style={{...styles.optionButton, ...(downPaymentPercent === percent ? styles.optionButtonActive : {})}}
-                  onClick={() => setDownPaymentPercent(percent)}
-                >
-                  {percent === 0 ? '$0' : `${percent}.00%`}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={styles.buyingPowerSection}>
-            <p style={styles.buyingPowerIntro}>
-              Here's the straight-up math on what that budget really buys today.
-            </p>
-            
-            <div style={styles.buyingPowerCard}>
-              <h4 style={styles.buyingPowerTitle}>📊 Your Buying Power</h4>
-              <ul style={styles.buyingPowerList}>
-                <li>Down payment: <strong>{downPaymentPercent === 0 ? '$0' : `${downPaymentPercent}% (~$${Math.round(downPaymentAmount).toLocaleString()})`}</strong></li>
-                <li>Monthly payment: <strong>${budgetRange.max.toLocaleString()}</strong></li>
-                <li>Term: <strong>{term} months</strong></li>
-                <li>APR: <strong>7%</strong></li>
-              </ul>
-              
-              <p style={styles.buyingPowerText}>
-                Using standard auto-loan amortization, your <strong>loan amount</strong> (what the payment supports) comes out to:
-              </p>
-              
-              <div style={styles.buyingPowerResult}>
-                <span>👍 Approximately:</span>
-                <strong>${Math.round(loanAmount).toLocaleString()} financed</strong>
-              </div>
-              
-              <p style={styles.buyingPowerText}>
-                {downPaymentPercent > 0 
-                  ? `Add your ${downPaymentPercent}% down payment (~$${Math.round(downPaymentAmount).toLocaleString()}):`
-                  : 'With $0 down payment:'
-                }
-              </p>
-              
-              <div style={styles.buyingPowerTotal}>
-                <span>🚗 Estimated max vehicle sale price:</span>
-                <strong>~${Math.round(totalBuyingPower).toLocaleString()}</strong>
-              </div>
-            </div>
-
-            <div style={styles.mathBreakdown}>
-              <h4 style={styles.mathTitle}>📋 How it breaks down</h4>
-              <ul style={styles.mathList}>
-                <li>Monthly rate = {(APR * 100).toFixed(0)}% / 12 = {(monthlyRate * 100).toFixed(4)}%</li>
-                <li>Payment factor over {term} months gives you ~${Math.round(loanAmount / 1000)}k in borrowing power.</li>
-                <li>Total buying power = loan amount {downPaymentPercent > 0 ? `+ ${downPaymentPercent}% down payment` : '(no down payment)'}.</li>
-              </ul>
-            </div>
-          </div>
-
-          <button style={styles.continueButton} onClick={() => setStep(6)}>
-            Continue
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
-          </button>
           
-          <p style={styles.disclaimer}>Taxes and Dealer fees separate.</p>
+          <div style={styles.sliderContainer}>
+            <label style={styles.sliderLabel}>Minimum Payment</label>
+            <input
+              type="range"
+              min="200"
+              max="2000"
+              step="50"
+              value={budgetRange.min}
+              onChange={(e) => setBudgetRange(prev => ({ ...prev, min: Math.min(parseInt(e.target.value), prev.max - 50) }))}
+              style={styles.slider}
+            />
+          </div>
+          
+          <div style={styles.sliderContainer}>
+            <label style={styles.sliderLabel}>Maximum Payment</label>
+            <input
+              type="range"
+              min="200"
+              max="2000"
+              step="50"
+              value={budgetRange.max}
+              onChange={(e) => setBudgetRange(prev => ({ ...prev, max: Math.max(parseInt(e.target.value), prev.min + 50) }))}
+              style={styles.slider}
+            />
+          </div>
+
+          <div style={styles.sliderContainer}>
+            <label style={styles.sliderLabel}>Down Payment: {downPaymentPercent}%</label>
+            <input
+              type="range"
+              min="0"
+              max="30"
+              step="5"
+              value={downPaymentPercent}
+              onChange={(e) => setDownPaymentPercent(parseInt(e.target.value))}
+              style={styles.slider}
+            />
+          </div>
+
+          <div style={styles.priceEstimate}>
+            <p style={styles.priceEstimateText}>
+              Estimated vehicle price range: <strong>${minVehiclePrice.toLocaleString()} - ${maxVehiclePrice.toLocaleString()}</strong>
+            </p>
+            <p style={styles.priceEstimateNote}>
+              Based on 72 months at 6.9% APR with {downPaymentPercent}% down
+            </p>
+          </div>
         </div>
+        <button 
+          style={styles.continueButton}
+          onClick={() => setStep(6)}
+        >
+          Continue
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
       </div>
     );
   };
 
   // Step 6: Trade-In Qualification
-  const renderTradeInQualification = (): JSX.Element | null => {
-    if (!selectedModel) return null;
-    
-    return (
-      <div style={styles.stepContainer}>
-        <button style={styles.backButton} onClick={handleBack}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          Back
-        </button>
-        <div style={styles.stepHeader}>
-          <span style={styles.modelBadge}>{selectedModel.name} {selectedCab && `• ${selectedCab}`}</span>
-          <h1 style={styles.stepTitle}>🚗 Trade-In Vehicle</h1>
-          <p style={styles.stepSubtitle}>Do you have a vehicle to trade in?</p>
-        </div>
-        <div style={styles.formSection}>
-          <div style={styles.tradeOptions}>
-            <button
-              style={{...styles.tradeCard, ...(hasTrade === true ? styles.tradeCardActive : {})}}
-              onClick={() => setHasTrade(true)}
-            >
-              <div style={styles.tradeIcon}>✓</div>
-              <span style={styles.tradeName}>Yes, I have a trade-in</span>
-              <span style={styles.tradeDesc}>Get an instant estimate on your current vehicle</span>
-            </button>
-            <button
-              style={{...styles.tradeCard, ...(hasTrade === false ? styles.tradeCardActive : {})}}
-              onClick={() => { setHasTrade(false); setHasPayoff(null); }}
-            >
-              <div style={styles.tradeIcon}>✗</div>
-              <span style={styles.tradeName}>No trade-in</span>
-              <span style={styles.tradeDesc}>I don't have a vehicle to trade</span>
-            </button>
-          </div>
-
-          {hasTrade === true && (
-            <div style={styles.payoffSection}>
-              {/* Trade Vehicle Information */}
-              <h3 style={styles.payoffTitle}>Tell us about your trade-in vehicle</h3>
-              <div style={styles.tradeVehicleGrid}>
-                <div style={styles.payoffFieldGroup}>
-                  <label style={styles.inputLabel}>Year</label>
-                  <select
-                    style={styles.selectInput}
-                    value={tradeVehicle.year}
-                    onChange={(e) => handleTradeVehicleChange('year', e.target.value)}
-                  >
-                    <option value="">Select Year</option>
-                    {YEAR_OPTIONS.map((year) => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={styles.payoffFieldGroup}>
-                  <label style={styles.inputLabel}>Make</label>
-                  <select
-                    style={styles.selectInput}
-                    value={tradeVehicle.make}
-                    onChange={(e) => handleTradeVehicleChange('make', e.target.value)}
-                  >
-                    <option value="">Select Make</option>
-                    {COMMON_MAKES.map((make) => (
-                      <option key={make} value={make}>{make}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={styles.payoffFieldGroup}>
-                  <label style={styles.inputLabel}>Model</label>
-                  <select
-                    style={styles.selectInput}
-                    value={tradeVehicle.model}
-                    onChange={(e) => handleTradeVehicleChange('model', e.target.value)}
-                    disabled={!tradeVehicle.year || !tradeVehicle.make || loadingTradeModels}
-                  >
-                    <option value="">{loadingTradeModels ? 'Loading...' : 'Select Model'}</option>
-                    {tradeModels.map((model) => (
-                      <option key={model} value={model}>{model}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={styles.payoffFieldGroup}>
-                  <label style={styles.inputLabel}>Mileage</label>
-                  <input
-                    type="text"
-                    style={styles.textInputStandalone}
-                    placeholder="e.g., 45000"
-                    value={tradeVehicle.mileage}
-                    onChange={(e) => handleTradeVehicleChange('mileage', e.target.value.replace(/[^0-9]/g, ''))}
-                  />
-                </div>
-              </div>
-
-              {/* Loan Payoff Question */}
-              <h3 style={{...styles.payoffTitle, marginTop: '24px'}}>Does your trade-in have a loan payoff?</h3>
-              <div style={styles.payoffOptions}>
-                <button
-                  style={{...styles.optionButton, ...(hasPayoff === true ? styles.optionButtonActive : {})}}
-                  onClick={() => setHasPayoff(true)}
-                >
-                  Yes
-                </button>
-                <button
-                  style={{...styles.optionButton, ...(hasPayoff === false ? styles.optionButtonActive : {})}}
-                  onClick={() => setHasPayoff(false)}
-                >
-                  No / Paid Off
-                </button>
-              </div>
-
-              {hasPayoff === true && (
-                <div style={styles.payoffFieldsGrid}>
-                  <div style={styles.payoffFieldGroup}>
-                    <label style={styles.inputLabel}>Approximate Payoff Amount</label>
-                    <div style={styles.inputWrapper}>
-                      <span style={styles.inputPrefix}>$</span>
-                      <input
-                        type="text"
-                        style={styles.textInput}
-                        placeholder="18,000.00"
-                        value={getDisplayValue('payoff', payoffAmount)}
-                        onChange={handlePayoffAmountChange}
-                        onFocus={() => setFocusedField('payoff')}
-                        onBlur={handlePayoffBlur}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div style={styles.payoffFieldGroup}>
-                    <label style={styles.inputLabel}>Monthly Payment</label>
-                    <div style={styles.inputWrapper}>
-                      <span style={styles.inputPrefix}>$</span>
-                      <input
-                        type="text"
-                        style={styles.textInput}
-                        placeholder="450.00"
-                        value={getDisplayValue('monthly', monthlyPayment)}
-                        onChange={handleMonthlyPaymentChange}
-                        onFocus={() => setFocusedField('monthly')}
-                        onBlur={handleMonthlyPaymentBlur}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div style={styles.payoffFieldGroup}>
-                    <label style={styles.inputLabel}>Financed With</label>
-                    <div style={styles.inputWrapper}>
-                      <input
-                        type="text"
-                        style={styles.textInputFull}
-                        placeholder="Bank or lender name"
-                        value={financedWith}
-                        onChange={handleFinancedWithChange}
-                        maxLength={25}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
+  const renderTradeInQualification = (): JSX.Element => (
+    <div style={styles.stepContainer}>
+      <button style={styles.backButton} onClick={handleBack}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Back
+      </button>
+      <div style={styles.stepHeader}>
+        <h1 style={styles.stepTitle}>🚗 Trade-In Vehicle</h1>
+        <p style={styles.stepSubtitle}>Do you have a vehicle to trade in?</p>
+      </div>
+      <div style={styles.formSection}>
+        <div style={styles.tradeOptions}>
           <button
-            style={{...styles.searchButton, opacity: (hasTrade !== null) ? 1 : 0.5}}
-            onClick={handleSearch}
-            disabled={hasTrade === null}
+            style={{...styles.tradeCard, ...(hasTrade === true ? styles.tradeCardActive : {})}}
+            onClick={() => setHasTrade(true)}
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="M21 21l-4.35-4.35"/>
-            </svg>
-            Find My {selectedModel.name}
+            <div style={styles.tradeIcon}>✓</div>
+            <span style={styles.tradeName}>Yes, I have a trade-in</span>
+            <span style={styles.tradeDesc}>Get an instant estimate on your current vehicle</span>
+          </button>
+          <button
+            style={{...styles.tradeCard, ...(hasTrade === false ? styles.tradeCardActive : {})}}
+            onClick={() => { setHasTrade(false); setHasPayoff(null); }}
+          >
+            <div style={styles.tradeIcon}>✗</div>
+            <span style={styles.tradeName}>No trade-in</span>
+            <span style={styles.tradeDesc}>I don't have a vehicle to trade</span>
           </button>
         </div>
+
+        {hasTrade === true && (
+          <div style={styles.payoffSection}>
+            {/* Trade Vehicle Information */}
+            <h3 style={styles.payoffTitle}>Tell us about your trade-in vehicle</h3>
+            <div style={styles.tradeVehicleGrid}>
+              <div style={styles.payoffFieldGroup}>
+                <label style={styles.inputLabel}>Year</label>
+                <select
+                  style={styles.selectInput}
+                  value={tradeVehicle.year}
+                  onChange={(e) => handleTradeVehicleChange('year', e.target.value)}
+                >
+                  <option value="">Select Year</option>
+                  {YEAR_OPTIONS.map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.payoffFieldGroup}>
+                <label style={styles.inputLabel}>Make</label>
+                <select
+                  style={styles.selectInput}
+                  value={tradeVehicle.make}
+                  onChange={(e) => handleTradeVehicleChange('make', e.target.value)}
+                >
+                  <option value="">Select Make</option>
+                  {COMMON_MAKES.map((make) => (
+                    <option key={make} value={make}>{make}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.payoffFieldGroup}>
+                <label style={styles.inputLabel}>Model</label>
+                <select
+                  style={styles.selectInput}
+                  value={tradeVehicle.model}
+                  onChange={(e) => handleTradeVehicleChange('model', e.target.value)}
+                  disabled={!tradeVehicle.year || !tradeVehicle.make || loadingTradeModels}
+                >
+                  <option value="">{loadingTradeModels ? 'Loading...' : 'Select Model'}</option>
+                  {tradeModels.map((model) => (
+                    <option key={model} value={model}>{model}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.payoffFieldGroup}>
+                <label style={styles.inputLabel}>Mileage</label>
+                <input
+                  type="text"
+                  style={styles.textInputStandalone}
+                  placeholder="e.g., 45000"
+                  value={tradeVehicle.mileage}
+                  onChange={(e) => handleTradeVehicleChange('mileage', e.target.value.replace(/[^0-9]/g, ''))}
+                />
+              </div>
+            </div>
+
+            {/* Loan Payoff Question */}
+            <h3 style={{...styles.payoffTitle, marginTop: '24px'}}>Does your trade-in have a loan payoff?</h3>
+            <div style={styles.payoffOptions}>
+              <button
+                style={{...styles.optionButton, ...(hasPayoff === true ? styles.optionButtonActive : {})}}
+                onClick={() => setHasPayoff(true)}
+              >
+                Yes
+              </button>
+              <button
+                style={{...styles.optionButton, ...(hasPayoff === false ? styles.optionButtonActive : {})}}
+                onClick={() => setHasPayoff(false)}
+              >
+                No / Paid Off
+              </button>
+            </div>
+
+            {hasPayoff === true && (
+              <div style={styles.payoffFieldsGrid}>
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Approximate Payoff Amount</label>
+                  <div style={styles.inputWrapper}>
+                    <span style={styles.inputPrefix}>$</span>
+                    <input
+                      type="text"
+                      style={styles.textInput}
+                      placeholder="18,000.00"
+                      value={getDisplayValue('payoff', payoffAmount)}
+                      onChange={handlePayoffAmountChange}
+                      onFocus={() => setFocusedField('payoff')}
+                      onBlur={handlePayoffBlur}
+                    />
+                  </div>
+                </div>
+                
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Monthly Payment</label>
+                  <div style={styles.inputWrapper}>
+                    <span style={styles.inputPrefix}>$</span>
+                    <input
+                      type="text"
+                      style={styles.textInput}
+                      placeholder="450.00"
+                      value={getDisplayValue('monthly', monthlyPayment)}
+                      onChange={handleMonthlyPaymentChange}
+                      onFocus={() => setFocusedField('monthly')}
+                      onBlur={handleMonthlyPaymentBlur}
+                    />
+                  </div>
+                </div>
+                
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Financed With</label>
+                  <div style={styles.inputWrapper}>
+                    <input
+                      type="text"
+                      style={styles.textInputFull}
+                      placeholder="Bank or lender name"
+                      value={financedWith}
+                      onChange={handleFinancedWithChange}
+                      maxLength={25}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          style={{...styles.searchButton, opacity: (hasTrade !== null) ? 1 : 0.5}}
+          onClick={handleSearch}
+          disabled={hasTrade === null}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          Find My {selectedModel?.name}
+        </button>
       </div>
-    );
-  };
+    </div>
+  );
 
   // Progress bar
   const totalSteps = selectedModel?.cabOptions ? 6 : 5;
