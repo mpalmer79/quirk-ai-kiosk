@@ -46,14 +46,28 @@ const COMMON_MAKES = [
 
 // Model name to image mapping
 const MODEL_IMAGES: Record<string, string> = {
+  // Trucks
+  'Silverado 1500': '/images/models/1500.jpg',
+  'Silverado 2500HD': '/images/models/2500.jpg',
+  'Silverado 3500HD': '/images/models/3500.jpg',
+  'Colorado': '/images/models/Colorado.jpg',
   // SUVs & Crossovers
   'Trax': '/images/models/trax.webp',
+  'Trailblazer': '/images/models/trailblazer.webp',
   'Equinox': '/images/models/equinox.avif',
-  'Equinox EV': '/images/models/equinox.avif',
+  'Equinox EV': '/images/models/equinox-ev.webp',
+  'Blazer': '/images/models/blazer.webp',
+  'Blazer EV': '/images/models/blazer-ev.webp',
   'Traverse': '/images/models/traverse.avif',
   'Tahoe': '/images/models/tahoe.png',
   'Suburban': '/images/models/suburban.avif',
-  // Add more models as needed (Trucks, Sports Cars, Electric, etc.)
+  // Sports Cars
+  'Corvette': '/images/models/corvette.webp',
+  'Camaro': '/images/models/camaro.webp',
+  // Electric
+  'Bolt EV': '/images/models/bolt-ev.webp',
+  'Bolt EUV': '/images/models/bolt-euv.webp',
+  'Silverado EV': '/images/models/silverado-ev.webp',
 };
 
 const ModelBudgetSelector: React.FC<KioskComponentProps> = ({ 
@@ -402,8 +416,9 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
           <h1 style={styles.stepTitle}>Which model interests you?</h1>
           <p style={styles.stepSubtitle}>Select a model to see available options</p>
         </div>
-        <div style={styles.modelGrid}>
-          {category.models.map((model) => {
+        <div style={styles.categorySelectionCard}>
+          <div style={styles.modelGrid}>
+            {category.models.map((model) => {
             const modelImage = MODEL_IMAGES[model.name];
             return (
               <button key={model.name} style={styles.modelCard} onClick={() => handleModelSelect(model)}>
@@ -454,6 +469,7 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
               </button>
             );
           })}
+          </div>
         </div>
       </div>
     );
