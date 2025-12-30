@@ -285,7 +285,20 @@ class NotificationService:
                 }
             })
         
-        # Add dashboard link button
+        # Add vehicle badge button (green with Year Make Model)
+        context = notification.get("additional_context", {})
+        vehicle_info = context.get("vehicle_info", {})
+        
+        if vehicle_info:
+            year = vehicle_info.get("year", "")
+            make = vehicle_info.get("make", "")
+            model = vehicle_info.get("model", "")
+            vehicle_label = f"🚗 {year} {make} {model}".strip()
+        elif notification.get("vehicle_stock"):
+            vehicle_label = f"🚗 Stock #{notification['vehicle_stock']}"
+        else:
+            vehicle_label = "🚗 Vehicle Request"
+        
         slack_payload["blocks"].append({
             "type": "actions",
             "elements": [
@@ -293,10 +306,10 @@ class NotificationService:
                     "type": "button",
                     "text": {
                         "type": "plain_text",
-                        "text": "📊 View in Dashboard",
+                        "text": vehicle_label,
                         "emoji": True
                     },
-                    "url": notification["dashboard_url"],
+                    "url": f"https://quirk-frontend-production.up.railway.app/#vehicleDetail?stock={notification.get('vehicle_stock', '')}",
                     "style": "primary"
                 }
             ]
