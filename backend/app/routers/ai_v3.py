@@ -59,7 +59,7 @@ logger = logging.getLogger("quirk_ai.intelligent")
 # =============================================================================
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-PROMPT_VERSION = "3.4.0"
+PROMPT_VERSION = "3.5.0"  # Updated for towing capacity reference
 # Updated to Claude Sonnet 4.5 (released September 2025) - previous Sonnet 4 may be deprecated
 MODEL_NAME = "claude-sonnet-4-5-20250929"
 MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
@@ -524,6 +524,37 @@ COMMERCIAL:
 - CP31003/CP34003 = LCF (Low Cab Forward) 4500
 
 Use this when customers ask about specific model codes or when explaining inventory results.
+
+🚛 TOWING CAPACITY REFERENCE (CRITICAL - DO NOT GUESS!):
+ALWAYS reference these official GM towing capacities. NEVER guess or estimate towing capacity.
+If customer asks about towing and the specific trim is not listed, tell them the range and offer to verify for the specific vehicle.
+
+TRUCKS (Maximum Towing):
+- Colorado: Up to 7,700 lbs (with Trailering Package) - CANNOT tow 10,000+ lbs
+- Silverado 1500: Up to 13,300 lbs (varies significantly by trim/engine/config)
+- Silverado 2500HD: Up to 18,510 lbs conventional / 21,500 lbs 5th wheel
+- Silverado 3500HD: Up to 20,000 lbs conventional / 36,000 lbs 5th wheel/gooseneck
+
+SUVS (Maximum Towing):
+- Trax: 1,000 lbs (light towing only - bike rack, small trailer)
+- Trailblazer: 1,000 lbs (light towing only)
+- Equinox: 1,500 lbs (small utility trailer)
+- Blazer: Up to 4,500 lbs
+- Traverse: Up to 5,000 lbs
+- Tahoe: Up to 8,400 lbs (with Max Trailering Package)
+- Suburban: Up to 8,300 lbs (with Max Trailering Package)
+
+TOWING RECOMMENDATIONS BY WEIGHT:
+- Under 2,000 lbs (jet ski, small boat): Equinox, Blazer, Traverse, any truck
+- 2,000-5,000 lbs (small camper, mid-size boat): Blazer, Traverse, Tahoe, Suburban, Colorado, Silverado
+- 5,000-7,700 lbs (larger boat, travel trailer): Tahoe, Suburban, Colorado (maxed), Silverado
+- 7,700-13,300 lbs (large RV, heavy boat): Silverado 1500 (with appropriate package)
+- Over 13,300 lbs (5th wheel, gooseneck, heavy equipment): Silverado 2500HD or 3500HD ONLY
+
+⚠️ CRITICAL: If a customer needs to tow 10,000+ lbs:
+- Colorado CANNOT do this - max is 7,700 lbs
+- Silverado 1500 can handle up to 13,300 lbs with proper configuration
+- For consistent heavy towing over 10,000 lbs, recommend 2500HD or 3500HD
 
 🔧 SERVICE CUSTOMER CONVERSATION FLOW (CRITICAL):
 When a customer says "I'm in for service" or indicates they're waiting for their car to be serviced:
