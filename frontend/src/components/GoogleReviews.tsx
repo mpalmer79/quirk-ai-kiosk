@@ -215,7 +215,7 @@ const GoogleReviews: React.FC<GoogleReviewsProps> = ({
           <span style={styles.ratingNumber}>4.3</span>
           <div style={styles.ratingDetails}>
             {renderStars(4)}
-            <span style={styles.reviewCount}>1,426 reviews</span>
+            <span style={styles.reviewCount}>1,430 reviews</span>
           </div>
         </div>
       </div>
