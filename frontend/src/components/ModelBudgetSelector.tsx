@@ -70,6 +70,25 @@ const MODEL_IMAGES: Record<string, string> = {
   'Silverado EV': '/images/models/silverado-ev.webp',
 };
 
+// Cab configuration images - keyed by "ModelName-CabType"
+const CAB_IMAGES: Record<string, string> = {
+  // Silverado 1500
+  'Silverado 1500-Regular Cab': '/images/cabs/1500regcab.jpg',
+  'Silverado 1500-Double Cab': '/images/cabs/1500doublecab.jpg',
+  'Silverado 1500-Crew Cab': '/images/cabs/1500crewcab.jpg',
+  // Silverado 2500HD
+  'Silverado 2500HD-Regular Cab': '/images/cabs/2500regcab.jpg',
+  'Silverado 2500HD-Double Cab': '/images/cabs/2500doublecab.jpg',
+  'Silverado 2500HD-Crew Cab': '/images/cabs/2500crewcab.jpg',
+  // Silverado 3500HD
+  'Silverado 3500HD-Regular Cab': '/images/cabs/3500regcab.jpg',
+  'Silverado 3500HD-Double Cab': '/images/cabs/3500doublecab.jpg',
+  'Silverado 3500HD-Crew Cab': '/images/cabs/3500crewcab.jpg',
+  // Colorado
+  'Colorado-Extended Cab': '/images/cabs/coloradoextcab.jpg',
+  'Colorado-Crew Cab': '/images/cabs/coloradocrewcab.jpg',
+};
+
 const ModelBudgetSelector: React.FC<KioskComponentProps> = ({ 
   navigateTo, 
   updateCustomerData, 
@@ -479,6 +498,15 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
   const renderCabSelection = (): JSX.Element | null => {
     if (!selectedModel?.cabOptions) return null;
     
+    // Helper to get cab description
+    const getCabDescription = (cab: string): string => {
+      if (cab.includes('Regular')) return '2-door, 3 passengers';
+      if (cab.includes('Double')) return '4-door, 5-6 passengers';
+      if (cab.includes('Crew')) return '4-door, 5-6 passengers, most room';
+      if (cab.includes('Extended')) return '4-door, 5 passengers';
+      return '';
+    };
+    
     return (
       <div style={styles.stepContainer}>
         <button style={styles.backButton} onClick={handleBack}>
@@ -492,24 +520,71 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
           <h1 style={styles.stepTitle}>What cab configuration?</h1>
           <p style={styles.stepSubtitle}>Select the cab style that fits your needs</p>
         </div>
-        <div style={styles.cabGrid}>
-          {selectedModel.cabOptions.map((cab) => (
-            <button key={cab} style={styles.cabCard} onClick={() => handleCabSelect(cab)}>
-              <div style={styles.cabIcon}>
-                {cab.includes('Regular') && '🚗'}
-                {cab.includes('Double') && '🚙'}
-                {cab.includes('Crew') && '🛻'}
-                {cab.includes('Extended') && '🚙'}
-              </div>
-              <span style={styles.cabName}>{cab}</span>
-              <span style={styles.cabDesc}>
-                {cab.includes('Regular') && '2-door, 3 passengers'}
-                {cab.includes('Double') && '4-door, 5-6 passengers'}
-                {cab.includes('Crew') && '4-door, 5-6 passengers, most room'}
-                {cab.includes('Extended') && '4-door, 5 passengers'}
-              </span>
-            </button>
-          ))}
+        <div style={styles.categorySelectionCard}>
+          <div style={styles.cabGrid}>
+            {selectedModel.cabOptions.map((cab) => {
+              const cabImageKey = `${selectedModel.name}-${cab}`;
+              const cabImage = CAB_IMAGES[cabImageKey];
+              
+              return (
+                <button key={cab} style={styles.modelCard} onClick={() => handleCabSelect(cab)}>
+                  {/* Image container with fallback to icon */}
+                  {cabImage ? (
+                    <div style={styles.categoryImageContainer as React.CSSProperties}>
+                      <img 
+                        src={cabImage} 
+                        alt={cab}
+                        style={styles.categoryImage as React.CSSProperties}
+                        onError={(e) => {
+                          // Hide broken image, show fallback
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          const parent = (e.target as HTMLImageElement).parentElement;
+                          if (parent) {
+                            const fallback = parent.querySelector('[data-fallback]') as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }
+                        }}
+                      />
+                      <div 
+                        data-fallback
+                        style={{ 
+                          ...styles.categoryImagePlaceholder as React.CSSProperties, 
+                          display: 'none',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                        }}
+                      >
+                        <div style={styles.cabIconLarge}>
+                          {cab.includes('Regular') && '🚗'}
+                          {cab.includes('Double') && '🚙'}
+                          {cab.includes('Crew') && '🛻'}
+                          {cab.includes('Extended') && '🚙'}
+                        </div>
+                      </div>
+                      <div style={styles.categoryImageOverlay as React.CSSProperties} />
+                    </div>
+                  ) : (
+                    <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
+                      <div style={styles.cabIconLarge}>
+                        {cab.includes('Regular') && '🚗'}
+                        {cab.includes('Double') && '🚙'}
+                        {cab.includes('Crew') && '🛻'}
+                        {cab.includes('Extended') && '🚙'}
+                      </div>
+                    </div>
+                  )}
+                  {/* Text content below image */}
+                  <div style={styles.categoryContent as React.CSSProperties}>
+                    <span style={styles.modelName}>{cab}</span>
+                    <span style={styles.modelConfig}>{getCabDescription(cab)}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
