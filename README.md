@@ -683,4 +683,4 @@ For issues or questions:
 
 ---
 
-*Built with ❤️ for Quirk Auto Dealers - New England's #1 Dealer*
+*Built by mpalmer@quirkcars.com for Quirk Auto Dealers - New England's #1 Dealer*
