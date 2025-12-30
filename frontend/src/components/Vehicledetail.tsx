@@ -286,7 +286,7 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
                 style={{
                   ...s.thumbnail,
                   background: gradient,
-                  borderColor: selectedImageIndex === idx ? '#22c55e' : 'rgba(255,255,255,0.1)',
+                  borderColor: selectedImageIndex === idx ? '#22c55e' : '#e2e8f0',
                 }}
                 onClick={() => setSelectedImageIndex(idx)}
               >
@@ -499,12 +499,12 @@ const VehicleDetail: React.FC<KioskComponentProps> = ({ navigateTo, updateCustom
   );
 };
 
-// Styles
+// Styles - Light Theme
 const s: Record<string, CSSProperties> = {
   container: {
     minHeight: '100vh',
-    background: '#0a0a0a',
-    color: '#fff',
+    background: '#f5f7fa',
+    color: '#1a1a2e',
   },
   
   // Header Bar
@@ -513,8 +513,9 @@ const s: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     padding: '20px 40px',
-    background: '#1a1a1a',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
+    background: '#ffffff',
+    borderBottom: '1px solid #e2e8f0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
   },
   headerLeft: {
     display: 'flex',
@@ -524,7 +525,7 @@ const s: Record<string, CSSProperties> = {
   vehicleTitle: {
     fontSize: '24px',
     fontWeight: 700,
-    color: '#fff',
+    color: '#1a1a2e',
     margin: 0,
   },
   headerMeta: {
@@ -533,12 +534,12 @@ const s: Record<string, CSSProperties> = {
   },
   vinText: {
     fontSize: '13px',
-    color: 'rgba(255,255,255,0.5)',
+    color: '#64748b',
     fontFamily: 'monospace',
   },
   stockText: {
     fontSize: '13px',
-    color: 'rgba(255,255,255,0.5)',
+    color: '#64748b',
   },
   headerRight: {
     display: 'flex',
@@ -550,13 +551,14 @@ const s: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 20px',
-    background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
     borderRadius: '8px',
-    color: '#fff',
+    color: '#1a1a2e',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
   },
 
   // Main Content
@@ -593,7 +595,7 @@ const s: Record<string, CSSProperties> = {
   imagePlaceholder: {
     fontSize: '120px',
     fontWeight: 800,
-    color: 'rgba(255,255,255,0.2)',
+    color: 'rgba(255,255,255,0.4)',
   },
   thumbnailStrip: {
     display: 'flex',
@@ -607,13 +609,14 @@ const s: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    border: '2px solid rgba(255,255,255,0.1)',
+    border: '2px solid #e2e8f0',
     transition: 'border-color 0.2s',
+    background: '#ffffff',
   },
   thumbnailPlaceholder: {
     fontSize: '24px',
     fontWeight: 700,
-    color: 'rgba(255,255,255,0.3)',
+    color: '#94a3b8',
   },
   thumbnailImage: {
     width: '100%',
@@ -643,12 +646,12 @@ const s: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 16px',
-    background: 'rgba(0,0,0,0.7)',
+    background: '#ffffff',
     borderRadius: '8px',
     fontSize: '14px',
     fontWeight: 600,
-    color: '#fff',
-    backdropFilter: 'blur(8px)',
+    color: '#1a1a2e',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
   },
   statusDot: {
     width: '10px',
@@ -777,15 +780,15 @@ const s: Record<string, CSSProperties> = {
   // Specs Card
   specsCard: {
     padding: '24px',
-    background: 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.08) 100%)',
+    background: '#ffffff',
     borderRadius: '16px',
-    border: '1px solid rgba(255,255,255,0.12)',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
   },
   specsTitle: {
     fontSize: '16px',
     fontWeight: 700,
-    color: '#fff',
+    color: '#1a1a2e',
     margin: '0 0 16px 0',
   },
   specsGrid: {
@@ -801,13 +804,13 @@ const s: Record<string, CSSProperties> = {
   specLabel: {
     fontSize: '11px',
     fontWeight: 600,
-    color: 'rgba(255,255,255,0.4)',
+    color: '#64748b',
     textTransform: 'uppercase',
   },
   specValue: {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#fff',
+    color: '#1a1a2e',
   },
   specValueWithSwatch: {
     display: 'flex',
@@ -818,21 +821,21 @@ const s: Record<string, CSSProperties> = {
     width: '16px',
     height: '16px',
     borderRadius: '4px',
-    border: '1px solid rgba(255,255,255,0.2)',
+    border: '1px solid #e2e8f0',
   },
 
   // Features Card
   featuresCard: {
     padding: '24px',
-    background: 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.08) 100%)',
+    background: '#ffffff',
     borderRadius: '16px',
-    border: '1px solid rgba(255,255,255,0.12)',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
   },
   featuresTitle: {
     fontSize: '16px',
     fontWeight: 700,
-    color: '#fff',
+    color: '#1a1a2e',
     margin: '0 0 12px 0',
   },
   featuresTags: {
@@ -842,11 +845,12 @@ const s: Record<string, CSSProperties> = {
   },
   featureTag: {
     padding: '6px 12px',
-    background: 'rgba(27,115,64,0.2)',
+    background: '#ecfdf5',
     borderRadius: '6px',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#4ade80',
+    color: '#059669',
+    border: '1px solid #a7f3d0',
   },
 
   // Let's See It Button
@@ -869,7 +873,7 @@ const s: Record<string, CSSProperties> = {
   },
   letsSeeItHint: {
     fontSize: '13px',
-    color: 'rgba(255,255,255,0.5)',
+    color: '#64748b',
     textAlign: 'center',
     margin: '8px 0 0 0',
   },
@@ -895,13 +899,14 @@ const s: Record<string, CSSProperties> = {
     justifyContent: 'center',
     gap: '8px',
     padding: '14px 16px',
-    background: 'rgba(255,255,255,0.12)',
-    border: '1px solid rgba(255,255,255,0.2)',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
     borderRadius: '10px',
-    color: '#fff',
+    color: '#1a1a2e',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
   },
   qrCodeBtn: {
     display: 'flex',
@@ -911,10 +916,10 @@ const s: Record<string, CSSProperties> = {
     width: '100%',
     padding: '14px 20px',
     marginTop: '8px',
-    background: 'rgba(27, 115, 64, 0.15)',
-    border: '1px solid rgba(27, 115, 64, 0.3)',
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
     borderRadius: '10px',
-    color: '#4ade80',
+    color: '#059669',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -928,10 +933,10 @@ const s: Record<string, CSSProperties> = {
     width: '100%',
     padding: '14px 20px',
     marginTop: '8px',
-    background: 'rgba(239, 68, 68, 0.15)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
     borderRadius: '10px',
-    color: '#f87171',
+    color: '#dc2626',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -950,31 +955,32 @@ const s: Record<string, CSSProperties> = {
     maxWidth: '500px',
     width: '100%',
     padding: '40px',
-    background: 'rgba(255,255,255,0.12)',
+    background: '#ffffff',
     borderRadius: '24px',
-    border: '1px solid rgba(255,255,255,0.1)',
+    border: '1px solid #e2e8f0',
     textAlign: 'center',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
   },
   successIcon: {
     width: '80px',
     height: '80px',
     margin: '0 auto 24px',
     borderRadius: '50%',
-    background: 'rgba(74,222,128,0.2)',
+    background: '#ecfdf5',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#4ade80',
+    color: '#059669',
   },
   successTitle: {
     fontSize: '32px',
     fontWeight: 700,
-    color: '#fff',
+    color: '#1a1a2e',
     margin: '0 0 12px 0',
   },
   successSubtitle: {
     fontSize: '16px',
-    color: 'rgba(255,255,255,0.6)',
+    color: '#64748b',
     margin: '0 0 24px 0',
     lineHeight: 1.5,
   },
@@ -983,10 +989,11 @@ const s: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: '16px',
     padding: '16px',
-    background: 'rgba(0,0,0,0.2)',
+    background: '#f8fafc',
     borderRadius: '12px',
     marginBottom: '24px',
     textAlign: 'left',
+    border: '1px solid #e2e8f0',
   },
   successVehicleThumb: {
     width: '70px',
@@ -1000,7 +1007,7 @@ const s: Record<string, CSSProperties> = {
   successVehicleInitial: {
     fontSize: '24px',
     fontWeight: 800,
-    color: 'rgba(255,255,255,0.3)',
+    color: '#94a3b8',
   },
   successVehicleInfo: {
     display: 'flex',
@@ -1010,27 +1017,28 @@ const s: Record<string, CSSProperties> = {
   successVehicleName: {
     fontSize: '18px',
     fontWeight: 700,
-    color: '#fff',
+    color: '#1a1a2e',
   },
   successVehicleTrim: {
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.6)',
+    color: '#64748b',
   },
   successVehicleStock: {
     fontSize: '12px',
-    color: 'rgba(255,255,255,0.4)',
+    color: '#94a3b8',
   },
   expectSection: {
     padding: '20px',
-    background: 'rgba(255,255,255,0.03)',
+    background: '#f8fafc',
     borderRadius: '12px',
     marginBottom: '24px',
     textAlign: 'left',
+    border: '1px solid #e2e8f0',
   },
   expectTitle: {
     fontSize: '14px',
     fontWeight: 700,
-    color: 'rgba(255,255,255,0.8)',
+    color: '#1a1a2e',
     margin: '0 0 16px 0',
   },
   expectSteps: {
@@ -1047,18 +1055,18 @@ const s: Record<string, CSSProperties> = {
     width: '28px',
     height: '28px',
     borderRadius: '50%',
-    background: 'rgba(27,115,64,0.3)',
+    background: '#ecfdf5',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '13px',
     fontWeight: 700,
-    color: '#4ade80',
+    color: '#059669',
     flexShrink: 0,
   },
   stepText: {
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.7)',
+    color: '#475569',
   },
   estimatedTime: {
     display: 'flex',
@@ -1066,7 +1074,7 @@ const s: Record<string, CSSProperties> = {
     justifyContent: 'center',
     gap: '8px',
     fontSize: '14px',
-    color: 'rgba(255,255,255,0.5)',
+    color: '#64748b',
     marginBottom: '24px',
   },
   successActions: {
@@ -1095,13 +1103,14 @@ const s: Record<string, CSSProperties> = {
     justifyContent: 'center',
     gap: '8px',
     padding: '14px 24px',
-    background: 'rgba(255,255,255,0.12)',
-    border: '1px solid rgba(255,255,255,0.2)',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
     borderRadius: '12px',
-    color: '#fff',
+    color: '#1a1a2e',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
   },
 };
 
