@@ -1,34 +1,45 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../../api';
 import { BASE_CATEGORIES, modelMatches } from '../../../types/vehicleCategories';
-import type { Vehicle, VehicleCategories, AvailableModel } from '../../../types';
-import type { InventoryByModel } from '../types';
+import type { Vehicle } from '../../../types';
+
+// Inventory count by model name
+type InventoryByModel = Record<string, number>;
 
 interface UseInventoryCountsResult {
   inventoryByModel: InventoryByModel;
-  vehicleCategories: VehicleCategories;
-  loading: boolean;
-  error: string | null;
+  loadingInventory: boolean;
 }
+
+const INVENTORY_TIMEOUT_MS = 5000;
 
 export const useInventoryCounts = (): UseInventoryCountsResult => {
   const [inventoryByModel, setInventoryByModel] = useState<InventoryByModel>({});
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
 
   useEffect(() => {
     const loadInventoryCounts = async (): Promise<void> => {
       try {
-        const data = await api.getInventory({});
-        const vehicles: Vehicle[] = Array.isArray(data) 
-          ? data 
+        // Create a timeout promise that rejects after 5 seconds
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Inventory load timeout')), INVENTORY_TIMEOUT_MS)
+        );
+
+        // Race the API call against the timeout
+        const data = await Promise.race([
+          api.getInventory({}),
+          timeoutPromise
+        ]);
+
+        const vehicles: Vehicle[] = Array.isArray(data)
+          ? data
           : (data as { vehicles?: Vehicle[] }).vehicles || [];
-        
+
         const counts: InventoryByModel = {};
         vehicles.forEach((vehicle: Vehicle) => {
           const model = (vehicle.model || '').trim();
           if (model) {
-            Object.values(BASE_CATEGORIES).forEach(category => {
+            Object.values(BASE_CATEGORIES).forEach((category) => {
               category.modelNames.forEach((categoryModel: string) => {
                 if (modelMatches(model, categoryModel)) {
                   counts[categoryModel] = (counts[categoryModel] || 0) + 1;
@@ -37,52 +48,22 @@ export const useInventoryCounts = (): UseInventoryCountsResult => {
             });
           }
         });
-        
+
         setInventoryByModel(counts);
       } catch (err) {
-        console.error('Error loading inventory counts:', err);
-        setError('Failed to load inventory');
+        // Log warning but don't block UI - allow component to render with empty inventory
+        console.warn('Failed to load inventory counts:', err);
+        setInventoryByModel({});
       } finally {
-        setLoading(false);
+        // Always set loading to false so UI can render
+        setLoadingInventory(false);
       }
     };
-    
+
     loadInventoryCounts();
   }, []);
 
-  // Build dynamic categories based on actual inventory
-  const vehicleCategories: VehicleCategories = useMemo(() => {
-    return Object.entries(BASE_CATEGORIES).reduce(
-      (acc: VehicleCategories, [key, category]) => {
-        const availableModels: AvailableModel[] = category.modelNames
-          .filter((modelName: string) => (inventoryByModel[modelName] || 0) > 0)
-          .map((modelName: string) => ({
-            name: modelName,
-            count: inventoryByModel[modelName] || 0,
-            cabOptions: category.cabOptions?.[modelName],
-          }));
-        
-        if (availableModels.length > 0) {
-          acc[key] = {
-            name: category.name,
-            icon: category.icon,
-            image: category.image,
-            models: availableModels,
-          };
-        }
-        
-        return acc;
-      }, 
-      {} as VehicleCategories
-    );
-  }, [inventoryByModel]);
-
-  return {
-    inventoryByModel,
-    vehicleCategories,
-    loading,
-    error,
-  };
+  return { inventoryByModel, loadingInventory };
 };
 
 export default useInventoryCounts;
