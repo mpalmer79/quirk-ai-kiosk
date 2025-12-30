@@ -86,6 +86,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           Start Over
         </button>
       </div>
+      
+      {/* Transcript Notice */}
+      <div style={{
+        textAlign: 'center' as const,
+        padding: '8px 0 16px 0',
+        fontSize: '12px',
+        color: '#6b7280',
+        fontStyle: 'italic'
+      }}>
+        Transcript available upon request
+      </div>
     </>
   );
 };
