@@ -778,9 +778,18 @@ export const chatWithAI = async (request: AIChatRequest): Promise<AIChatResponse
  * Triggers Slack/SMS/Email notifications
  */
 export interface NotifyStaffRequest {
-  notification_type: 'sales' | 'appraisal' | 'finance';
+  notification_type: 'sales' | 'vehicle_request' | 'appraisal' | 'finance';
   message: string;
   vehicle_stock?: string;
+  vehicle_info?: {
+    year?: number;
+    make?: string;
+    model?: string;
+    trim?: string;
+    exteriorColor?: string;
+    msrp?: number;
+    salePrice?: number;
+  };
 }
 
 export interface NotifyStaffResponse {
