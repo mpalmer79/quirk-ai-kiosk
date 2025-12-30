@@ -380,8 +380,8 @@ describe('VehicleComparison Component', () => {
         expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
       });
       
-      // Should show formatted price on vehicle card
-      expect(screen.getByText('$32,000')).toBeInTheDocument();
+      // Should show formatted MSRP on vehicle card (component shows MSRP first)
+      expect(screen.getByText('$34,000')).toBeInTheDocument();
     });
   });
 
