@@ -31,21 +31,24 @@ const BudgetSelection: React.FC<BudgetSelectionProps> = ({
     }
   }
 
-  // If model not found, redirect
+  // MOVED: useEffect MUST be called before any early returns
+  // Sync with parent state
+  useEffect(() => {
+    if (foundModel) {
+      updateState({ 
+        selectedModel: foundModel,
+        selectedCab: cabSlug ? cabSlug.split('-').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ') : null,
+      });
+    }
+  }, [foundModel, cabSlug, updateState]);
+
+  // If model not found, redirect (AFTER all hooks)
   if (!foundModel) {
     setTimeout(() => navigateTo('modelBudget/category'), 0);
     return null;
   }
-
-  // Sync with parent state
-  useEffect(() => {
-    updateState({ 
-      selectedModel: foundModel,
-      selectedCab: cabSlug ? cabSlug.split('-').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-      ).join(' ') : null,
-    });
-  }, [foundModel, cabSlug, updateState]);
 
   // Calculate buying power
   const APR = 0.07;
