@@ -1286,9 +1286,10 @@ async def intelligent_chat(
 
 class NotifyStaffRequest(BaseModel):
     """Request to notify staff"""
-    notification_type: str = Field(default="sales", description="Type: sales, appraisal, or finance")
+    notification_type: str = Field(default="sales", description="Type: sales, vehicle_request, appraisal, or finance")
     message: str = Field(description="Message describing what customer needs")
     vehicle_stock: Optional[str] = Field(default=None, description="Stock number if applicable")
+    vehicle_info: Optional[Dict[str, Any]] = Field(default=None, description="Vehicle details (year, make, model, etc.)")
 
 
 @router.post("/notify-staff")
@@ -1320,6 +1321,10 @@ async def notify_staff_endpoint(
         if state.vehicle_preferences:
             additional_context["preferences"] = state.vehicle_preferences
     
+    # Add vehicle_info from request if provided
+    if request.vehicle_info:
+        additional_context["vehicle_info"] = request.vehicle_info
+    
     # Send notification
     try:
         notification_service = get_notification_service()
@@ -1340,6 +1345,10 @@ async def notify_staff_endpoint(
                 state.appraisal_requested = True
             elif request.notification_type == "sales":
                 state.test_drive_requested = True
+            elif request.notification_type == "vehicle_request":
+                state.vehicle_requested = True
+                if request.vehicle_stock:
+                    state.requested_vehicle_stock = request.vehicle_stock
             state_manager.save_state(state)
         
         return {
