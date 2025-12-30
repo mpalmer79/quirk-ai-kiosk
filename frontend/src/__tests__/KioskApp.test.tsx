@@ -10,7 +10,7 @@ import KioskApp from '../components/Kioskapp';
 
 // Mock all child components to isolate KioskApp testing
 jest.mock('../components/WelcomeScreen', () => {
-  return function MockWelcomeScreen({ navigateTo, updateCustomerData }: any) {
+  return function MockWelcomescreen({ navigateTo, updateCustomerData }: any) {
     return (
       <div data-testid="welcome-screen">
         <button onClick={() => navigateTo('inventory')}>Go to Inventory</button>
