@@ -169,6 +169,83 @@ class Settings(BaseSettings):
     crm_api_url: Optional[str] = Field(default=None)
     
     # =========================================================================
+    # STAFF NOTIFICATIONS (Slack & SMS)
+    # =========================================================================
+    
+    # Slack webhook URLs for different notification types
+    slack_webhook_sales: Optional[str] = Field(
+        default=None,
+        description="Slack webhook URL for sales team notifications"
+    )
+    slack_webhook_appraisal: Optional[str] = Field(
+        default=None,
+        description="Slack webhook URL for appraisal team notifications"
+    )
+    slack_webhook_finance: Optional[str] = Field(
+        default=None,
+        description="Slack webhook URL for finance team notifications"
+    )
+    slack_webhook_default: Optional[str] = Field(
+        default=None,
+        description="Default Slack webhook if team-specific not set"
+    )
+    
+    # Twilio SMS settings
+    twilio_account_sid: Optional[str] = Field(default=None)
+    twilio_auth_token: Optional[str] = Field(default=None)
+    twilio_phone_number: Optional[str] = Field(
+        default=None,
+        description="Twilio phone number to send SMS from"
+    )
+    
+    # Phone numbers for SMS notifications (comma-separated for multiple)
+    sms_notify_sales: Optional[str] = Field(
+        default=None,
+        description="Phone number(s) for sales notifications"
+    )
+    sms_notify_appraisal: Optional[str] = Field(
+        default=None,
+        description="Phone number(s) for appraisal notifications"
+    )
+    sms_notify_finance: Optional[str] = Field(
+        default=None,
+        description="Phone number(s) for finance notifications"
+    )
+    
+    @property
+    def is_slack_configured(self) -> bool:
+        return bool(self.slack_webhook_default or self.slack_webhook_sales)
+    
+    @property
+    def is_sms_configured(self) -> bool:
+        return bool(
+            self.twilio_account_sid and 
+            self.twilio_auth_token and 
+            self.twilio_phone_number
+        )
+    
+    def get_slack_webhook(self, notification_type: str) -> Optional[str]:
+        """Get the appropriate Slack webhook for notification type"""
+        webhooks = {
+            "sales": self.slack_webhook_sales,
+            "appraisal": self.slack_webhook_appraisal,
+            "finance": self.slack_webhook_finance,
+        }
+        return webhooks.get(notification_type) or self.slack_webhook_default
+    
+    def get_sms_numbers(self, notification_type: str) -> List[str]:
+        """Get phone numbers for notification type"""
+        numbers_map = {
+            "sales": self.sms_notify_sales,
+            "appraisal": self.sms_notify_appraisal,
+            "finance": self.sms_notify_finance,
+        }
+        numbers_str = numbers_map.get(notification_type)
+        if numbers_str:
+            return [n.strip() for n in numbers_str.split(",") if n.strip()]
+        return []
+    
+    # =========================================================================
     # MONITORING
     # =========================================================================
     
