@@ -311,10 +311,11 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
     if (selectedSession) {
       const updated = sessions.find(s => s.sessionId === selectedSession.sessionId);
       if (updated) setSelectedSession(updated);
-      fetchSessionDetail(selectedSession.sessionId);
+      // Don't refetch session detail on every 5-second refresh - only update the session card data
+      // Session detail is fetched when user clicks on a session
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, selectedSession?.sessionId]);
+  }, [sessions]);
 
   // ============================================================================
   // Handlers
@@ -955,14 +956,14 @@ const styles: Record<string, CSSProperties> = {
   },
   lastUpdate: {
     fontSize: '13px',
-    color: '#64748b',
+    color: '#1a1a2e',
   },
   autoRefreshLabel: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     fontSize: '13px',
-    color: '#475569',
+    color: '#1a1a2e',
     cursor: 'pointer',
   },
   checkbox: {
@@ -1005,7 +1006,7 @@ const styles: Record<string, CSSProperties> = {
   sessionListTitle: {
     fontSize: '12px',
     fontWeight: 700,
-    color: '#64748b',
+    color: '#1a1a2e',
     textTransform: 'uppercase',
     letterSpacing: '1px',
     margin: 0,
@@ -1017,7 +1018,7 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'center',
     padding: '40px 20px',
     gap: '12px',
-    color: '#64748b',
+    color: '#1a1a2e',
   },
   spinner: {
     width: '32px',
@@ -1033,7 +1034,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     padding: '40px 20px',
     gap: '12px',
-    color: '#64748b',
+    color: '#1a1a2e',
   },
   emptyIcon: {
     fontSize: '48px',
@@ -1064,7 +1065,7 @@ const styles: Record<string, CSSProperties> = {
   },
   sessionTime: {
     fontSize: '12px',
-    color: '#64748b',
+    color: '#1a1a2e',
   },
   sessionMeta: {
     display: 'flex',
@@ -1073,7 +1074,7 @@ const styles: Record<string, CSSProperties> = {
   },
   sessionStep: {
     fontSize: '12px',
-    color: '#475569',
+    color: '#1a1a2e',
   },
   sessionVehicle: {
     fontSize: '12px',
@@ -1089,7 +1090,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    color: '#64748b',
+    color: '#1a1a2e',
   },
   placeholderIcon: {
     fontSize: '64px',
@@ -1142,7 +1143,7 @@ const styles: Record<string, CSSProperties> = {
   },
   noMessages: {
     textAlign: 'center',
-    color: '#64748b',
+    color: '#1a1a2e',
     padding: '40px',
   },
   message: {
@@ -1164,7 +1165,7 @@ const styles: Record<string, CSSProperties> = {
   messageRole: {
     fontSize: '11px',
     fontWeight: 700,
-    color: '#64748b',
+    color: '#1a1a2e',
     textTransform: 'uppercase',
     display: 'block',
     marginBottom: '4px',
@@ -1198,7 +1199,7 @@ const styles: Record<string, CSSProperties> = {
   },
   worksheetCustomer: {
     fontSize: '14px',
-    color: '#64748b',
+    color: '#1a1a2e',
     margin: '4px 0 0 0',
   },
   worksheetActions: {
@@ -1220,7 +1221,7 @@ const styles: Record<string, CSSProperties> = {
     background: '#f8fafc',
     border: '1px solid #e2e8f0',
     borderRadius: '6px',
-    color: '#475569',
+    color: '#1a1a2e',
     fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -1253,7 +1254,7 @@ const styles: Record<string, CSSProperties> = {
     gap: '8px',
     fontSize: '12px',
     fontWeight: 700,
-    color: '#64748b',
+    color: '#1a1a2e',
     textTransform: 'uppercase',
     letterSpacing: '1px',
     margin: '0 0 16px 0',
@@ -1273,11 +1274,11 @@ const styles: Record<string, CSSProperties> = {
   },
   vehicleTrim: {
     fontSize: '14px',
-    color: '#475569',
+    color: '#1a1a2e',
   },
   vehicleStock: {
     fontSize: '13px',
-    color: '#64748b',
+    color: '#1a1a2e',
   },
   tradeVehicle: {
     fontSize: '16px',
@@ -1286,18 +1287,18 @@ const styles: Record<string, CSSProperties> = {
   },
   tradeMileage: {
     fontSize: '13px',
-    color: '#64748b',
+    color: '#1a1a2e',
   },
   pendingValue: {
     fontSize: '14px',
-    color: '#94a3b8',
+    color: '#1a1a2e',
     fontStyle: 'italic',
   },
   priceRow: {
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: '14px',
-    color: '#475569',
+    color: '#1a1a2e',
   },
   editableRow: {
     display: 'flex',
@@ -1306,7 +1307,7 @@ const styles: Record<string, CSSProperties> = {
   },
   editableLabel: {
     fontSize: '12px',
-    color: '#64748b',
+    color: '#1a1a2e',
   },
   editableInput: {
     padding: '10px 12px',
@@ -1336,7 +1337,7 @@ const styles: Record<string, CSSProperties> = {
   },
   budgetNote: {
     fontSize: '12px',
-    color: '#64748b',
+    color: '#1a1a2e',
     fontStyle: 'italic',
   },
   paymentToggle: {
@@ -1350,7 +1351,7 @@ const styles: Record<string, CSSProperties> = {
     background: '#f8fafc',
     border: '1px solid #e2e8f0',
     borderRadius: '8px',
-    color: '#64748b',
+    color: '#1a1a2e',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -1374,7 +1375,7 @@ const styles: Record<string, CSSProperties> = {
     background: '#f8fafc',
     border: '1px solid #e2e8f0',
     borderRadius: '6px',
-    color: '#64748b',
+    color: '#1a1a2e',
     fontSize: '13px',
     cursor: 'pointer',
   },
@@ -1394,7 +1395,7 @@ const styles: Record<string, CSSProperties> = {
   paymentLabel: {
     display: 'block',
     fontSize: '12px',
-    color: '#64748b',
+    color: '#1a1a2e',
     textTransform: 'uppercase',
   },
   paymentAmount: {
@@ -1407,7 +1408,7 @@ const styles: Record<string, CSSProperties> = {
   paymentTerm: {
     display: 'block',
     fontSize: '13px',
-    color: '#475569',
+    color: '#1a1a2e',
   },
   dealSummary: {
     display: 'flex',
@@ -1428,7 +1429,7 @@ const styles: Record<string, CSSProperties> = {
   },
   summaryLabel: {
     fontSize: '11px',
-    color: '#64748b',
+    color: '#1a1a2e',
     textTransform: 'uppercase',
   },
   summaryValue: {
@@ -1460,7 +1461,7 @@ const styles: Record<string, CSSProperties> = {
   boxTitle: {
     fontSize: '12px',
     fontWeight: 700,
-    color: '#64748b',
+    color: '#1a1a2e',
     textTransform: 'uppercase',
     margin: '0 0 12px 0',
   },
@@ -1469,7 +1470,7 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
     gap: '6px',
     fontSize: '13px',
-    color: '#475569',
+    color: '#1a1a2e',
   },
   notesBox: {
     background: '#f8fafc',
