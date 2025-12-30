@@ -228,6 +228,7 @@ class Settings(BaseSettings):
         """Get the appropriate Slack webhook for notification type"""
         webhooks = {
             "sales": self.slack_webhook_sales,
+            "vehicle_request": self.slack_webhook_sales,  # Vehicle bring-up goes to sales
             "appraisal": self.slack_webhook_appraisal,
             "finance": self.slack_webhook_finance,
         }
@@ -237,6 +238,7 @@ class Settings(BaseSettings):
         """Get phone numbers for notification type"""
         numbers_map = {
             "sales": self.sms_notify_sales,
+            "vehicle_request": self.sms_notify_sales,  # Vehicle bring-up goes to sales
             "appraisal": self.sms_notify_appraisal,
             "finance": self.sms_notify_finance,
         }
@@ -298,6 +300,7 @@ class Settings(BaseSettings):
         """Get email addresses for notification type"""
         emails_map = {
             "sales": self.email_notify_sales,
+            "vehicle_request": self.email_notify_sales,  # Vehicle bring-up goes to sales
             "appraisal": self.email_notify_appraisal,
             "finance": self.email_notify_finance,
         }
