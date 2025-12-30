@@ -46,6 +46,7 @@ class TrafficSession(Base):
     actions = Column(JSONB, default=list)  # List of actions taken
     chat_history = Column(JSONB, nullable=True)  # AI chat conversation
     quiz_answers = Column(JSONB, nullable=True)
+    manager_notes = Column(Text, nullable=True)  # Notes added by sales manager
     
     # Timestamps (stored in Eastern Time)
     created_at = Column(String(30), nullable=False)
@@ -68,6 +69,7 @@ class TrafficSession(Base):
             "actions": self.actions or [],
             "chatHistory": self.chat_history,
             "quizAnswers": self.quiz_answers,
+            "managerNotes": self.manager_notes,
             "createdAt": self.created_at,
             "updatedAt": self.updated_at,
         }
@@ -90,6 +92,7 @@ class TrafficSession(Base):
             actions=data.get("actions", []),
             chat_history=data.get("chatHistory"),
             quiz_answers=data.get("quizAnswers"),
+            manager_notes=data.get("managerNotes"),
             created_at=data.get("createdAt"),
             updated_at=data.get("updatedAt"),
         )
