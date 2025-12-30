@@ -39,7 +39,8 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ vehicle, isOpen, onClose }) =
   const model = vehicle.model || '';
   const trim = vehicle.trim || '';
   const exteriorColor = vehicle.exteriorColor || vehicle.exterior_color || '';
-  const price = vehicle.price || vehicle.salePrice || vehicle.sale_price || vehicle.msrp || 0;
+  // Show MSRP (not discounted sale price)
+  const price = vehicle.msrp || vehicle.MSRP || vehicle.price || vehicle.salePrice || vehicle.sale_price || 0;
 
   // Copy URL to clipboard
   const handleCopyUrl = async () => {
