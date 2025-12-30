@@ -773,6 +773,52 @@ export const chatWithAI = async (request: AIChatRequest): Promise<AIChatResponse
   return await response.json() as AIChatResponse;
 };
 
+/**
+ * Notify staff when customer requests assistance
+ * Triggers Slack/SMS/Email notifications
+ */
+export interface NotifyStaffRequest {
+  notification_type: 'sales' | 'appraisal' | 'finance';
+  message: string;
+  vehicle_stock?: string;
+}
+
+export interface NotifyStaffResponse {
+  success: boolean;
+  slack_sent?: boolean;
+  sms_sent?: boolean;
+  email_sent?: boolean;
+  errors?: string[];
+}
+
+export const notifyStaff = async (request: NotifyStaffRequest): Promise<NotifyStaffResponse> => {
+  // Get base URL without any version prefix
+  let baseUrl = API_BASE_URL;
+  
+  // Remove /v1 suffix if present
+  if (baseUrl.endsWith('/v1')) {
+    baseUrl = baseUrl.slice(0, -3);
+  }
+  
+  const url = `${baseUrl}/v3/ai/notify-staff`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Session-ID': getSessionId(),
+    },
+    body: JSON.stringify(request),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `API Error: ${response.status}`);
+  }
+  
+  return await response.json() as NotifyStaffResponse;
+};
+
 // ============================================
 // TEXT-TO-SPEECH (ELEVENLABS)
 // ============================================
@@ -899,6 +945,7 @@ const api = {
   
   // AI Assistant
   chatWithAI,
+  notifyStaff,
   
   // Text-to-Speech
   getTTSStatus,
