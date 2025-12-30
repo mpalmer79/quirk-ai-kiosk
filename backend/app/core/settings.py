@@ -246,6 +246,67 @@ class Settings(BaseSettings):
         return []
     
     # =========================================================================
+    # EMAIL NOTIFICATIONS
+    # =========================================================================
+    
+    # SendGrid (recommended)
+    sendgrid_api_key: Optional[str] = Field(
+        default=None,
+        description="SendGrid API key for email notifications"
+    )
+    
+    # Generic SMTP (alternative)
+    smtp_host: Optional[str] = Field(default=None)
+    smtp_port: int = Field(default=587)
+    smtp_username: Optional[str] = Field(default=None)
+    smtp_password: Optional[str] = Field(default=None)
+    smtp_use_tls: bool = Field(default=True)
+    
+    # Email sender
+    email_from_address: Optional[str] = Field(
+        default="kiosk@quirkchevrolet.com",
+        description="From address for notification emails"
+    )
+    email_from_name: Optional[str] = Field(
+        default="Quirk AI Kiosk",
+        description="From name for notification emails"
+    )
+    
+    # Email recipients by notification type (comma-separated)
+    email_notify_sales: Optional[str] = Field(
+        default=None,
+        description="Email address(es) for sales notifications"
+    )
+    email_notify_appraisal: Optional[str] = Field(
+        default=None,
+        description="Email address(es) for appraisal notifications"
+    )
+    email_notify_finance: Optional[str] = Field(
+        default=None,
+        description="Email address(es) for finance notifications"
+    )
+    email_notify_default: Optional[str] = Field(
+        default=None,
+        description="Default email if team-specific not set"
+    )
+    
+    @property
+    def is_email_configured(self) -> bool:
+        return bool(self.sendgrid_api_key or (self.smtp_host and self.smtp_username))
+    
+    def get_email_recipients(self, notification_type: str) -> List[str]:
+        """Get email addresses for notification type"""
+        emails_map = {
+            "sales": self.email_notify_sales,
+            "appraisal": self.email_notify_appraisal,
+            "finance": self.email_notify_finance,
+        }
+        emails_str = emails_map.get(notification_type) or self.email_notify_default
+        if emails_str:
+            return [e.strip() for e in emails_str.split(",") if e.strip()]
+        return []
+    
+    # =========================================================================
     # MONITORING
     # =========================================================================
     
