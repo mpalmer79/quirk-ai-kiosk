@@ -301,7 +301,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const handleRequestConsultant = async () => {
     try {
       // Call the notify_staff endpoint
-      const response = await api.notifyStaff({
+      await api.notifyStaff({
         notification_type: 'sales',
         message: 'Customer at kiosk requested to speak with a sales consultant',
         vehicle_stock: customerData?.selectedVehicle?.stockNumber
