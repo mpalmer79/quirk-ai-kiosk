@@ -1,398 +1,416 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import QRCodeModal from '../components/QRCodeModal';
+import VehicleComparison from '../components/VehicleComparison';
+import api from '../components/api';
 
-// Mock clipboard API
-const mockWriteText = jest.fn();
-Object.assign(navigator, {
-  clipboard: {
-    writeText: mockWriteText,
+// Mock the API module
+jest.mock('../components/api', () => ({
+  __esModule: true,
+  default: {
+    getInventory: jest.fn(),
   },
-});
+}));
 
 // Mock vehicle data
-const mockVehicle = {
-  id: '1',
-  stock_number: 'STK001',
-  stockNumber: 'STK001',
-  year: 2024,
-  make: 'Chevrolet',
-  model: 'Equinox',
-  trim: 'LT AWD',
-  exteriorColor: 'Summit White',
-  exterior_color: 'Summit White',
-  price: 32000,
-  salePrice: 32000,
-  msrp: 34000,
+const mockVehicles = [
+  {
+    id: '1',
+    stock_number: 'STK001',
+    year: 2024,
+    make: 'Chevrolet',
+    model: 'Equinox',
+    trim: 'LT',
+    exterior_color: 'Blue',
+    interior_color: 'Black',
+    price: 32000,
+    msrp: 34000,
+    engine: '1.5L Turbo',
+    transmission: 'Automatic',
+    drivetrain: 'AWD',
+    fuel_type: 'Gasoline',
+    mpg_city: 26,
+    mpg_highway: 31,
+    body_style: 'SUV',
+    doors: 4,
+    status: 'In Stock',
+    features: ['Apple CarPlay', 'Android Auto', 'Backup Camera'],
+  },
+  {
+    id: '2',
+    stock_number: 'STK002',
+    year: 2024,
+    make: 'Chevrolet',
+    model: 'Blazer',
+    trim: 'RS',
+    exterior_color: 'Red',
+    interior_color: 'Jet Black',
+    price: 45000,
+    msrp: 47000,
+    engine: '3.6L V6',
+    transmission: 'Automatic',
+    drivetrain: 'AWD',
+    fuel_type: 'Gasoline',
+    mpg_city: 19,
+    mpg_highway: 27,
+    body_style: 'SUV',
+    doors: 4,
+    status: 'In Stock',
+    features: ['Leather Seats', 'Sunroof', 'Bose Audio', 'Navigation'],
+  },
+  {
+    id: '3',
+    stock_number: 'STK003',
+    year: 2024,
+    make: 'Chevrolet',
+    model: 'Silverado',
+    trim: 'LTZ',
+    exterior_color: 'White',
+    interior_color: 'Brown',
+    price: 55000,
+    msrp: 58000,
+    engine: '5.3L V8',
+    transmission: 'Automatic',
+    drivetrain: '4WD',
+    fuel_type: 'Gasoline',
+    mpg_city: 16,
+    mpg_highway: 22,
+    body_style: 'Truck',
+    doors: 4,
+    status: 'In Stock',
+    features: ['Towing Package', 'Bed Liner', 'Heated Seats'],
+  },
+];
+
+// Default props for the component
+const defaultProps = {
+  navigateTo: jest.fn(),
+  resetJourney: jest.fn(),
+  customerData: {},
+  updateCustomerData: jest.fn(),
 };
 
-describe('QRCodeModal Component', () => {
-  // Declare mocks inside describe so they're reset properly
-  let mockDocumentWrite: jest.Mock;
-  let mockDocumentClose: jest.Mock;
-  let mockPrint: jest.Mock;
-  let mockClose: jest.Mock;
-  let mockFocus: jest.Mock;
-  let mockOpen: jest.Mock;
-
+describe('VehicleComparison Component', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
-    mockWriteText.mockClear();
-    
-    // Create fresh mocks for each test
-    mockDocumentWrite = jest.fn();
-    mockDocumentClose = jest.fn();
-    mockPrint = jest.fn();
-    mockClose = jest.fn();
-    mockFocus = jest.fn();
-    
-    const mockPrintWindow = {
-      document: {
-        write: mockDocumentWrite,
-        close: mockDocumentClose,
-      },
-      print: mockPrint,
-      close: mockClose,
-      focus: mockFocus,
-    };
-    
-    mockOpen = jest.fn().mockReturnValue(mockPrintWindow);
-    window.open = mockOpen;
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
+    jest.clearAllMocks();
+    (api.getInventory as jest.Mock).mockResolvedValue(mockVehicles);
   });
 
   describe('Rendering', () => {
-    it('renders nothing when isOpen is false', () => {
-      const { container } = render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={false} onClose={jest.fn()} />
-      );
+    it('renders the comparison title', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      expect(container.firstChild).toBeNull();
+      expect(screen.getByText('Vehicle Comparison')).toBeInTheDocument();
     });
 
-    it('renders modal when isOpen is true', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+    it('renders the subtitle instruction', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      expect(screen.getByText('Save This Vehicle')).toBeInTheDocument();
+      expect(screen.getByText('Select up to 3 vehicles to compare side-by-side')).toBeInTheDocument();
     });
 
-    it('displays vehicle information', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+    it('displays loading state initially', () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
-      expect(screen.getByText('LT AWD')).toBeInTheDocument();
-      expect(screen.getByText('Summit White')).toBeInTheDocument();
+      expect(screen.getByText('Loading inventory...')).toBeInTheDocument();
     });
 
-    it('displays stock number', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
-      
-      expect(screen.getByText('Stock #STK001')).toBeInTheDocument();
-    });
-
-    it('displays formatted price', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
-      
-      expect(screen.getByText('$32,000')).toBeInTheDocument();
-    });
-
-    it('renders QR code image with correct URL', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
-      
-      const qrImage = screen.getByAltText('Vehicle QR Code');
-      expect(qrImage).toBeInTheDocument();
-      expect(qrImage.getAttribute('src')).toContain('api.qrserver.com');
-      expect(qrImage.getAttribute('src')).toContain('STK001');
-    });
-
-    it('displays usage instructions', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
-      
-      expect(screen.getByText('Open camera on your phone')).toBeInTheDocument();
-      expect(screen.getByText('Point at QR code')).toBeInTheDocument();
-      expect(screen.getByText('Tap the link that appears')).toBeInTheDocument();
-    });
-
-    it('displays vehicle URL', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
-      
-      expect(screen.getByText(/quirkchevynh.com\/inventory\/STK001/)).toBeInTheDocument();
-    });
-  });
-
-  describe('Close Functionality', () => {
-    it('calls onClose when close button is clicked', () => {
-      const mockOnClose = jest.fn();
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={mockOnClose} />
-      );
-      
-      // Find and click close button (it's the button in top right)
-      const closeButton = screen.getAllByRole('button')[0];
-      fireEvent.click(closeButton);
-      
-      expect(mockOnClose).toHaveBeenCalled();
-    });
-
-    it('calls onClose when backdrop is clicked', () => {
-      const mockOnClose = jest.fn();
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={mockOnClose} />
-      );
-      
-      // Click on the overlay (backdrop)
-      const overlay = screen.getByText('Save This Vehicle').closest('div[style*="position: fixed"]');
-      if (overlay) {
-        fireEvent.click(overlay);
-        expect(mockOnClose).toHaveBeenCalled();
-      }
-    });
-  });
-
-  describe('Copy Link Functionality', () => {
-    it('copies URL to clipboard when Copy Link is clicked', async () => {
-      mockWriteText.mockResolvedValue(undefined);
-      
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
-      
-      const copyButton = screen.getByText('Copy Link');
-      fireEvent.click(copyButton);
-      
-      expect(mockWriteText).toHaveBeenCalledWith(
-        expect.stringContaining('quirkchevynh.com/inventory/STK001')
-      );
-    });
-
-    it('shows "Copied!" after successful copy', async () => {
-      mockWriteText.mockResolvedValue(undefined);
-      
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
-      
-      const copyButton = screen.getByText('Copy Link');
-      fireEvent.click(copyButton);
+    it('displays vehicles after loading', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
       await waitFor(() => {
-        expect(screen.getByText('Copied!')).toBeInTheDocument();
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+        expect(screen.getByText('2024 Chevrolet Blazer')).toBeInTheDocument();
+        expect(screen.getByText('2024 Chevrolet Silverado')).toBeInTheDocument();
+      });
+    });
+
+    it('displays search bar', async () => {
+      render(<VehicleComparison {...defaultProps} />);
+      
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/search by year, make, model/i)).toBeInTheDocument();
       });
     });
   });
 
-  describe('Print Functionality', () => {
-    it('opens print window when Print QR Card is clicked', () => {
-      const { container } = render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+  describe('Vehicle Selection', () => {
+    it('allows selecting a vehicle', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      // Ensure modal is rendered with ref attached
-      expect(container.querySelector('[style*="position: fixed"]')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
       
-      const printButton = screen.getByText('Print QR Card');
-      fireEvent.click(printButton);
+      // Click on the first vehicle card
+      const vehicleCards = screen.getAllByText(/2024 Chevrolet/);
+      fireEvent.click(vehicleCards[0].closest('div[style*="cursor"]') as Element);
       
-      expect(mockOpen).toHaveBeenCalledWith('', '_blank');
+      // Should show selection pill
+      await waitFor(() => {
+        expect(screen.getByText('2024 Equinox')).toBeInTheDocument();
+      });
     });
 
-    it('writes HTML content to print window', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+    it('shows "2 more available" after selecting 1 vehicle', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      const printButton = screen.getByText('Print QR Card');
-      fireEvent.click(printButton);
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
       
-      expect(mockDocumentWrite).toHaveBeenCalled();
-      const htmlContent = mockDocumentWrite.mock.calls[0][0];
-      expect(htmlContent).toContain('2024 Chevrolet Equinox');
+      // Click on a vehicle
+      const vehicleCards = screen.getAllByText(/2024 Chevrolet/);
+      fireEvent.click(vehicleCards[0].closest('div[style*="cursor"]') as Element);
+      
+      await waitFor(() => {
+        expect(screen.getByText('2 more available')).toBeInTheDocument();
+      });
     });
 
-    it('includes vehicle details in print content', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+    it('shows "Compare Now" button after selecting 2 vehicles', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      const printButton = screen.getByText('Print QR Card');
-      fireEvent.click(printButton);
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
       
-      expect(mockDocumentWrite).toHaveBeenCalled();
-      const htmlContent = mockDocumentWrite.mock.calls[0][0];
-      expect(htmlContent).toContain('LT AWD');
-      expect(htmlContent).toContain('STK001');
-      expect(htmlContent).toContain('$32,000');
+      // Select first vehicle
+      const vehicleCards = screen.getAllByText(/2024 Chevrolet/);
+      fireEvent.click(vehicleCards[0].closest('div[style*="cursor"]') as Element);
+      
+      // Select second vehicle
+      fireEvent.click(vehicleCards[1].closest('div[style*="cursor"]') as Element);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Compare Now/)).toBeInTheDocument();
+      });
     });
 
-    it('triggers print after delay', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+    it('allows deselecting a vehicle via remove button', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      const printButton = screen.getByText('Print QR Card');
-      fireEvent.click(printButton);
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
       
-      // Verify window was opened
-      expect(mockOpen).toHaveBeenCalled();
+      // Select a vehicle
+      const vehicleCards = screen.getAllByText(/2024 Chevrolet/);
+      fireEvent.click(vehicleCards[0].closest('div[style*="cursor"]') as Element);
       
-      // Fast-forward timer
-      jest.advanceTimersByTime(500);
+      // Wait for pill to appear
+      await waitFor(() => {
+        expect(screen.getByText('2024 Equinox')).toBeInTheDocument();
+      });
       
-      expect(mockPrint).toHaveBeenCalled();
-      expect(mockClose).toHaveBeenCalled();
-    });
-  });
-
-  describe('QR Code Loading States', () => {
-    it('shows loading spinner initially', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+      // Click remove button
+      const removeBtn = screen.getByText('×');
+      fireEvent.click(removeBtn);
       
-      // The spinner should be in the DOM (inside qrPlaceholder)
-      const qrImage = screen.getByAltText('Vehicle QR Code');
-      // Image should be hidden initially
-      expect(qrImage).toHaveStyle({ display: 'none' });
-    });
-
-    it('shows QR code after loading', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
-      
-      const qrImage = screen.getByAltText('Vehicle QR Code');
-      
-      // Simulate image load
-      fireEvent.load(qrImage);
-      
-      expect(qrImage).toHaveStyle({ display: 'block' });
-    });
-
-    it('shows error state when QR code fails to load', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
-      
-      const qrImage = screen.getByAltText('Vehicle QR Code');
-      
-      // Simulate image error
-      fireEvent.error(qrImage);
-      
-      expect(screen.getByText('Unable to generate QR code')).toBeInTheDocument();
+      // Pill should be removed
+      await waitFor(() => {
+        expect(screen.queryByText('2 more available')).not.toBeInTheDocument();
+      });
     });
   });
 
-  describe('Vehicle Data Handling', () => {
-    it('handles vehicle with snake_case properties', () => {
-      const snakeCaseVehicle = {
-        id: '2',
-        stock_number: 'STK002',
-        year: 2024,
-        make: 'Chevrolet',
-        model: 'Blazer',
-        trim: 'RS',
-        exterior_color: 'Black',
-        sale_price: 45000,
-      };
+  describe('Search Functionality', () => {
+    it('filters vehicles by search term', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      render(
-        <QRCodeModal vehicle={snakeCaseVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
       
-      expect(screen.getByText('2024 Chevrolet Blazer')).toBeInTheDocument();
-      expect(screen.getByText('Stock #STK002')).toBeInTheDocument();
-      expect(screen.getByText('$45,000')).toBeInTheDocument();
+      const searchInput = screen.getByPlaceholderText(/search by year, make, model/i);
+      fireEvent.change(searchInput, { target: { value: 'Silverado' } });
+      
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Silverado')).toBeInTheDocument();
+        expect(screen.queryByText('2024 Chevrolet Equinox')).not.toBeInTheDocument();
+      });
     });
 
-    it('handles vehicle with camelCase properties', () => {
-      const camelCaseVehicle = {
-        id: '3',
-        stockNumber: 'STK003',
-        year: 2024,
-        make: 'Chevrolet',
-        model: 'Silverado',
-        trim: 'LTZ',
-        exteriorColor: 'White',
-        salePrice: 55000,
-      };
+    it('shows clear button when search has value', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      render(
-        <QRCodeModal vehicle={camelCaseVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
       
-      expect(screen.getByText('2024 Chevrolet Silverado')).toBeInTheDocument();
-      expect(screen.getByText('Stock #STK003')).toBeInTheDocument();
-      expect(screen.getByText('$55,000')).toBeInTheDocument();
+      const searchInput = screen.getByPlaceholderText(/search by year, make, model/i);
+      fireEvent.change(searchInput, { target: { value: 'test' } });
+      
+      // Clear button should appear (×)
+      const clearButtons = screen.getAllByText('×');
+      expect(clearButtons.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Comparison View', () => {
+    it('shows comparison table after clicking Compare Now', async () => {
+      render(<VehicleComparison {...defaultProps} />);
+      
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
+      
+      // Select two vehicles
+      const vehicleCards = screen.getAllByText(/2024 Chevrolet/);
+      fireEvent.click(vehicleCards[0].closest('div[style*="cursor"]') as Element);
+      fireEvent.click(vehicleCards[1].closest('div[style*="cursor"]') as Element);
+      
+      // Click Compare Now
+      await waitFor(() => {
+        expect(screen.getByText(/Compare Now/)).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText(/Compare Now/));
+      
+      // Should show comparison specs
+      await waitFor(() => {
+        expect(screen.getByText('Price')).toBeInTheDocument();
+        expect(screen.getByText('Engine')).toBeInTheDocument();
+        expect(screen.getByText('Drivetrain')).toBeInTheDocument();
+      });
     });
 
-    it('uses MSRP when sale price is not available', () => {
-      const vehicleWithMsrpOnly = {
-        id: '4',
-        stockNumber: 'STK004',
-        year: 2024,
-        make: 'Chevrolet',
-        model: 'Tahoe',
-        msrp: 60000,
-      };
+    it('shows "Modify Selection" button in comparison view', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      render(
-        <QRCodeModal vehicle={vehicleWithMsrpOnly} isOpen={true} onClose={jest.fn()} />
-      );
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
       
-      expect(screen.getByText('$60,000')).toBeInTheDocument();
+      // Select and compare
+      const vehicleCards = screen.getAllByText(/2024 Chevrolet/);
+      fireEvent.click(vehicleCards[0].closest('div[style*="cursor"]') as Element);
+      fireEvent.click(vehicleCards[1].closest('div[style*="cursor"]') as Element);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Compare Now/)).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText(/Compare Now/));
+      
+      await waitFor(() => {
+        expect(screen.getByText('← Modify Selection')).toBeInTheDocument();
+      });
     });
 
-    it('handles missing optional fields gracefully', () => {
-      const minimalVehicle = {
-        id: '5',
-        stockNumber: 'STK005',
-        year: 2024,
-        model: 'Trax',
-      };
+    it('shows View Details button for each vehicle', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      render(
-        <QRCodeModal vehicle={minimalVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
       
-      expect(screen.getByText('2024 Chevrolet Trax')).toBeInTheDocument();
+      // Select and compare
+      const vehicleCards = screen.getAllByText(/2024 Chevrolet/);
+      fireEvent.click(vehicleCards[0].closest('div[style*="cursor"]') as Element);
+      fireEvent.click(vehicleCards[1].closest('div[style*="cursor"]') as Element);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Compare Now/)).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText(/Compare Now/));
+      
+      await waitFor(() => {
+        const viewDetailsBtns = screen.getAllByText('View Details');
+        expect(viewDetailsBtns.length).toBe(2);
+      });
+    });
+  });
+
+  describe('Navigation', () => {
+    it('calls navigateTo when clicking View Details', async () => {
+      render(<VehicleComparison {...defaultProps} />);
+      
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
+      
+      // Select and compare
+      const vehicleCards = screen.getAllByText(/2024 Chevrolet/);
+      fireEvent.click(vehicleCards[0].closest('div[style*="cursor"]') as Element);
+      fireEvent.click(vehicleCards[1].closest('div[style*="cursor"]') as Element);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Compare Now/)).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText(/Compare Now/));
+      
+      await waitFor(() => {
+        const viewDetailsBtns = screen.getAllByText('View Details');
+        fireEvent.click(viewDetailsBtns[0]);
+      });
+      
+      expect(defaultProps.navigateTo).toHaveBeenCalledWith('vehicleDetail');
+    });
+
+    it('calls navigateTo when clicking Browse More Vehicles', async () => {
+      render(<VehicleComparison {...defaultProps} />);
+      
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
+      
+      // Select and compare
+      const vehicleCards = screen.getAllByText(/2024 Chevrolet/);
+      fireEvent.click(vehicleCards[0].closest('div[style*="cursor"]') as Element);
+      fireEvent.click(vehicleCards[1].closest('div[style*="cursor"]') as Element);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Compare Now/)).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText(/Compare Now/));
+      
+      await waitFor(() => {
+        expect(screen.getByText('Browse More Vehicles')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText('Browse More Vehicles'));
+      
+      expect(defaultProps.navigateTo).toHaveBeenCalledWith('inventory');
+    });
+  });
+
+  describe('Price Formatting', () => {
+    it('displays formatted prices correctly', async () => {
+      render(<VehicleComparison {...defaultProps} />);
+      
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
+      
+      // Should show formatted MSRP on vehicle card (component shows MSRP first)
+      expect(screen.getByText('$34,000')).toBeInTheDocument();
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('handles API error gracefully', async () => {
+      (api.getInventory as jest.Mock).mockRejectedValue(new Error('API Error'));
+      
+      render(<VehicleComparison {...defaultProps} />);
+      
+      // Should not crash and eventually finish loading
+      await waitFor(() => {
+        expect(screen.queryByText('Loading inventory...')).not.toBeInTheDocument();
+      });
     });
   });
 
   describe('Accessibility', () => {
-    it('has accessible buttons', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+    it('has clickable vehicle cards', async () => {
+      render(<VehicleComparison {...defaultProps} />);
       
-      const buttons = screen.getAllByRole('button');
-      expect(buttons.length).toBeGreaterThan(0);
-    });
-
-    it('QR code image has alt text', () => {
-      render(
-        <QRCodeModal vehicle={mockVehicle} isOpen={true} onClose={jest.fn()} />
-      );
+      await waitFor(() => {
+        expect(screen.getByText('2024 Chevrolet Equinox')).toBeInTheDocument();
+      });
       
-      const qrImage = screen.getByAltText('Vehicle QR Code');
-      expect(qrImage).toBeInTheDocument();
+      const vehicleCards = screen.getAllByText(/2024 Chevrolet/);
+      vehicleCards.forEach(card => {
+        const clickableParent = card.closest('div[style*="cursor"]');
+        expect(clickableParent).toBeInTheDocument();
+      });
     });
   });
 });
