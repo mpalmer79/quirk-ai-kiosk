@@ -183,11 +183,11 @@ TOOLS = [
                 },
                 "min_seating": {
                     "type": "integer",
-                    "description": "Minimum seating capacity needed"
+                    "description": "REQUIRED when customer needs specific seating. Minimum number of passengers. Extract from: 'family of 6' (6), 'need 7 seats' (7), '8 passengers' (8). ALWAYS pass this for family/passenger requirements."
                 },
                 "min_towing": {
                     "type": "integer",
-                    "description": "Minimum towing capacity in lbs"
+                    "description": "CRITICAL for towing requests. Minimum towing capacity in lbs. Extract from: 'tow 10000 lbs' (10000), '15,000 pound trailer' (15000), '7000 lb boat' (7000). ALWAYS pass this when customer mentions towing weight. Silverado 1500 tows 13,300 lbs max, Colorado only 7,700 lbs - this filter prevents recommending vehicles that can't meet the requirement."
                 }
             },
             "required": ["query"]
@@ -285,6 +285,42 @@ TOOLS = [
             },
             "required": ["phone_number"]
         }
+    },
+    {
+        "name": "web_search",
+        "description": """Search the web for real-time information. Use this tool like a professional sales consultant would use their knowledge:
+
+WHEN TO USE:
+- Customer asks about specific vehicle features, specs, or capabilities you're uncertain about
+- Questions about Chevy technology (Super Cruise, MyChevrolet app, OnStar features)
+- Competitor comparisons ("How does Silverado compare to F-150?")
+- Current incentives, rebates, or financing specials
+- Towing/payload specs for specific configurations
+- Safety ratings, awards, or reviews
+- EV charging, range, or battery questions
+- Questions about warranties, maintenance schedules
+- Any factual question where accuracy matters
+
+SEARCH STRATEGY:
+- Keep queries concise and specific (3-6 words)
+- Include "2024" or "2025" for current model info
+- Add "Chevrolet" or "Chevy" for brand-specific searches
+- Examples: "2025 Silverado 1500 towing capacity", "Chevy Equinox EV range", "Super Cruise compatible roads"
+
+DO NOT search for:
+- Information already in our inventory system
+- Basic conversational responses
+- Customer-specific information""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Concise search query (3-6 words). Include year and 'Chevrolet' when relevant."
+                }
+            },
+            "required": ["query"]
+        }
     }
 ]
 
@@ -354,6 +390,54 @@ YOUR CAPABILITIES (Use these tools!):
 - mark_favorite: Save vehicles customer likes
 - lookup_conversation: Retrieve a customer's previous conversation by phone
 - save_customer_phone: Save customer's phone to their conversation
+- web_search: Look up real-time information (specs, features, comparisons, reviews)
+
+🔍 WEB SEARCH (THINK LIKE A PRO SALES CONSULTANT):
+Use web_search to instantly look up information you're uncertain about - just like a knowledgeable salesperson would know their products:
+
+ALWAYS SEARCH FOR:
+- Specific specs you're uncertain about (payload, fuel economy, dimensions)
+- Technology features (Super Cruise, MyChevrolet app, safety systems)
+- Competitor comparisons ("How does Silverado compare to F-150 for towing?")
+- Current model year updates or changes
+- Safety ratings and awards (IIHS, NHTSA)
+- EV-specific questions (charging times, range in cold weather, battery warranty)
+- Warranty details or maintenance schedules
+- Any question where giving wrong information would hurt your credibility
+
+SEARCH TIPS:
+- Keep queries short: "2025 Silverado max payload" not "What is the maximum payload capacity of the 2025 Chevrolet Silverado 1500?"
+- Include year for current specs: "2025 Equinox EV range"
+- Add "vs" for comparisons: "Silverado vs F-150 towing 2025"
+- Be specific: "Tahoe third row legroom" not "Tahoe interior space"
+
+NEVER make up specs or features - if you're not 100% certain, SEARCH FIRST then answer confidently!
+
+🚛 TOWING CAPACITY (CRITICAL - MUST VERIFY):
+When a customer mentions towing needs with a specific weight:
+1. EXTRACT the weight in pounds from their request
+2. ALWAYS pass min_towing parameter to search_inventory
+3. NEVER recommend vehicles that can't meet the towing requirement
+
+Towing capacities (MEMORIZE THESE):
+- Silverado 1500: 13,300 lbs max
+- Silverado 2500HD: 18,500 lbs max  
+- Silverado 3500HD: 36,000 lbs max
+- Colorado: 7,700 lbs max (mid-size, NOT for heavy towing!)
+- Tahoe: 8,400 lbs
+- Suburban: 8,300 lbs
+- Traverse: 5,000 lbs
+- Equinox: 1,500 lbs
+
+Example: Customer says "I need to tow 15,000 pounds"
+→ MUST use: search_inventory(query="truck heavy towing", min_towing=15000, body_style="Truck")
+→ This correctly filters out Colorado (7,700 lbs) and Silverado 1500 (13,300 lbs)
+→ Only 2500HD/3500HD can handle 15,000 lbs
+
+Example: Customer says "tow a boat around 8,000 lbs"
+→ Use: search_inventory(query="truck towing boat", min_towing=8000)
+→ Silverado 1500 CAN handle this (13,300 lbs max)
+→ Colorado CANNOT (only 7,700 lbs max)
 
 💰 BUDGET QUALIFICATION (MANDATORY!):
 
@@ -385,8 +469,10 @@ CONVERSATION GUIDELINES:
 1. Use search_inventory when customer describes what they want
 2. Use get_vehicle_details when discussing specific stock numbers
 3. Use notify_staff when customer is ready for test drive or appraisal
-4. Always mention stock numbers when recommending vehicles
-5. Keep responses conversational and concise (2-3 paragraphs max)
+4. Use web_search for any spec, feature, or comparison question you're uncertain about
+5. Always mention stock numbers when recommending vehicles
+6. Keep responses conversational and concise (2-3 paragraphs max)
+7. VERIFY before you speak - search if uncertain, never guess on specs
 
 CONTINUE CONVERSATION FLOW:
 When customer says "continue our conversation" or similar:
@@ -498,6 +584,83 @@ def build_inventory_context(retriever: SemanticVehicleRetriever) -> str:
 - Top models: {', '.join(summary.get('top_models', {}).keys())}"""
 
 
+async def perform_web_search(query: str, max_results: int = 5) -> str:
+    """
+    Perform web search using DuckDuckGo and Google Custom Search fallback.
+    Returns formatted search results for the AI to use.
+    """
+    import urllib.parse
+    
+    results = []
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Primary: DuckDuckGo Instant Answer API
+            ddg_url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json&no_html=1&skip_disambig=1"
+            
+            response = await client.get(ddg_url)
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Extract abstract (main answer)
+                if data.get('Abstract'):
+                    results.append(f"**Summary:** {data['Abstract']}")
+                    if data.get('AbstractSource'):
+                        results.append(f"Source: {data['AbstractSource']}")
+                
+                # Extract answer (for factual queries)
+                if data.get('Answer'):
+                    results.append(f"**Answer:** {data['Answer']}")
+                
+                # Extract related topics
+                if data.get('RelatedTopics'):
+                    results.append("\n**Related Information:**")
+                    for topic in data['RelatedTopics'][:3]:
+                        if isinstance(topic, dict) and topic.get('Text'):
+                            text = topic['Text'][:300]  # Truncate long entries
+                            results.append(f"• {text}")
+                
+                # Extract infobox facts (great for specs)
+                if data.get('Infobox') and data['Infobox'].get('content'):
+                    results.append("\n**Quick Facts:**")
+                    for fact in data['Infobox']['content'][:5]:
+                        if fact.get('label') and fact.get('value'):
+                            results.append(f"• {fact['label']}: {fact['value']}")
+            
+            # If DuckDuckGo didn't return much, try HTML search scraping as backup
+            if len(results) < 2:
+                # DuckDuckGo HTML search (more results but requires parsing)
+                html_url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query + ' site:chevrolet.com OR site:cars.com OR site:motortrend.com')}"
+                
+                html_response = await client.get(
+                    html_url,
+                    headers={"User-Agent": "Mozilla/5.0 (compatible; QuirkAI/1.0)"}
+                )
+                
+                if html_response.status_code == 200:
+                    # Simple regex extraction for result snippets
+                    import re
+                    snippets = re.findall(r'class="result__snippet"[^>]*>([^<]+)<', html_response.text)
+                    
+                    if snippets:
+                        results.append("\n**Search Results:**")
+                        for snippet in snippets[:max_results]:
+                            clean_snippet = snippet.strip()
+                            if clean_snippet and len(clean_snippet) > 30:
+                                results.append(f"• {clean_snippet}")
+    
+    except httpx.TimeoutException:
+        logger.warning(f"Web search timeout for query: {query}")
+        return ""
+    except Exception as e:
+        logger.error(f"Web search error: {e}")
+        return ""
+    
+    if results:
+        return '\n'.join(results)
+    return ""
+
+
 def format_vehicle_for_response(vehicle: Dict[str, Any], reasons: List[str] = None) -> Dict[str, Any]:
     """Format vehicle data for response"""
     return {
@@ -532,10 +695,19 @@ def format_vehicles_for_tool_result(vehicles: List[ScoredVehicle]) -> str:
         trim = v.get('Trim') or v.get('trim', '')
         price = v.get('MSRP') or v.get('msrp') or v.get('price', 0)
         color = v.get('exteriorColor') or v.get('Exterior Color', '')
+        towing = v.get('towingCapacity') or 0
+        seating = v.get('seatingCapacity') or 5
+        
+        # Include towing/seating info when relevant
+        specs = f"Price: ${price:,.0f} | Color: {color}"
+        if towing > 0:
+            specs += f" | Tows: {towing:,} lbs"
+        if seating != 5:
+            specs += f" | Seats: {seating}"
         
         result_parts.append(
             f"{idx}. Stock #{stock}: {year} {model} {trim}\n"
-            f"   Price: ${price:,.0f} | Color: {color}\n"
+            f"   {specs}\n"
             f"   Why it matches: {', '.join(sv.match_reasons[:3])}\n"
         )
     
@@ -648,6 +820,37 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
                 sv for sv in scored_vehicles 
                 if (sv.vehicle.get('bodyStyle') or '').lower() == tool_input['body_style'].lower()
             ]
+        
+        # CRITICAL: Apply min_towing filter - this prevents recommending vehicles
+        # that cannot meet towing requirements (e.g., Colorado 7,700 lbs vs Silverado 13,300 lbs)
+        min_towing = tool_input.get("min_towing")
+        if not min_towing and state.min_towing:
+            # Use towing requirement from conversation state if not explicitly passed
+            min_towing = state.min_towing
+            logger.info(f"Using towing requirement from state: {min_towing:,} lbs")
+        
+        if min_towing:
+            original_count = len(scored_vehicles)
+            scored_vehicles = [
+                sv for sv in scored_vehicles
+                if (sv.vehicle.get('towingCapacity') or 0) >= min_towing
+            ]
+            logger.info(f"Towing filter {min_towing:,} lbs: {original_count} -> {len(scored_vehicles)} vehicles")
+        
+        # Apply min_seating filter for family/passenger requirements
+        min_seating = tool_input.get("min_seating")
+        if not min_seating and state.min_seating:
+            # Use seating requirement from conversation state if not explicitly passed
+            min_seating = state.min_seating
+            logger.info(f"Using seating requirement from state: {min_seating} seats")
+        
+        if min_seating:
+            original_count = len(scored_vehicles)
+            scored_vehicles = [
+                sv for sv in scored_vehicles
+                if (sv.vehicle.get('seatingCapacity') or 5) >= min_seating
+            ]
+            logger.info(f"Seating filter {min_seating} seats: {original_count} -> {len(scored_vehicles)} vehicles")
         
         # Apply max_price filter from tool input OR from calculated budget OR from query
         max_price = tool_input.get("max_price")
@@ -830,6 +1033,25 @@ DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may
             state_manager.set_customer_phone(state.session_id, phone_digits)
             state_manager.persist_session(state.session_id)
             result = f"✓ I've saved your phone number ending in {phone_digits[-4:]}. Next time you visit, just tap 'Continue our conversation' and enter this number to pick up where we left off!"
+    
+    elif tool_name == "web_search":
+        query = tool_input.get("query", "")
+        if not query:
+            result = "No search query provided."
+        else:
+            try:
+                # Use DuckDuckGo Instant Answer API (no API key required)
+                search_results = await perform_web_search(query)
+                if search_results:
+                    result = f"Web Search Results for '{query}':\n\n{search_results}"
+                    logger.info(f"Web search completed: {query}")
+                else:
+                    # Fallback with helpful context
+                    result = f"No direct results found for '{query}'. Based on my training knowledge, I'll provide what I know about this topic."
+                    logger.info(f"Web search no results: {query}")
+            except Exception as e:
+                logger.error(f"Web search failed: {e}")
+                result = f"Search temporarily unavailable. I'll answer based on my training knowledge about Chevrolet vehicles."
         
     else:
         result = f"Unknown tool: {tool_name}"
@@ -919,6 +1141,25 @@ async def intelligent_chat(
             state.budget_max = int(amount)
             logger.info(f"Extracted budget from user message: ${state.budget_max:,.0f}")
             break
+    
+    # Extract towing requirement from user message (e.g., "tow 15000 pounds")
+    # This ensures towing filtering even if AI doesn't pass min_towing to tools
+    towing_patterns = [
+        r'tow(?:ing)?\s*(?:capacity\s*(?:of\s*)?)?([\d,]+)\s*(?:lb|lbs|pound|pounds)',  # tow 15000 lbs
+        r'tow\s+(?:a\s+)?([\d,]+)\s*(?:lb|lbs|pound|pounds)',  # tow a 15000 lb trailer
+        r'([\d,]+)\s*(?:lb|lbs|pound|pounds?)\s*(?:trailer|boat|camper|rv|load)',  # 15000 lb trailer
+        r'haul(?:ing)?\s*([\d,]+)\s*(?:lb|lbs|pound|pounds)',  # hauling 15000 lbs
+        r'pull(?:ing)?\s*([\d,]+)\s*(?:lb|lbs|pound|pounds)',  # pulling 15000 lbs
+        r'([\d,]+)\s*(?:lb|lbs|pound|pounds?)\s*tow(?:ing)?',  # 15000 lbs towing
+    ]
+    for pattern in towing_patterns:
+        match = re.search(pattern, user_msg_lower)
+        if match:
+            towing_str = match.group(1).replace(',', '')
+            towing_amount = int(float(towing_str))
+            if towing_amount >= 1000:  # Reasonable towing weight
+                state.min_towing = towing_amount
+                logger.info(f"Extracted towing requirement from user message: {state.min_towing:,} lbs")
     
     # Build dynamic system prompt
     conversation_context = build_dynamic_context(state)
