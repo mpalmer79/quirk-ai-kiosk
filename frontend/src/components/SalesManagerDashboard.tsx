@@ -211,7 +211,7 @@ interface SalesManagerDashboardProps {
   navigateTo?: (page: string) => void;
 }
 
-const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerData, updateCustomerData }) => {
+const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerData, updateCustomerData, navigateTo }) => {
   // Session state
   const [sessions, setSessions] = useState<CustomerSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -226,6 +226,8 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
   // Digital Worksheet state
   const [paymentMode, setPaymentMode] = useState<'finance' | 'lease'>('finance');
   const [managerNotes, setManagerNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
   const [overrides, setOverrides] = useState<DealOverrides>({
     salePrice: null,
     tradeACV: null,
@@ -237,6 +239,105 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
     leaseMoneyFactor: 0.00125,
     leaseResidual: 0.55,
   });
+
+  // ============================================================================
+  // Chat History Analysis Helpers
+  // ============================================================================
+
+  /**
+   * Extract vehicle mentions from chat history
+   * Returns array of vehicles discussed in the conversation
+   */
+  const extractVehiclesFromChat = (chatHistory: ChatMessage[] | undefined): Array<{stockNumber: string, year: string, model: string, trim?: string, price?: number}> => {
+    if (!chatHistory || chatHistory.length === 0) return [];
+    
+    const vehicles: Array<{stockNumber: string, year: string, model: string, trim?: string, price?: number}> = [];
+    
+    // Pattern to match: **2025 Corvette 3LZ (Stock #M39196)** - $130,575
+    // Or: 2025 Corvette 3LZ (Stock #M39196) - $130,575
+    const vehiclePattern = /\*?\*?(\d{4})\s+([A-Za-z]+(?:\s+[A-Za-z0-9]+)?)\s+([A-Za-z0-9]+)?\s*\(Stock\s*#?([A-Za-z0-9]+)\)\*?\*?\s*[-–]?\s*\$?([\d,]+)?/gi;
+    
+    chatHistory.forEach(msg => {
+      if (msg.role === 'assistant') {
+        // Reset regex lastIndex for each message
+        vehiclePattern.lastIndex = 0;
+        let match;
+        while ((match = vehiclePattern.exec(msg.content)) !== null) {
+          const [, year, model, trim, stock, price] = match;
+          // Avoid duplicates
+          if (!vehicles.find(v => v.stockNumber === stock)) {
+            vehicles.push({
+              stockNumber: stock,
+              year: year,
+              model: model.trim(),
+              trim: trim?.trim(),
+              price: price ? parseInt(price.replace(/,/g, '')) : undefined
+            });
+          }
+        }
+      }
+    });
+    
+    return vehicles;
+  };
+
+  /**
+   * Extract trade-in information from chat history
+   */
+  const extractTradeInFromChat = (chatHistory: ChatMessage[] | undefined): {hasTrade: boolean, description: string} | null => {
+    if (!chatHistory || chatHistory.length === 0) return null;
+    
+    const tradeKeywords = ['trade', 'trading', 'trade-in', 'current vehicle', 'my car', 'i have a', 'want to trade'];
+    
+    for (const msg of chatHistory) {
+      if (msg.role === 'user') {
+        const lowerContent = msg.content.toLowerCase();
+        if (tradeKeywords.some(keyword => lowerContent.includes(keyword))) {
+          // Extract vehicle description from the message
+          return {
+            hasTrade: true,
+            description: msg.content
+          };
+        }
+      }
+    }
+    
+    return null;
+  };
+
+  /**
+   * Extract payment preferences from chat history
+   */
+  const extractPaymentFromChat = (chatHistory: ChatMessage[] | undefined): {downPayment?: number, monthlyBudget?: number, payingCash?: boolean} | null => {
+    if (!chatHistory || chatHistory.length === 0) return null;
+    
+    const result: {downPayment?: number, monthlyBudget?: number, payingCash?: boolean} = {};
+    
+    chatHistory.forEach(msg => {
+      if (msg.role === 'user') {
+        const lowerContent = msg.content.toLowerCase();
+        
+        // Check for cash payment
+        if (lowerContent.includes('cash') || lowerContent.includes('paying cash') || lowerContent.includes('pay cash')) {
+          result.payingCash = true;
+        }
+        
+        // Extract down payment amounts
+        const downMatch = msg.content.match(/(\$?[\d,]+)\s*(down|down payment)/i);
+        if (downMatch) {
+          result.downPayment = parseInt(downMatch[1].replace(/[$,]/g, ''));
+        }
+        
+        // Extract monthly budget
+        const monthlyMatch = msg.content.match(/(\$?[\d,]+)\s*(per month|\/month|monthly|a month)/i);
+        if (monthlyMatch) {
+          result.monthlyBudget = parseInt(monthlyMatch[1].replace(/[$,]/g, ''));
+        }
+      }
+    });
+    
+    return Object.keys(result).length > 0 ? result : null;
+  };
 
   // ============================================================================
   // Data Fetching
@@ -325,6 +426,7 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
     setSelectedSession(session);
     setShowChatTranscript(false);
     setManagerNotes('');
+    setNotesSaved(false);
     setOverrides({
       salePrice: null,
       tradeACV: null,
@@ -356,6 +458,30 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
 
   const handleSendToFI = () => {
     alert('Send to F&I functionality would integrate with your DMS (PBS/Reynolds/CDK)');
+  };
+
+  const handleSaveNotes = async () => {
+    if (!selectedSession || !managerNotes.trim()) return;
+    
+    setSavingNotes(true);
+    setNotesSaved(false);
+    
+    try {
+      // Save notes via API
+      await api.logTrafficSession({
+        sessionId: selectedSession.sessionId,
+        managerNotes: managerNotes,
+        currentStep: selectedSession.currentStep,
+      });
+      setNotesSaved(true);
+      // Reset saved indicator after 3 seconds
+      setTimeout(() => setNotesSaved(false), 3000);
+    } catch (error) {
+      console.error('Failed to save notes:', error);
+      alert('Failed to save notes. Please try again.');
+    } finally {
+      setSavingNotes(false);
+    }
   };
 
   // ============================================================================
@@ -567,9 +693,27 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
                   />
                 </div>
               </div>
-            ) : (
-              <div style={styles.pendingValue}>No vehicle selected</div>
-            )}
+            ) : (() => {
+              // Check chat history for vehicles discussed
+              const vehiclesFromChat = extractVehiclesFromChat(sessionDetail?.chatHistory);
+              if (vehiclesFromChat.length > 0) {
+                return (
+                  <div style={styles.sectionContent}>
+                    <div style={{...styles.pendingValue, fontStyle: 'normal', color: '#1a1a2e'}}>
+                      <strong>Vehicles Discussed:</strong>
+                    </div>
+                    {vehiclesFromChat.map((v, idx) => (
+                      <div key={idx} style={{marginTop: '8px', padding: '8px', background: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0'}}>
+                        <div style={styles.vehicleTitle}>{v.year} {v.model} {v.trim || ''}</div>
+                        <div style={styles.vehicleStock}>Stock #{v.stockNumber}</div>
+                        {v.price && <div style={styles.priceRow}><span>Price</span><span>{formatCurrency(v.price)}</span></div>}
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              return <div style={styles.pendingValue}>No vehicle selected</div>;
+            })()}}
           </div>
 
           {/* Trade-In Section */}
@@ -607,6 +751,12 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
                       <span>Lender</span>
                       <span>{trade.financedWith || 'Unknown'}</span>
                     </div>
+                    {trade.monthlyPayment && (
+                      <div style={styles.priceRow}>
+                        <span>Monthly Payment</span>
+                        <span>{formatCurrency(trade.monthlyPayment)}</span>
+                      </div>
+                    )}
                   </>
                 )}
                 
@@ -617,9 +767,31 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
                   </span>
                 </div>
               </div>
-            ) : (
-              <div style={styles.pendingValue}>No trade-in</div>
-            )}
+            ) : (() => {
+              // Check chat history for trade-in mentions
+              const tradeFromChat = extractTradeInFromChat(sessionDetail?.chatHistory);
+              if (tradeFromChat?.hasTrade) {
+                return (
+                  <div style={styles.sectionContent}>
+                    <div style={{padding: '12px', background: '#fef3c7', borderRadius: '8px', border: '1px solid #fcd34d'}}>
+                      <div style={{fontWeight: 600, color: '#92400e', marginBottom: '4px'}}>Trade-In Mentioned:</div>
+                      <div style={{color: '#78350f', fontSize: '13px'}}>{tradeFromChat.description}</div>
+                    </div>
+                    <div style={styles.editableRow}>
+                      <label style={styles.editableLabel}>Trade ACV (to be appraised)</label>
+                      <input
+                        type="number"
+                        value={overrides.tradeACV ?? ''}
+                        onChange={(e) => handleOverrideChange('tradeACV', e.target.value ? Number(e.target.value) : null)}
+                        style={styles.editableInput}
+                        placeholder="Enter ACV after appraisal"
+                      />
+                    </div>
+                  </div>
+                );
+              }
+              return <div style={styles.pendingValue}>No trade-in</div>;
+            })()}
           </div>
 
           {/* Down Payment Section */}
@@ -840,12 +1012,54 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
             <h4 style={styles.boxTitle}>Manager Notes</h4>
             <textarea
               value={managerNotes}
-              onChange={(e) => setManagerNotes(e.target.value)}
+              onChange={(e) => { setManagerNotes(e.target.value); setNotesSaved(false); }}
               placeholder="Add notes about this deal..."
               style={styles.notesTextarea}
             />
+            <div style={{display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px'}}>
+              <button 
+                style={{
+                  ...styles.actionBtnPrimary,
+                  opacity: savingNotes || !managerNotes.trim() ? 0.6 : 1,
+                  cursor: savingNotes || !managerNotes.trim() ? 'not-allowed' : 'pointer'
+                }} 
+                onClick={handleSaveNotes}
+                disabled={savingNotes || !managerNotes.trim()}
+              >
+                {savingNotes ? '💾 Saving...' : '💾 Save Notes'}
+              </button>
+              {notesSaved && (
+                <span style={{color: '#10b981', fontSize: '13px', fontWeight: 600}}>
+                  ✓ Notes saved!
+                </span>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Payment Preferences from Chat */}
+        {(() => {
+          const paymentFromChat = extractPaymentFromChat(sessionDetail?.chatHistory);
+          if (paymentFromChat && (paymentFromChat.downPayment || paymentFromChat.monthlyBudget || paymentFromChat.payingCash)) {
+            return (
+              <div style={{...styles.interestBox, marginTop: '20px', background: '#eff6ff', border: '1px solid #bfdbfe'}}>
+                <h4 style={{...styles.boxTitle, color: '#1e40af'}}>💬 Payment Info from Conversation</h4>
+                <div style={styles.interestDetails}>
+                  {paymentFromChat.payingCash && (
+                    <span style={{color: '#10b981', fontWeight: 600}}>✓ Customer indicated paying CASH</span>
+                  )}
+                  {paymentFromChat.downPayment && (
+                    <span>Down Payment mentioned: {formatCurrency(paymentFromChat.downPayment)}</span>
+                  )}
+                  {paymentFromChat.monthlyBudget && (
+                    <span>Monthly Budget: {formatCurrency(paymentFromChat.monthlyBudget)}/mo</span>
+                  )}
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
     );
   };
@@ -874,7 +1088,7 @@ const SalesManagerDashboard: React.FC<SalesManagerDashboardProps> = ({ customerD
             Refresh
           </button>
           {selectedSession && (
-            <button style={styles.homeBtn} onClick={handleHomeClick}>
+            <button style={styles.homeBtn} onClick={() => navigateTo ? navigateTo('trafficLog') : handleHomeClick()}>
               ← All Sessions
             </button>
           )}
