@@ -1,798 +1,1023 @@
-import React, { useState, useCallback, useEffect, useRef, CSSProperties, ReactNode } from 'react';
-
-// Import all customer journey components (matching actual filenames - case sensitive)
-import WelcomeScreen from './Welcomescreen';
-import StockLookup from './Stocklookup';
-import ModelBudgetSelector from './ModelBudgetSelector';
-import GuidedQuiz from './Guidedquiz';
-import InventoryResults from './Inventoryresults';
-import VehicleDetail from './Vehicledetail';
-import VehicleComparison from './VehicleComparison';
-import VirtualTestDrive from './VirtualTestDrive';
-import PaymentCalculator from './Paymentcalculator';
-import TradeInEstimator from './TradeInEstimator';
-import CustomerHandoff from './Customerhandoff';
-import ProtectionPackages from './Protectionpackages';
-import TrafficLog from './Trafficlog';
-import AIAssistant from './AIAssistant';
-import SalesManagerDashboard from './SalesManagerDashboard';
-import InventorySyncDashboard from './InventorySyncDashboard';
-import ErrorBoundary from './Errorboundary';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import api from './api';
+import GM_COLORS from '../types/gmColors';
+import { BASE_CATEGORIES, modelMatches } from '../types/vehicleCategories';
+import styles from './modelBudgetSelectorStyles';
+import type { 
+  BudgetRange, 
+  Vehicle, 
+  VehicleCategories, 
+  AvailableModel,
+  GMColor,
+  KioskComponentProps
+} from '../types';
 
-import type { CustomerData, KioskComponentProps } from '../types';
-
-// Screen names type
-type ScreenName = 
-  | 'welcome'
-  | 'stockLookup'
-  | 'modelBudget'
-  | 'guidedQuiz'
-  | 'aiAssistant'
-  | 'inventory'
-  | 'vehicleDetail'
-  | 'vehicleComparison'
-  | 'virtualTestDrive'
-  | 'paymentCalculator'
-  | 'tradeIn'
-  | 'handoff'
-  | 'protectionPackages'
-  | 'trafficLog'
-  | 'salesDashboard'
-  | 'inventorySync';
-
-// Navigation options for filtering
-interface NavigationOptions {
-  bodyStyle?: string;
-  model?: string;
-  minPrice?: number;
-  maxPrice?: number;
+// Color choices state interface
+interface ColorChoices {
+  first: string;
+  second: string;
 }
 
-// Screen error boundary props
-interface ScreenErrorBoundaryProps {
-  children: ReactNode;
-  onReset: () => void;
-  screenName: string;
+// Trade-in vehicle info
+interface TradeVehicleInfo {
+  year: string;
+  make: string;
+  model: string;
+  mileage: string;
 }
 
-// Screen-level error boundary with recovery option
-const ScreenErrorBoundary: React.FC<ScreenErrorBoundaryProps> = ({ children, onReset, screenName }) => {
-  return (
-    <ErrorBoundary
-      fallback={
-        <div style={screenErrorStyles.container}>
-          <div style={screenErrorStyles.icon}>⚠️</div>
-          <h2 style={screenErrorStyles.title}>This screen encountered an error</h2>
-          <p style={screenErrorStyles.text}>
-            We had trouble loading {screenName || 'this screen'}. 
-            Let's get you back on track.
-          </p>
-          <div style={screenErrorStyles.buttons}>
-            <button style={screenErrorStyles.primaryBtn} onClick={onReset}>
-              Return to Start
-            </button>
-          </div>
-        </div>
-      }
-    >
-      {children}
-    </ErrorBoundary>
-  );
+// Inventory count by model name
+type InventoryByModel = Record<string, number>;
+
+// Generate year options (current year + 1 down to 20 years ago)
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 21 }, (_, i) => (currentYear + 1 - i).toString());
+
+// Common makes for dropdown - comprehensive list including newer brands
+const COMMON_MAKES = [
+  'Acura', 'Alfa Romeo', 'Aston Martin', 'Audi', 'Bentley', 'BMW', 'Buick', 
+  'Cadillac', 'Chevrolet', 'Chrysler', 'Dodge', 'Ferrari', 'Fiat', 'Ford', 
+  'Genesis', 'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Jaguar', 'Jeep', 'Kia', 
+  'Lamborghini', 'Land Rover', 'Lexus', 'Lincoln', 'Lucid', 'Maserati', 'Mazda', 
+  'McLaren', 'Mercedes-Benz', 'Mini', 'Mitsubishi', 'Nissan', 'Polestar', 
+  'Porsche', 'Ram', 'Rivian', 'Rolls-Royce', 'Subaru', 'Tesla', 'Toyota', 
+  'Volkswagen', 'Volvo', 'Other'
+];
+
+// Model name to image mapping
+const MODEL_IMAGES: Record<string, string> = {
+  // Trucks
+  'Silverado 1500': '/images/models/1500.jpg',
+  'Silverado 2500HD': '/images/models/2500.jpg',
+  'Silverado 3500HD': '/images/models/3500.jpg',
+  'Colorado': '/images/models/Colorado.jpg',
+  // SUVs & Crossovers
+  'Trax': '/images/models/trax.webp',
+  'Trailblazer': '/images/models/trailblazer.webp',
+  'Equinox': '/images/models/equinox.avif',
+  'Equinox EV': '/images/models/equinox-ev.webp',
+  'Blazer': '/images/models/blazer.webp',
+  'Blazer EV': '/images/models/blazer-ev.webp',
+  'Traverse': '/images/models/traverse.avif',
+  'Tahoe': '/images/models/tahoe.png',
+  'Suburban': '/images/models/suburban.avif',
+  // Sports Cars
+  'Corvette': '/images/models/corvette.webp',
+  'Camaro': '/images/models/camaro.webp',
+  // Electric
+  'Bolt EV': '/images/models/bolt-ev.webp',
+  'Bolt EUV': '/images/models/bolt-euv.webp',
+  'Silverado EV': '/images/models/silverado-ev.webp',
 };
 
-const screenErrorStyles: Record<string, CSSProperties> = {
-  container: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '40px',
-    textAlign: 'center',
-  },
-  icon: {
-    fontSize: '64px',
-    marginBottom: '20px',
-  },
-  title: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: '12px',
-  },
-  text: {
-    fontSize: '16px',
-    color: 'rgba(255,255,255,0.6)',
-    marginBottom: '28px',
-    maxWidth: '400px',
-  },
-  buttons: {
-    display: 'flex',
-    gap: '16px',
-  },
-  primaryBtn: {
-    padding: '14px 32px',
-    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-    border: 'none',
-    borderRadius: '12px',
-    color: '#ffffff',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
+// Cab configuration images - keyed by "ModelName-CabType"
+const CAB_IMAGES: Record<string, string> = {
+  // Silverado 1500
+  'Silverado 1500-Regular Cab': '/images/cabs/1500regcab.jpg',
+  'Silverado 1500-Double Cab': '/images/cabs/1500doublecab.jpg',
+  'Silverado 1500-Crew Cab': '/images/cabs/1500crewcab.jpg',
+  // Silverado 2500HD
+  'Silverado 2500HD-Regular Cab': '/images/cabs/2500regcab.jpg',
+  'Silverado 2500HD-Double Cab': '/images/cabs/2500doublecab.jpg',
+  'Silverado 2500HD-Crew Cab': '/images/cabs/2500crewcab.jpg',
+  // Silverado 3500HD
+  'Silverado 3500HD-Regular Cab': '/images/cabs/3500regcab.jpg',
+  'Silverado 3500HD-Double Cab': '/images/cabs/3500doublecab.jpg',
+  'Silverado 3500HD-Crew Cab': '/images/cabs/3500crewcab.jpg',
+  // Colorado
+  'Colorado-Extended Cab': '/images/cabs/coloradoextcab.jpg',
+  'Colorado-Crew Cab': '/images/cabs/coloradocrewcab.jpg',
 };
 
-// Initial customer data state
-const initialCustomerData: CustomerData = {
-  customerName: undefined,
-  namePhaseCompleted: undefined,
-  path: undefined,
-  stockNumber: undefined,
-  selectedModel: undefined,
-  budgetRange: { min: 300, max: 800 },
-  downPayment: 3000,
-  quizAnswers: {},
-  selectedVehicle: undefined,
-  tradeIn: undefined,
-  paymentPreference: undefined,
-  contactInfo: undefined,
-  // Filter state for inventory
-  bodyStyleFilter: undefined,
-};
+const ModelBudgetSelector: React.FC<KioskComponentProps> = ({ 
+  navigateTo, 
+  updateCustomerData, 
+  customerData,
+  resetJourney 
+}) => {
+  // Steps: 1=Category, 2=Model, 3=Cab, 4=Colors, 5=Budget, 6=Trade-In
+  const [step, setStep] = useState<number>(1);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<AvailableModel | null>(null);
+  const [selectedCab, setSelectedCab] = useState<string | null>(null);
+  const [colorChoices, setColorChoices] = useState<ColorChoices>({ first: '', second: '' });
+  const [budgetRange, setBudgetRange] = useState<BudgetRange>({ min: 400, max: 900 });
+  const [downPaymentPercent, setDownPaymentPercent] = useState<number>(10);
+  const [hasTrade, setHasTrade] = useState<boolean | null>(null);
+  const [hasPayoff, setHasPayoff] = useState<boolean | null>(null);
+  const [payoffAmount, setPayoffAmount] = useState<string>('');
+  const [monthlyPayment, setMonthlyPayment] = useState<string>('');
+  const [financedWith, setFinancedWith] = useState<string>('');
+  // Track which currency field is focused (show raw value while editing)
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [tradeVehicle, setTradeVehicle] = useState<TradeVehicleInfo>({
+    year: '',
+    make: '',
+    model: '',
+    mileage: '',
+  });
+  const [inventoryCount, setInventoryCount] = useState<number | null>(null);
+  const [inventoryByModel, setInventoryByModel] = useState<InventoryByModel>({});
+  const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
+  // Trade-in model dropdown state
+  const [tradeModels, setTradeModels] = useState<string[]>([]);
+  const [loadingTradeModels, setLoadingTradeModels] = useState<boolean>(false);
 
-// Main Kiosk Application - Customer Journey Controller
-const KioskApp: React.FC = () => {
-  const [currentScreen, setCurrentScreen] = useState<ScreenName>('welcome');
-  const [customerData, setCustomerData] = useState<CustomerData>(initialCustomerData);
-  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
-  
-  // Track navigation history for back button support
-  const navigationHistoryRef = useRef<ScreenName[]>(['welcome']);
-  const isPopStateNavigationRef = useRef<boolean>(false);
-
-  const updateCustomerData = useCallback((updates: Partial<CustomerData>): void => {
-    setCustomerData(prev => ({ ...prev, ...updates }));
-  }, []);
-
-  // Navigate to a new screen with browser history support
-  // Now accepts optional navigation options for filtering
-  const navigateTo = useCallback((screen: string, options?: NavigationOptions): void => {
-    const screenName = screen as ScreenName;
-    
-    // Don't push duplicate consecutive screens
-    const currentHistory = navigationHistoryRef.current;
-    if (currentHistory[currentHistory.length - 1] === screenName && !options) {
-      return;
-    }
-    
-    // Apply filter options to customer data if provided
-    if (options) {
-      setCustomerData(prev => ({
-        ...prev,
-        bodyStyleFilter: options.bodyStyle || undefined,
-        selectedModel: options.model || prev.selectedModel,
-        budgetRange: options.minPrice && options.maxPrice 
-          ? { min: options.minPrice, max: options.maxPrice }
-          : prev.budgetRange,
-      }));
-    } else if (screenName === 'inventory') {
-      // Clear filters when navigating to inventory without options
-      setCustomerData(prev => ({
-        ...prev,
-        bodyStyleFilter: undefined,
-      }));
-    }
-    
-    setIsTransitioning(true);
-    
-    setTimeout(() => {
-      // If this navigation is triggered by popstate (back button), don't push to history
-      if (!isPopStateNavigationRef.current) {
-        // Add to navigation history
-        navigationHistoryRef.current = [...navigationHistoryRef.current, screenName];
-        
-        // Push state to browser history
-        window.history.pushState(
-          { screen: screenName, index: navigationHistoryRef.current.length - 1 },
-          '',
-          `#${screenName}`
-        );
-      }
-      
-      isPopStateNavigationRef.current = false;
-      setCurrentScreen(screenName);
-      setIsTransitioning(false);
-    }, 150);
-  }, []);
-
-  // Go back to previous screen
-  const goBack = useCallback((): void => {
-    const currentHistory = navigationHistoryRef.current;
-    
-    // If we're at welcome or only have one screen, can't go back further
-    if (currentHistory.length <= 1 || currentScreen === 'welcome') {
-      return;
-    }
-    
-    // Remove current screen from history
-    const newHistory = currentHistory.slice(0, -1);
-    navigationHistoryRef.current = newHistory;
-    
-    // Get the previous screen
-    const previousScreen = newHistory[newHistory.length - 1];
-    
-    // Clear filters when going back
-    setCustomerData(prev => ({
-      ...prev,
-      bodyStyleFilter: undefined,
-    }));
-    
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setCurrentScreen(previousScreen);
-      setIsTransitioning(false);
-    }, 150);
-  }, [currentScreen]);
-
-  const resetJourney = useCallback((): void => {
-    // Clear navigation history and reset to welcome
-    navigationHistoryRef.current = ['welcome'];
-    
-    // Replace current history state with welcome
-    window.history.replaceState(
-      { screen: 'welcome', index: 0 },
-      '',
-      '#welcome'
-    );
-    
-    setCustomerData(initialCustomerData);
-    setCurrentScreen('welcome');
-  }, []);
-
-  // Initialize browser history state on mount
+  // Fetch inventory counts on mount to filter available models
   useEffect(() => {
-    // Set initial state in browser history
-    window.history.replaceState(
-      { screen: 'welcome', index: 0 },
-      '',
-      '#welcome'
-    );
+    const loadInventoryCounts = async (): Promise<void> => {
+      try {
+        const data = await api.getInventory({});
+        const vehicles: Vehicle[] = Array.isArray(data) ? data : (data as { vehicles?: Vehicle[] }).vehicles || [];
+        
+        const counts: InventoryByModel = {};
+        vehicles.forEach((vehicle: Vehicle) => {
+          const model = (vehicle.model || '').trim();
+          if (model) {
+            Object.values(BASE_CATEGORIES).forEach(category => {
+              category.modelNames.forEach((categoryModel: string) => {
+                if (modelMatches(model, categoryModel)) {
+                  counts[categoryModel] = (counts[categoryModel] || 0) + 1;
+                }
+              });
+            });
+          }
+        });
+        
+        setInventoryByModel(counts);
+      } catch (err) {
+        console.error('Error loading inventory counts:', err);
+      } finally {
+        setLoadingInventory(false);
+      }
+    };
+    
+    loadInventoryCounts();
   }, []);
 
-  // Handle browser back/forward buttons
+  // Fetch trade-in models when year and make are selected
   useEffect(() => {
-    const handlePopState = (event: PopStateEvent): void => {
-      // Prevent default browser behavior of leaving the page
-      const state = event.state;
-      
-      if (state && state.screen) {
-        // Browser back/forward to a known screen
-        const targetScreen = state.screen as ScreenName;
-        const targetIndex = state.index as number;
-        
-        // Update our navigation history to match
-        navigationHistoryRef.current = navigationHistoryRef.current.slice(0, targetIndex + 1);
-        
-        // Mark this as a popstate navigation so navigateTo doesn't push to history
-        isPopStateNavigationRef.current = true;
-        
-        // Clear filters when navigating via back/forward
-        setCustomerData(prev => ({
-          ...prev,
-          bodyStyleFilter: undefined,
-        }));
-        
-        setIsTransitioning(true);
-        setTimeout(() => {
-          setCurrentScreen(targetScreen);
-          setIsTransitioning(false);
-          isPopStateNavigationRef.current = false;
-        }, 150);
+    const fetchTradeModels = async () => {
+      if (tradeVehicle.year && tradeVehicle.make) {
+        setLoadingTradeModels(true);
+        try {
+          const models = await api.getModels(tradeVehicle.make, tradeVehicle.year);
+          setTradeModels(models || []);
+        } catch (err) {
+          console.error('Error fetching trade models:', err);
+          setTradeModels([]);
+        } finally {
+          setLoadingTradeModels(false);
+        }
       } else {
-        // No state - user is trying to go before our app started
-        // Push them back to welcome and make it the backstop
-        window.history.pushState(
-          { screen: 'welcome', index: 0 },
-          '',
-          '#welcome'
-        );
-        
-        navigationHistoryRef.current = ['welcome'];
-        setCurrentScreen('welcome');
-        setCustomerData(initialCustomerData);
+        setTradeModels([]);
       }
     };
+    fetchTradeModels();
+    // Reset model when year or make changes
+    setTradeVehicle(prev => ({ ...prev, model: '' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tradeVehicle.year, tradeVehicle.make]);
 
-    window.addEventListener('popstate', handlePopState);
-    
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
-
-  // Prevent leaving the app when on welcome screen
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
-      // Only show warning if user has progressed beyond welcome
-      if (currentScreen !== 'welcome' && navigationHistoryRef.current.length > 1) {
-        event.preventDefault();
-        event.returnValue = '';
+  // Build dynamic categories based on actual inventory
+  // UPDATED: Now passes through image property for image-based cards
+  const VEHICLE_CATEGORIES: VehicleCategories = Object.entries(BASE_CATEGORIES).reduce(
+    (acc: VehicleCategories, [key, category]) => {
+      const availableModels: AvailableModel[] = category.modelNames
+        .filter((modelName: string) => (inventoryByModel[modelName] || 0) > 0)
+        .map((modelName: string) => ({
+          name: modelName,
+          count: inventoryByModel[modelName] || 0,
+          cabOptions: category.cabOptions?.[modelName],
+        }));
+      
+      if (availableModels.length > 0) {
+        acc[key] = {
+          name: category.name,
+          icon: category.icon,
+          image: category.image,  // Pass through image path for image-based cards
+          models: availableModels,
+        };
       }
-    };
+      
+      return acc;
+    }, 
+    {} as VehicleCategories
+  );
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [currentScreen]);
+  const getModelColors = (): GMColor[] => {
+    if (!selectedModel) return [];
+    return GM_COLORS[selectedModel.name] || GM_COLORS['Equinox'];
+  };
 
-  // Idle timeout - return to welcome after 3 minutes of inactivity
   useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-    const resetTimer = (): void => {
-      clearTimeout(timeout);
-      if (currentScreen !== 'welcome' && currentScreen !== 'trafficLog' && currentScreen !== 'salesDashboard') {
-        timeout = setTimeout(() => {
-          resetJourney();
-        }, 180000); // 3 minutes
+    if (selectedModel) {
+      setInventoryCount(inventoryByModel[selectedModel.name] || 0);
+    }
+  }, [selectedModel, inventoryByModel]);
+
+  const handleCategorySelect = (categoryKey: string): void => {
+    setSelectedCategory(categoryKey);
+    setSelectedModel(null);
+    setSelectedCab(null);
+    setStep(2);
+  };
+
+  const handleModelSelect = (model: AvailableModel): void => {
+    setSelectedModel(model);
+    setStep(model.cabOptions ? 3 : 4);
+  };
+
+  const handleCabSelect = (cab: string): void => {
+    setSelectedCab(cab);
+    setStep(4);
+  };
+
+  const handleColorChange = (choice: keyof ColorChoices, value: string): void => {
+    setColorChoices(prev => ({ ...prev, [choice]: value }));
+  };
+
+  // Fixed: Allow decimals in currency input - store raw value
+  const handlePayoffAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    // Allow only digits and one decimal point
+    const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./, '$1');
+    setPayoffAmount(rawValue);
+  };
+
+  // Format payoff on blur
+  const handlePayoffBlur = (): void => {
+    setFocusedField(null);
+    if (payoffAmount) {
+      const num = parseFloat(payoffAmount);
+      if (!isNaN(num)) {
+        setPayoffAmount(num.toFixed(2));
       }
-    };
-
-    const events: string[] = ['touchstart', 'click', 'mousemove', 'keypress'];
-    events.forEach(event => window.addEventListener(event, resetTimer));
-    resetTimer();
-
-    return () => {
-      clearTimeout(timeout);
-      events.forEach(event => window.removeEventListener(event, resetTimer));
-    };
-  }, [currentScreen, resetJourney]);
-
-  // Traffic logging - log session on key customer data changes
-  useEffect(() => {
-    // Skip logging for admin screens
-    if (currentScreen === 'trafficLog' || currentScreen === 'salesDashboard') return;
-    
-    // Only log if we have some meaningful data
-    const hasData = customerData.customerName || 
-                    customerData.path || 
-                    customerData.selectedVehicle || 
-                    customerData.tradeIn ||
-                    customerData.contactInfo ||
-                    customerData.conversationLog;
-    
-    if (!hasData) return;
-
-    // Build session data for logging
-    const sessionData: Record<string, unknown> = {
-      customerName: customerData.customerName,
-      phone: customerData.contactInfo?.phone,
-      path: customerData.path,
-      vehicleRequested: !!customerData.vehicleRequested,
-      actions: [currentScreen],
-    };
-
-    // Add vehicle if selected
-    if (customerData.selectedVehicle) {
-      const vehicle = customerData.selectedVehicle;
-      sessionData.vehicle = {
-        stockNumber: vehicle.stockNumber || vehicle.stock_number,
-        year: vehicle.year,
-        make: vehicle.make,
-        model: vehicle.model,
-        trim: vehicle.trim,
-        msrp: vehicle.msrp,
-        salePrice: vehicle.salePrice || vehicle.sale_price,
-      };
     }
+  };
 
-    // Add trade-in if provided
-    if (customerData.tradeIn) {
-      const tradeIn = customerData.tradeIn;
-      sessionData.tradeIn = {
-        year: tradeIn.year,
-        make: tradeIn.make,
-        model: tradeIn.model,
-        mileage: tradeIn.mileage,
-        condition: tradeIn.condition,
-        estimatedValue: tradeIn.estimatedValue,
-      };
+  // Fixed: Allow decimals in currency input - store raw value
+  const handleMonthlyPaymentChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    // Allow only digits and one decimal point
+    const rawValue = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./, '$1');
+    setMonthlyPayment(rawValue);
+  };
+
+  // Format monthly payment on blur
+  const handleMonthlyPaymentBlur = (): void => {
+    setFocusedField(null);
+    if (monthlyPayment) {
+      const num = parseFloat(monthlyPayment);
+      if (!isNaN(num)) {
+        setMonthlyPayment(num.toFixed(2));
+      }
     }
+  };
 
-    // Add payment preference if set
-    if (customerData.paymentPreference) {
-      const payment = customerData.paymentPreference;
-      sessionData.payment = {
-        type: payment.type,
-        monthly: payment.monthly,
-        term: payment.term,
-        downPayment: payment.downPayment,
-      };
-    }
+  // Get display value for currency fields (formatted when not focused)
+  const getDisplayValue = (field: string, rawValue: string): string => {
+    if (!rawValue) return '';
+    if (focusedField === field) return rawValue;
+    const num = parseFloat(rawValue);
+    if (isNaN(num)) return rawValue;
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
-    // Add AI conversation log if present
-    if (customerData.conversationLog && customerData.conversationLog.length > 0) {
-      sessionData.conversationLog = customerData.conversationLog;
-    }
+  const handleFinancedWithChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const value = e.target.value.slice(0, 25);
+    setFinancedWith(value);
+  };
 
-    // Log to traffic API (fire and forget)
-    api.logTrafficSession(sessionData).catch(() => {
-      // Silent fail - don't disrupt user experience
+  const handleTradeVehicleChange = (field: keyof TradeVehicleInfo, value: string): void => {
+    setTradeVehicle(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSearch = (): void => {
+    updateCustomerData({
+      selectedModel: selectedModel?.name,
+      selectedCab: selectedCab || undefined,
+      colorPreferences: [colorChoices.first, colorChoices.second].filter(Boolean),
+      budgetRange,
+      downPaymentPercent,
+      hasTrade,
+      hasPayoff,
+      payoffAmount: hasPayoff ? parseFloat(payoffAmount) : null,
+      monthlyPayment: hasPayoff ? parseFloat(monthlyPayment) : null,
+      financedWith: hasPayoff ? financedWith : null,
+      tradeVehicle: hasTrade ? {
+        year: tradeVehicle.year,
+        make: tradeVehicle.make,
+        model: tradeVehicle.model,
+        mileage: tradeVehicle.mileage ? parseInt(tradeVehicle.mileage) : null,
+      } : null,
+      path: 'modelBudget',
     });
-  }, [
-    currentScreen,
-    customerData.customerName,
-    customerData.path,
-    customerData.selectedVehicle,
-    customerData.tradeIn,
-    customerData.paymentPreference,
-    customerData.contactInfo,
-    customerData.conversationLog,
-    customerData,
-  ]);
-
-  // Screen components map
-  const screens: Record<ScreenName, React.FC<KioskComponentProps>> = {
-    welcome: WelcomeScreen,
-    stockLookup: StockLookup,
-    modelBudget: ModelBudgetSelector,
-    guidedQuiz: GuidedQuiz,
-    aiAssistant: AIAssistant,
-    inventory: InventoryResults,
-    vehicleDetail: VehicleDetail,
-    vehicleComparison: VehicleComparison,
-    virtualTestDrive: VirtualTestDrive,
-    paymentCalculator: PaymentCalculator,
-    tradeIn: TradeInEstimator,
-    handoff: CustomerHandoff,
-    protectionPackages: ProtectionPackages,
-    trafficLog: TrafficLog,
-    salesDashboard: SalesManagerDashboard,
-    inventorySync: InventorySyncDashboard,
+    navigateTo('inventory');
   };
 
-  const CurrentScreenComponent = screens[currentScreen] || WelcomeScreen;
-
-  // Check if we can go back (not on welcome and have history)
-  const canGoBack = currentScreen !== 'welcome' && 
-                    currentScreen !== 'trafficLog' && 
-                    currentScreen !== 'salesDashboard' &&
-                    currentScreen !== 'inventorySync' &&
-                    navigationHistoryRef.current.length > 1;
-
-  // Props passed to all screen components
-  const screenProps: KioskComponentProps = {
-    customerData,
-    updateCustomerData,
-    navigateTo,
-    resetJourney,
+  const handleBack = (): void => {
+    if (step === 6) setStep(5);
+    else if (step === 5) setStep(4);
+    else if (step === 4 && selectedModel?.cabOptions) setStep(3);
+    else if (step === 4) setStep(2);
+    else if (step === 3) setStep(2);
+    else if (step === 2) { setStep(1); setSelectedCategory(null); }
   };
 
-  return (
-    <div style={{
-      ...styles.container,
-      ...(currentScreen === 'aiAssistant' ? {
-        backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.4)), url(/showroom3.jfif)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center top',
-        backgroundRepeat: 'no-repeat',
-      } : {})
-    }}>
-      {/* Header */}
-      <header style={{
-        ...styles.header,
-        ...(currentScreen === 'inventory' ? {
-          background: '#ffffff',
-          borderBottom: '1px solid rgba(0,0,0,0.1)',
-        } : {}),
-        ...(currentScreen === 'modelBudget' ? {
-          background: 'transparent',
-          borderBottom: 'none',
-        } : {}),
-        ...(currentScreen === 'aiAssistant' ? {
-          background: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(10px)',
-        } : {})
-      }}>
-        {/* Left spacer for centering */}
-        <div style={styles.headerLeft}>
-          {currentScreen !== 'welcome' && currentScreen !== 'trafficLog' && currentScreen !== 'salesDashboard' && canGoBack && (
-            <button style={styles.backButton} onClick={goBack}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
-              </svg>
-              Back
+  // Loading state
+  if (loadingInventory) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loadingContainer}>
+          <div style={styles.loadingSpinner} />
+          <p style={styles.loadingText}>Loading available models...</p>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  // Step 1: Category Selection - Image-based cards like GM Protection packages
+  const renderCategorySelection = (): JSX.Element => (
+    <div style={styles.stepContainer}>
+      <div style={styles.stepHeader}>
+        <div style={styles.stepIcon}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/>
+            <path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/>
+            <path d="M5 17h-2v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6"/>
+          </svg>
+        </div>
+        <h1 style={styles.stepTitle}>What type of vehicle are you looking for?</h1>
+        <p style={styles.stepSubtitle}>Select a category to get started</p>
+      </div>
+      <div style={styles.categorySelectionCard}>
+        <div style={styles.categoryGrid}>
+          {Object.entries(VEHICLE_CATEGORIES).map(([key, category]) => (
+            <button key={key} style={styles.categoryCard} onClick={() => handleCategorySelect(key)}>
+              {/* Image container with fallback to emoji */}
+              {category.image ? (
+                <div style={styles.categoryImageContainer as React.CSSProperties}>
+                  <img 
+                    src={category.image} 
+                    alt={category.name}
+                    style={styles.categoryImage as React.CSSProperties}
+                    onError={(e) => {
+                      // Hide broken image, show fallback
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const parent = (e.target as HTMLImageElement).parentElement;
+                      if (parent) {
+                        const fallback = parent.querySelector('[data-fallback]') as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }
+                    }}
+                  />
+                  <div 
+                    data-fallback
+                    style={{ 
+                      ...styles.categoryImagePlaceholder as React.CSSProperties, 
+                      display: 'none',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                    }}
+                  >
+                    <span style={styles.categoryFallbackIcon as React.CSSProperties}>{category.icon}</span>
+                  </div>
+                  <div style={styles.categoryImageOverlay as React.CSSProperties} />
+                </div>
+              ) : (
+                <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
+                  <span style={styles.categoryFallbackIcon as React.CSSProperties}>{category.icon}</span>
+                </div>
+              )}
+              {/* Text content below image */}
+              <div style={styles.categoryContent as React.CSSProperties}>
+                <div style={styles.categoryName}>{category.name}</div>
+                <div style={styles.categoryCount}>{category.models.length} models</div>
+              </div>
             </button>
-          )}
+          ))}
         </div>
         
-        {/* Centered Logo */}
-        <div style={styles.logoContainer}>
-          <div style={{
-            ...styles.logo,
-            ...(currentScreen === 'inventory' ? {
-              background: 'rgba(30, 41, 59, 0.95)',
-              padding: '10px 20px',
-              borderRadius: '12px',
-            } : {})
-          }} onClick={resetJourney}>
-            <span style={styles.logoText}>QUIRK</span>
-            <span style={styles.logoAI}>AI</span>
+        {resetJourney && (
+          <div style={styles.startOverContainer}>
+            <button style={styles.startOverButton} onClick={resetJourney}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+              </svg>
+              Start Over
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Step 2: Model Selection - Now with image-based cards like categories
+  const renderModelSelection = (): JSX.Element | null => {
+    const category = selectedCategory ? VEHICLE_CATEGORIES[selectedCategory] : null;
+    if (!category) {
+      setStep(1);
+      return null;
+    }
+    return (
+      <div style={styles.stepContainer}>
+        <button style={styles.backButton} onClick={handleBack}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back
+        </button>
+        <div style={styles.stepHeader}>
+          <h1 style={styles.stepTitle}>Which model interests you?</h1>
+          <p style={styles.stepSubtitle}>Select a model to see available options</p>
+        </div>
+        <div style={styles.categorySelectionCard}>
+          <div style={styles.modelGrid}>
+            {category.models.map((model) => {
+            const modelImage = MODEL_IMAGES[model.name];
+            return (
+              <button key={model.name} style={styles.modelCard} onClick={() => handleModelSelect(model)}>
+                {/* Image container with fallback to initial */}
+                {modelImage ? (
+                  <div style={styles.categoryImageContainer as React.CSSProperties}>
+                    <img 
+                      src={modelImage} 
+                      alt={model.name}
+                      style={styles.categoryImage as React.CSSProperties}
+                      onError={(e) => {
+                        // Hide broken image, show fallback
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        const parent = (e.target as HTMLImageElement).parentElement;
+                        if (parent) {
+                          const fallback = parent.querySelector('[data-fallback]') as HTMLElement;
+                          if (fallback) fallback.style.display = 'flex';
+                        }
+                      }}
+                    />
+                    <div 
+                      data-fallback
+                      style={{ 
+                        ...styles.categoryImagePlaceholder as React.CSSProperties, 
+                        display: 'none',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                      }}
+                    >
+                      <div style={styles.modelInitial}>{model.name.charAt(0)}</div>
+                    </div>
+                    <div style={styles.categoryImageOverlay as React.CSSProperties} />
+                  </div>
+                ) : (
+                  <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
+                    <div style={styles.modelInitial}>{model.name.charAt(0)}</div>
+                  </div>
+                )}
+                {/* Text content below image */}
+                <div style={styles.categoryContent as React.CSSProperties}>
+                  <span style={styles.modelName}>{model.name}</span>
+                  <span style={styles.modelCount}>{model.count} in stock</span>
+                  {model.cabOptions && <span style={styles.modelConfig}>{model.cabOptions.length} configurations</span>}
+                </div>
+              </button>
+            );
+          })}
           </div>
         </div>
-        
-        {/* Right side */}
-        <div style={styles.headerRight}>
-          {currentScreen === 'welcome' && (
-            <button 
-              className="sales-desk-btn"
-              style={styles.salesDeskLink} 
-              onClick={() => navigateTo('trafficLog')}
-            >
-              Sales Desk
-            </button>
-          )}
-        </div>
-      </header>
+      </div>
+    );
+  };
 
-      {/* Sales Consultant Button - shown on inventory and related screens */}
-      {['inventory', 'vehicleDetail', 'vehicleComparison', 'paymentCalculator'].includes(currentScreen) && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          padding: '12px 20px',
-          background: 'rgba(30, 41, 59, 0.95)',
-        }}>
-          <button
-            onClick={async () => {
-              try {
-                await api.notifyStaff({
-                  notification_type: 'sales',
-                  message: 'Customer at kiosk requested to speak with a sales consultant',
-                  vehicle_stock: customerData.selectedVehicle?.stockNumber
-                });
-                alert('✅ A sales consultant has been notified and will be with you shortly!');
-              } catch (error) {
-                console.error('Failed to notify staff:', error);
-                alert('Please speak with any of our associates on the showroom floor.');
-              }
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '12px 24px',
-              backgroundColor: '#4b5563',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '15px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'background-color 0.2s ease',
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#374151')}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#4b5563')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
+  // Step 3: Cab Selection
+  const renderCabSelection = (): JSX.Element | null => {
+    if (!selectedModel?.cabOptions) return null;
+    
+    // Helper to get cab description
+    const getCabDescription = (cab: string): string => {
+      if (cab.includes('Regular')) return '2-door, 3 passengers';
+      if (cab.includes('Double')) return '4-door, 5-6 passengers';
+      if (cab.includes('Crew')) return '4-door, 5-6 passengers, most room';
+      if (cab.includes('Extended')) return '4-door, 5 passengers';
+      return '';
+    };
+    
+    return (
+      <div style={styles.stepContainer}>
+        <button style={styles.backButton} onClick={handleBack}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back
+        </button>
+        <div style={styles.stepHeader}>
+          <h1 style={styles.stepTitle}>What cab configuration?</h1>
+          <p style={styles.stepSubtitle}>Select the cab style that fits your needs</p>
+        </div>
+        <div style={styles.categorySelectionCard}>
+          <div style={styles.cabGrid}>
+            {selectedModel.cabOptions.map((cab) => {
+              const cabImageKey = `${selectedModel.name}-${cab}`;
+              const cabImage = CAB_IMAGES[cabImageKey];
+              
+              return (
+                <button key={cab} style={styles.modelCard} onClick={() => handleCabSelect(cab)}>
+                  {/* Image container with fallback to icon */}
+                  {cabImage ? (
+                    <div style={styles.categoryImageContainer as React.CSSProperties}>
+                      <img 
+                        src={cabImage} 
+                        alt={cab}
+                        style={styles.categoryImage as React.CSSProperties}
+                        onError={(e) => {
+                          // Hide broken image, show fallback
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          const parent = (e.target as HTMLImageElement).parentElement;
+                          if (parent) {
+                            const fallback = parent.querySelector('[data-fallback]') as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }
+                        }}
+                      />
+                      <div 
+                        data-fallback
+                        style={{ 
+                          ...styles.categoryImagePlaceholder as React.CSSProperties, 
+                          display: 'none',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                        }}
+                      >
+                        <div style={styles.cabIconLarge}>
+                          {cab.includes('Regular') && '🚗'}
+                          {cab.includes('Double') && '🚙'}
+                          {cab.includes('Crew') && '🛻'}
+                          {cab.includes('Extended') && '🚙'}
+                        </div>
+                      </div>
+                      <div style={styles.categoryImageOverlay as React.CSSProperties} />
+                    </div>
+                  ) : (
+                    <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
+                      <div style={styles.cabIconLarge}>
+                        {cab.includes('Regular') && '🚗'}
+                        {cab.includes('Double') && '🚙'}
+                        {cab.includes('Crew') && '🛻'}
+                        {cab.includes('Extended') && '🚙'}
+                      </div>
+                    </div>
+                  )}
+                  {/* Text content below image */}
+                  <div style={styles.categoryContent as React.CSSProperties}>
+                    <span style={styles.modelName}>{cab}</span>
+                    <span style={styles.modelConfig}>{getCabDescription(cab)}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Step 4: Color Selection
+  const renderColorSelection = (): JSX.Element | null => {
+    if (!selectedModel) return null;
+    
+    const colors = getModelColors();
+    const availableForSecond = colors.filter(c => c.name !== colorChoices.first);
+
+    return (
+      <div style={styles.stepContainer}>
+        <button style={styles.backButton} onClick={handleBack}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back
+        </button>
+        <div style={styles.stepHeader}>
+          <h1 style={styles.stepTitle}>Color Preferences</h1>
+          <p style={styles.stepSubtitle}>
+            {inventoryCount !== null && `We have ${inventoryCount} ${selectedModel.name} vehicles in stock`}
+          </p>
+        </div>
+        <div style={styles.formSection}>
+          <p style={styles.formIntro}>Select up to 2 GM colors for {selectedModel.name} in order of preference:</p>
+          <div style={styles.colorSelects}>
+            <div style={styles.colorSelectGroup}>
+              <label style={styles.inputLabel}>First Choice</label>
+              <select 
+                style={styles.selectInput} 
+                value={colorChoices.first} 
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleColorChange('first', e.target.value)}
+              >
+                <option value="">Select a color...</option>
+                {colors.map((color) => (
+                  <option key={color.code} value={color.name}>
+                    {color.name} {color.premium && `(+$${color.price})`}
+                  </option>
+                ))}
+              </select>
+              {colorChoices.first && (
+                <div style={styles.colorPreview}>
+                  <div style={{...styles.colorSwatch, backgroundColor: colors.find(c => c.name === colorChoices.first)?.hex || '#666'}} />
+                  <span>{colorChoices.first}</span>
+                </div>
+              )}
+            </div>
+            <div style={styles.colorSelectGroup}>
+              <label style={styles.inputLabel}>Second Choice</label>
+              <select 
+                style={{...styles.selectInput, opacity: colorChoices.first ? 1 : 0.5}} 
+                value={colorChoices.second} 
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleColorChange('second', e.target.value)} 
+                disabled={!colorChoices.first}
+              >
+                <option value="">Select a color...</option>
+                {availableForSecond.map((color) => (
+                  <option key={color.code} value={color.name}>
+                    {color.name} {color.premium && `(+$${color.price})`}
+                  </option>
+                ))}
+              </select>
+              {colorChoices.second && (
+                <div style={styles.colorPreview}>
+                  <div style={{...styles.colorSwatch, backgroundColor: colors.find(c => c.name === colorChoices.second)?.hex || '#666'}} />
+                  <span>{colorChoices.second}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <button style={styles.continueButton} onClick={() => setStep(5)}>
+            Continue to Budget
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
             </svg>
-            Speak with a sales consultant
           </button>
         </div>
-      )}
+      </div>
+    );
+  };
 
-      {/* Main Content Area */}
-      <main style={{
-        ...styles.main,
-        opacity: isTransitioning ? 0 : 1,
-        transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)',
-      }}>
-        <ScreenErrorBoundary onReset={resetJourney} screenName={currentScreen}>
-          <CurrentScreenComponent {...screenProps} />
-        </ScreenErrorBoundary>
-      </main>
+  // Step 5: Budget Selection
+  const renderBudgetSelection = (): JSX.Element | null => {
+    if (!selectedModel) return null;
+    
+    const APR = 0.07;
+    const monthlyRate = APR / 12;
+    
+    const calculateLoanAmount = (payment: number, months: number): number => {
+      if (monthlyRate === 0) return payment * months;
+      return payment * ((1 - Math.pow(1 + monthlyRate, -months)) / monthlyRate);
+    };
+    
+    const estimatedLoan = calculateLoanAmount(budgetRange.max, 84);
+    const term = estimatedLoan > 20000 ? 84 : 72;
+    const loanAmount = calculateLoanAmount(budgetRange.max, term);
+    
+    const downPaymentFraction = downPaymentPercent / 100;
+    const totalBuyingPower = downPaymentPercent === 0 
+      ? loanAmount 
+      : loanAmount / (1 - downPaymentFraction);
+    const downPaymentAmount = totalBuyingPower * downPaymentFraction;
+    
+    return (
+      <div style={styles.stepContainer}>
+        <button style={styles.backButton} onClick={handleBack}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back
+        </button>
+        <div style={styles.stepHeader}>
+          <span style={styles.modelBadge}>{selectedModel.name} {selectedCab && `• ${selectedCab}`}</span>
+          <h1 style={styles.stepTitle}>💰 Monthly Budget</h1>
+          <p style={styles.stepSubtitle}>What monthly payment range works for you?</p>
+        </div>
+        <div style={styles.formSection}>
+          <div style={styles.budgetDisplay}>
+            <span style={styles.budgetValue}>${budgetRange.min.toLocaleString()}</span>
+            <span style={styles.budgetSeparator}>to</span>
+            <span style={styles.budgetValue}>${budgetRange.max.toLocaleString()}</span>
+            <span style={styles.budgetLabel}>/month</span>
+          </div>
+          <div style={styles.sliderGroup}>
+            <label style={styles.sliderLabel}>Target Budget: ${budgetRange.min.toLocaleString()}/mo</label>
+            <input 
+              type="range" 
+              min="200" 
+              max="2000" 
+              step="50" 
+              value={budgetRange.min}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                const val = parseInt(e.target.value);
+                setBudgetRange(prev => ({ ...prev, min: val, max: Math.max(val + 100, prev.max) }));
+              }}
+              style={styles.slider}
+            />
+          </div>
+          <div style={styles.sliderGroup}>
+            <label style={styles.sliderLabel}>Maximum: ${budgetRange.max.toLocaleString()}/mo</label>
+            <input 
+              type="range" 
+              min="300" 
+              max="2500" 
+              step="50" 
+              value={budgetRange.max}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                const val = parseInt(e.target.value);
+                setBudgetRange(prev => ({ ...prev, max: val, min: Math.min(val - 100, prev.min) }));
+              }}
+              style={styles.slider}
+            />
+          </div>
+          <div style={styles.downPaymentSection}>
+            <label style={styles.inputLabel}>
+              Down Payment <span style={styles.downPaymentDisclaimer}>(MOST LENDERS PREFER AT LEAST 20% INITIAL INVESTMENT)</span>
+            </label>
+            <div style={styles.downPaymentOptions}>
+              {[0, 5, 10, 15, 20].map((percent) => (
+                <button 
+                  key={percent}
+                  style={{...styles.optionButton, ...(downPaymentPercent === percent ? styles.optionButtonActive : {})}}
+                  onClick={() => setDownPaymentPercent(percent)}
+                >
+                  {percent === 0 ? '$0' : `${percent}.00%`}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {/* Footer */}
-      <footer style={{
-        ...styles.footer,
-        ...(currentScreen === 'inventory' ? {
-          background: '#ffffff',
-          borderTop: '1px solid rgba(0,0,0,0.1)',
-          color: '#1e293b',
-        } : {})
-      }}>
-        <span>Quirk Chevrolet</span>
-        <span style={{
-          ...styles.footerDot,
-          ...(currentScreen === 'inventory' ? { color: 'rgba(0,0,0,0.3)' } : {})
-        }}>•</span>
-        <span>New England's #1 Dealer</span>
-        <span style={{
-          ...styles.footerDot,
-          ...(currentScreen === 'inventory' ? { color: 'rgba(0,0,0,0.3)' } : {})
-        }}>•</span>
-        <span style={styles.footerTime}>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-      </footer>
+          <div style={styles.buyingPowerSection}>
+            <p style={styles.buyingPowerIntro}>
+              Here's the straight-up math on what that budget really buys today.
+            </p>
+            
+            <div style={styles.buyingPowerCard}>
+              <h4 style={styles.buyingPowerTitle}>📊 Your Buying Power</h4>
+              <ul style={styles.buyingPowerList}>
+                <li>Down payment: <strong>{downPaymentPercent === 0 ? '$0' : `${downPaymentPercent}% (~$${Math.round(downPaymentAmount).toLocaleString()})`}</strong></li>
+                <li>Monthly payment: <strong>${budgetRange.max.toLocaleString()}</strong></li>
+                <li>Term: <strong>{term} months</strong></li>
+                <li>APR: <strong>7%</strong></li>
+              </ul>
+              
+              <p style={styles.buyingPowerText}>
+                Using standard auto-loan amortization, your <strong>loan amount</strong> (what the payment supports) comes out to:
+              </p>
+              
+              <div style={styles.buyingPowerResult}>
+                <span>👍 Approximately:</span>
+                <strong>${Math.round(loanAmount).toLocaleString()} financed</strong>
+              </div>
+              
+              <p style={styles.buyingPowerText}>
+                {downPaymentPercent > 0 
+                  ? `Add your ${downPaymentPercent}% down payment (~$${Math.round(downPaymentAmount).toLocaleString()}):`
+                  : 'With $0 down payment:'
+                }
+              </p>
+              
+              <div style={styles.buyingPowerTotal}>
+                <span>🚗 Estimated max vehicle sale price:</span>
+                <strong>~${Math.round(totalBuyingPower).toLocaleString()}</strong>
+              </div>
+            </div>
 
-      {/* Google Font Import */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-        
-        * {
-          box-sizing: border-box;
-          margin: 0;
-          padding: 0;
-        }
-        
-        body {
-          font-family: 'Montserrat', 'Segoe UI', sans-serif;
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-        }
-        
-        input, select, button {
-          font-family: inherit;
-        }
-        
-        input:focus, select:focus, button:focus {
-          outline: none;
-        }
-        
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-          width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-          background: rgba(255,255,255,0.05);
-        }
-        ::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.2);
-          border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background: rgba(255,255,255,0.3);
-        }
-        
-        /* Hide Sales Desk button on mobile */
-        @media (max-width: 768px) {
-          .sales-desk-btn {
-            display: none !important;
-          }
-        }
-      `}</style>
+            <div style={styles.mathBreakdown}>
+              <h4 style={styles.mathTitle}>📋 How it breaks down</h4>
+              <ul style={styles.mathList}>
+                <li>Monthly rate = {(APR * 100).toFixed(0)}% / 12 = {(monthlyRate * 100).toFixed(4)}%</li>
+                <li>Payment factor over {term} months gives you ~${Math.round(loanAmount / 1000)}k in borrowing power.</li>
+                <li>Total buying power = loan amount {downPaymentPercent > 0 ? `+ ${downPaymentPercent}% down payment` : '(no down payment)'}.</li>
+              </ul>
+            </div>
+          </div>
+
+          <button style={styles.continueButton} onClick={() => setStep(6)}>
+            Continue
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </button>
+          
+          <p style={styles.disclaimer}>Taxes and Dealer fees separate.</p>
+        </div>
+      </div>
+    );
+  };
+
+  // Step 6: Trade-In Qualification
+  const renderTradeInQualification = (): JSX.Element | null => {
+    if (!selectedModel) return null;
+    
+    return (
+      <div style={styles.stepContainer}>
+        <button style={styles.backButton} onClick={handleBack}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back
+        </button>
+        <div style={styles.stepHeader}>
+          <span style={styles.modelBadge}>{selectedModel.name} {selectedCab && `• ${selectedCab}`}</span>
+          <h1 style={styles.stepTitle}>🚗 Trade-In Vehicle</h1>
+          <p style={styles.stepSubtitle}>Do you have a vehicle to trade in?</p>
+        </div>
+        <div style={styles.formSection}>
+          <div style={styles.tradeOptions}>
+            <button
+              style={{...styles.tradeCard, ...(hasTrade === true ? styles.tradeCardActive : {})}}
+              onClick={() => setHasTrade(true)}
+            >
+              <div style={styles.tradeIcon}>✓</div>
+              <span style={styles.tradeName}>Yes, I have a trade-in</span>
+              <span style={styles.tradeDesc}>Get an instant estimate on your current vehicle</span>
+            </button>
+            <button
+              style={{...styles.tradeCard, ...(hasTrade === false ? styles.tradeCardActive : {})}}
+              onClick={() => { setHasTrade(false); setHasPayoff(null); }}
+            >
+              <div style={styles.tradeIcon}>✗</div>
+              <span style={styles.tradeName}>No trade-in</span>
+              <span style={styles.tradeDesc}>I don't have a vehicle to trade</span>
+            </button>
+          </div>
+
+          {hasTrade === true && (
+            <div style={styles.payoffSection}>
+              {/* Trade Vehicle Information */}
+              <h3 style={styles.payoffTitle}>Tell us about your trade-in vehicle</h3>
+              <div style={styles.tradeVehicleGrid}>
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Year</label>
+                  <select
+                    style={styles.selectInput}
+                    value={tradeVehicle.year}
+                    onChange={(e) => handleTradeVehicleChange('year', e.target.value)}
+                  >
+                    <option value="">Select Year</option>
+                    {YEAR_OPTIONS.map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Make</label>
+                  <select
+                    style={styles.selectInput}
+                    value={tradeVehicle.make}
+                    onChange={(e) => handleTradeVehicleChange('make', e.target.value)}
+                  >
+                    <option value="">Select Make</option>
+                    {COMMON_MAKES.map((make) => (
+                      <option key={make} value={make}>{make}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Model</label>
+                  <select
+                    style={styles.selectInput}
+                    value={tradeVehicle.model}
+                    onChange={(e) => handleTradeVehicleChange('model', e.target.value)}
+                    disabled={!tradeVehicle.year || !tradeVehicle.make || loadingTradeModels}
+                  >
+                    <option value="">{loadingTradeModels ? 'Loading...' : 'Select Model'}</option>
+                    {tradeModels.map((model) => (
+                      <option key={model} value={model}>{model}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={styles.payoffFieldGroup}>
+                  <label style={styles.inputLabel}>Mileage</label>
+                  <input
+                    type="text"
+                    style={styles.textInputStandalone}
+                    placeholder="e.g., 45000"
+                    value={tradeVehicle.mileage}
+                    onChange={(e) => handleTradeVehicleChange('mileage', e.target.value.replace(/[^0-9]/g, ''))}
+                  />
+                </div>
+              </div>
+
+              {/* Loan Payoff Question */}
+              <h3 style={{...styles.payoffTitle, marginTop: '24px'}}>Does your trade-in have a loan payoff?</h3>
+              <div style={styles.payoffOptions}>
+                <button
+                  style={{...styles.optionButton, ...(hasPayoff === true ? styles.optionButtonActive : {})}}
+                  onClick={() => setHasPayoff(true)}
+                >
+                  Yes
+                </button>
+                <button
+                  style={{...styles.optionButton, ...(hasPayoff === false ? styles.optionButtonActive : {})}}
+                  onClick={() => setHasPayoff(false)}
+                >
+                  No / Paid Off
+                </button>
+              </div>
+
+              {hasPayoff === true && (
+                <div style={styles.payoffFieldsGrid}>
+                  <div style={styles.payoffFieldGroup}>
+                    <label style={styles.inputLabel}>Approximate Payoff Amount</label>
+                    <div style={styles.inputWrapper}>
+                      <span style={styles.inputPrefix}>$</span>
+                      <input
+                        type="text"
+                        style={styles.textInput}
+                        placeholder="18,000.00"
+                        value={getDisplayValue('payoff', payoffAmount)}
+                        onChange={handlePayoffAmountChange}
+                        onFocus={() => setFocusedField('payoff')}
+                        onBlur={handlePayoffBlur}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div style={styles.payoffFieldGroup}>
+                    <label style={styles.inputLabel}>Monthly Payment</label>
+                    <div style={styles.inputWrapper}>
+                      <span style={styles.inputPrefix}>$</span>
+                      <input
+                        type="text"
+                        style={styles.textInput}
+                        placeholder="450.00"
+                        value={getDisplayValue('monthly', monthlyPayment)}
+                        onChange={handleMonthlyPaymentChange}
+                        onFocus={() => setFocusedField('monthly')}
+                        onBlur={handleMonthlyPaymentBlur}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div style={styles.payoffFieldGroup}>
+                    <label style={styles.inputLabel}>Financed With</label>
+                    <div style={styles.inputWrapper}>
+                      <input
+                        type="text"
+                        style={styles.textInputFull}
+                        placeholder="Bank or lender name"
+                        value={financedWith}
+                        onChange={handleFinancedWithChange}
+                        maxLength={25}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            style={{...styles.searchButton, opacity: (hasTrade !== null) ? 1 : 0.5}}
+            onClick={handleSearch}
+            disabled={hasTrade === null}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="M21 21l-4.35-4.35"/>
+            </svg>
+            Find My {selectedModel.name}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Progress bar
+  const totalSteps = selectedModel?.cabOptions ? 6 : 5;
+  const adjustedStep = selectedModel?.cabOptions ? step : (step > 2 ? step - 1 : step);
+
+  return (
+    <div style={styles.container}>
+      {step === 1 && renderCategorySelection()}
+      {step === 2 && renderModelSelection()}
+      {step === 3 && renderCabSelection()}
+      {step === 4 && renderColorSelection()}
+      {step === 5 && renderBudgetSelection()}
+      {step === 6 && renderTradeInQualification()}
+
+      <div style={styles.progressBar}>
+        {Array.from({ length: totalSteps }, (_, i) => (
+          <div key={i} style={{
+            ...styles.progressDot,
+            ...(i + 1 <= adjustedStep ? styles.progressDotActive : {}),
+            ...(i + 1 < adjustedStep ? styles.progressDotComplete : {}),
+          }} />
+        ))}
+      </div>
     </div>
   );
 };
 
-const styles: Record<string, CSSProperties> = {
-  container: {
-    height: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    backgroundImage: 'linear-gradient(135deg, #1a2520 0%, #243028 50%, #1e2a22 100%)',
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-    fontFamily: '"Montserrat", "Segoe UI", sans-serif',
-    color: '#ffffff',
-    overflow: 'hidden',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px 40px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-    background: 'rgba(0,0,0,0.3)',
-    backdropFilter: 'blur(10px)',
-    zIndex: 100,
-  },
-  headerLeft: {
-    flex: 1,
-    display: 'flex',
-    justifyContent: 'flex-start',
-    minWidth: '120px',
-  },
-  logoContainer: {
-    flex: 1,
-    display: 'flex',
-    justifyContent: 'center',
-  },
-  logo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    cursor: 'pointer',
-    transition: 'transform 0.2s ease',
-  },
-  logoText: {
-    fontSize: '32px',
-    fontWeight: '800',
-    letterSpacing: '2px',
-    color: '#ffffff',
-  },
-  logoAI: {
-    fontSize: '20px',
-    fontWeight: '700',
-    background: '#22c55e',
-    color: '#ffffff',
-    padding: '4px 12px',
-    borderRadius: '6px',
-  },
-  headerRight: {
-    flex: 1,
-    display: 'flex',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: '16px',
-    minWidth: '120px',
-  },
-  backButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    color: '#ffffff',
-    padding: '12px 20px',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  salesDeskLink: {
-    background: 'rgba(27, 115, 64, 0.2)',
-    border: '1px solid rgba(27, 115, 64, 0.4)',
-    color: '#4ade80',
-    fontSize: '12px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    padding: '8px 14px',
-    borderRadius: '6px',
-    transition: 'all 0.2s ease',
-  },
-  adminLink: {
-    background: 'transparent',
-    border: 'none',
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: '12px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    padding: '8px 12px',
-    transition: 'color 0.2s ease',
-  },
-  main: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    minHeight: 0,
-    transition: 'opacity 0.15s ease, transform 0.15s ease',
-  },
-  footer: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '16px',
-    fontSize: '14px',
-    color: '#fff',
-    borderTop: '1px solid rgba(255,255,255,0.1)',
-    background: 'rgba(0,0,0,0.3)',
-  },
-  footerDot: {
-    color: '#22c55e',
-  },
-  footerTime: {
-    fontWeight: '600',
-    color: '#fff',
-  },
-};
-
-export default KioskApp;
+export default ModelBudgetSelector;
