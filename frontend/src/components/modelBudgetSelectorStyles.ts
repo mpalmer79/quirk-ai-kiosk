@@ -295,11 +295,7 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
     gap: '16px',
     width: '100%',
-    padding: '28px',
-    background: 'rgba(200, 200, 200, 0.5)',
-    borderRadius: '20px',
-    border: '1px solid rgba(255,255,255,0.3)',
-    backdropFilter: 'blur(12px)',
+    padding: '0',
   },
 
   // ---------------------------------------------------------------------------
@@ -365,6 +361,7 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: '16px',
     width: '100%',
+    padding: '0',
   },
   cabCard: {
     display: 'flex',
@@ -381,6 +378,10 @@ const styles: Record<string, CSSProperties> = {
   },
   cabIcon: { 
     fontSize: '40px',
+    filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
+  },
+  cabIconLarge: {
+    fontSize: '56px',
     filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
   },
   cabName: { 
