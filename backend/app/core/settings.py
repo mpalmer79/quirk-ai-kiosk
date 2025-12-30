@@ -189,6 +189,10 @@ class Settings(BaseSettings):
         default=None,
         description="Default Slack webhook if team-specific not set"
     )
+    slack_webhook_url: Optional[str] = Field(
+        default=None,
+        description="Primary Slack webhook URL (SLACK_WEBHOOK_URL env var)"
+    )
     
     # Twilio SMS settings
     twilio_account_sid: Optional[str] = Field(default=None)
@@ -214,7 +218,7 @@ class Settings(BaseSettings):
     
     @property
     def is_slack_configured(self) -> bool:
-        return bool(self.slack_webhook_default or self.slack_webhook_sales)
+        return bool(self.slack_webhook_url or self.slack_webhook_default or self.slack_webhook_sales)
     
     @property
     def is_sms_configured(self) -> bool:
@@ -232,7 +236,8 @@ class Settings(BaseSettings):
             "appraisal": self.slack_webhook_appraisal,
             "finance": self.slack_webhook_finance,
         }
-        return webhooks.get(notification_type) or self.slack_webhook_default
+        # Try team-specific first, then SLACK_WEBHOOK_URL, then SLACK_WEBHOOK_DEFAULT
+        return webhooks.get(notification_type) or self.slack_webhook_url or self.slack_webhook_default
     
     def get_sms_numbers(self, notification_type: str) -> List[str]:
         """Get phone numbers for notification type"""
