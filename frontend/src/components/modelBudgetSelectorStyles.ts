@@ -161,8 +161,23 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
     gap: '16px',
     width: '100%',
+    padding: '0',
+    paddingBottom: '0',
+  },
+  
+  // Category selection card wrapper (matches stepHeader glassmorphism)
+  categorySelectionCard: {
+    background: 'rgba(200, 200, 200, 0.5)',
+    borderRadius: '20px',
+    border: '1px solid rgba(255,255,255,0.3)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+    backdropFilter: 'blur(20px)',
     padding: '28px',
-    paddingBottom: '40px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '24px',
+    width: '100%',
   },
 
   // ---------------------------------------------------------------------------
@@ -171,8 +186,8 @@ const styles: Record<string, CSSProperties> = {
   startOverContainer: {
     display: 'flex',
     justifyContent: 'center',
-    marginTop: '32px',
-    marginBottom: '20px',
+    marginTop: '8px',
+    marginBottom: '0',
   },
   startOverButton: {
     display: 'flex',
