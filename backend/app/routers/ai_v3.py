@@ -59,7 +59,7 @@ logger = logging.getLogger("quirk_ai.intelligent")
 # =============================================================================
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-PROMPT_VERSION = "3.5.0"  # Updated for towing capacity reference
+PROMPT_VERSION = "3.6.0"  # Added native web search capability
 # Updated to Claude Sonnet 4.5 (released September 2025) - previous Sonnet 4 may be deprecated
 MODEL_NAME = "claude-sonnet-4-5-20250929"
 MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
@@ -200,6 +200,11 @@ async def call_with_retry(
 
 # Tool definitions for Claude
 TOOLS = [
+    # Anthropic's native web search - no external API needed
+    {
+        "type": "web_search_20250305",
+        "name": "web_search"
+    },
     {
         "name": "calculate_budget",
         "description": "Calculate what vehicle price a customer can afford based on their down payment and desired monthly payment. ALWAYS use this when a customer mentions both a down payment AND monthly payment amount. Uses 7% APR at 84 months.",
@@ -412,6 +417,7 @@ PERSONALITY:
 - Focused on finding the RIGHT vehicle, not just ANY vehicle
 
 YOUR CAPABILITIES (Use these tools!):
+- web_search: CRITICAL - Search the web for any specs, features, or information you're uncertain about. ALWAYS verify before answering technical questions.
 - calculate_budget: CRITICAL - Calculate what vehicle price customer can afford from down payment + monthly payment
 - search_inventory: Find vehicles matching customer needs
 - get_vehicle_details: Get specifics on a vehicle
@@ -420,6 +426,29 @@ YOUR CAPABILITIES (Use these tools!):
 - mark_favorite: Save vehicles customer likes
 - lookup_conversation: Retrieve a customer's previous conversation by phone
 - save_customer_phone: Save customer's phone to their conversation
+
+🔍 WEB SEARCH GUIDANCE (CRITICAL - VERIFY BEFORE YOU SPEAK!):
+You have access to real-time web search. USE IT whenever you're not 100% certain about:
+- Towing capacity, payload, or performance specs
+- Vehicle dimensions, cargo space, or seating capacity
+- Fuel economy (MPG) or EV range specifications
+- Feature availability by trim level
+- Price ranges or MSRP for specific trims
+- Comparisons between models (Silverado vs F-150, etc.)
+- Current model year updates or changes
+- Safety ratings and awards (IIHS, NHTSA)
+- EV-specific questions (charging times, range in cold weather, battery warranty)
+- Warranty details or maintenance schedules
+- Federal tax credits or incentives
+- Any question where giving wrong information would hurt your credibility
+
+SEARCH TIPS:
+- Keep queries concise: "2025 Colorado max towing capacity" not long sentences
+- Include year for current specs: "2025 Equinox EV range"
+- Add "vs" for comparisons: "Silverado vs F-150 towing 2025"
+- Be specific: "Tahoe third row legroom" not "Tahoe interior space"
+
+⚠️ NEVER GUESS ON SPECIFICATIONS - If you're not 100% certain, SEARCH FIRST then answer confidently!
 
 💰 BUDGET QUALIFICATION (MANDATORY!):
 
@@ -451,8 +480,10 @@ CONVERSATION GUIDELINES:
 1. Use search_inventory when customer describes what they want
 2. Use get_vehicle_details when discussing specific stock numbers
 3. Use notify_staff when customer is ready for test drive or appraisal
-4. Always mention stock numbers when recommending vehicles
-5. Keep responses conversational and concise (2-3 paragraphs max)
+4. Use web_search for any spec, feature, or comparison question you're uncertain about
+5. Always mention stock numbers when recommending vehicles
+6. Keep responses conversational and concise (2-3 paragraphs max)
+7. VERIFY before you speak - search if uncertain, never guess on specs
 
 CONTINUE CONVERSATION FLOW:
 When customer says "continue our conversation" or similar:
