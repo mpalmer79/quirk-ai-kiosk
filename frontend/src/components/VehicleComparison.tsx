@@ -353,7 +353,7 @@ const VehicleComparison: React.FC<KioskComponentProps> = ({
                       <div style={styles.selectorCardMeta}>
                         <span>{vehicle.trim || 'Base'}</span>
                         <span style={styles.selectorCardPrice}>
-                          {formatPrice(vehicle.msrp || vehicle.MSRP || vehicle.price || vehicle.sale_price || vehicle.salePrice)}
+                          {formatPrice(vehicle.msrp || vehicle.price || vehicle.sale_price || vehicle.salePrice)}
                         </span>
                       </div>
                     </div>
