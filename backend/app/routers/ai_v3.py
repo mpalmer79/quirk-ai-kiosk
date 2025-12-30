@@ -530,6 +530,19 @@ TRADE-IN POLICY:
 - Offer FREE professional appraisal (takes ~10-15 minutes)
 - Ask about: current payment, lease vs finance, payoff amount, lender
 
+🚗 HIGH-VALUE VEHICLE RULE ($100,000+):
+When discussing vehicles with MSRP of $100,000 or more (Corvettes, High Country trucks, etc.):
+- Do NOT offer test drives or say "get the keys for a test drive"
+- Do NOT offer to "bring it up front" for a casual look
+- Instead, close with: "Would you like for me to notify a sales consultant to assist in further exploring your next vehicle purchase?"
+- These premium vehicles require a sales consultant for proper presentation
+
+Example - WRONG for $126K Corvette:
+"I can have it brought up front or we can get the keys for a test drive!"
+
+Example - CORRECT for $126K Corvette:
+"Would you like for me to notify a sales consultant to assist in further exploring your next vehicle purchase?"
+
 ⚠️ CRITICAL TRADE-IN RULE:
 When a customer mentions trading in a vehicle (e.g., "I'm trading in my Equinox"):
 - The trade-in vehicle is what they're GETTING RID OF, not what they want to buy
@@ -725,11 +738,21 @@ def format_vehicles_for_tool_result(vehicles: List[ScoredVehicle], total_matches
     total = total_matches if total_matches else shown_count
     more_exist = total > shown_count
     
+    # Check if any vehicles are high-value ($100K+)
+    has_high_value = any(
+        (sv.vehicle.get('MSRP') or sv.vehicle.get('price', 0)) >= 100000 
+        for sv in vehicles
+    )
+    
     if more_exist:
         result_parts = [f"Found {shown_count} examples from {total}+ matching vehicles:\n"]
         result_parts.append("⚠️ MORE MATCHES EXIST - ASK QUALIFYING QUESTIONS to narrow down!\n")
     else:
         result_parts = [f"Found {shown_count} matching vehicles:\n"]
+    
+    # Add high-value warning if applicable
+    if has_high_value:
+        result_parts.append("💰 NOTE: Some vehicles are $100K+. For these, do NOT offer test drives. Instead close with: \"Would you like for me to notify a sales consultant to assist in further exploring your next vehicle purchase?\"\n")
     
     for idx, sv in enumerate(vehicles, 1):
         v = sv.vehicle
@@ -744,7 +767,10 @@ def format_vehicles_for_tool_result(vehicles: List[ScoredVehicle], total_matches
         body = v.get('Body') or v.get('body', '')
         
         # Include towing/seating info when relevant
-        specs = f"Price: ${price:,.0f} | Color: {color}"
+        specs = f"Price: ${price:,.0f}"
+        if price >= 100000:
+            specs += " ⚠️HIGH-VALUE"
+        specs += f" | Color: {color}"
         if towing > 0:
             specs += f" | Tows: {towing:,} lbs"
         if seating != 5:
@@ -789,6 +815,12 @@ def format_vehicle_details_for_tool(vehicle: Dict[str, Any]) -> str:
     seating = vehicle.get('seatingCapacity', 5)
     towing = vehicle.get('towingCapacity', 0)
     
+    # High-value vehicles ($100K+) require sales consultant, no test drive offers
+    if price >= 100000:
+        closing_line = "⚠️ HIGH-VALUE VEHICLE ($100K+): Do NOT offer test drive. Instead ask: \"Would you like for me to notify a sales consultant to assist in further exploring your next vehicle purchase?\""
+    else:
+        closing_line = "This vehicle is available in our showroom. I can have it brought up front or get the keys for a closer look."
+    
     return f"""Vehicle Details - Stock #{stock}:
 {year} {make} {model} {trim}
 
@@ -801,7 +833,7 @@ TOWING CAPACITY: {towing:,} lbs
 KEY FEATURES:
 {chr(10).join(f'- {f}' for f in features[:8])}
 
-This vehicle is available in our showroom. I can have it brought up front or get the keys for a closer look."""
+{closing_line}"""
 
 
 # =============================================================================
