@@ -9,7 +9,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import KioskApp from '../components/Kioskapp';
 
 // Mock all child components to isolate KioskApp testing
-jest.mock('../components/WelcomeScreen', () => {
+jest.mock('../components/Welcomescreen', () => {
   return function MockWelcomescreen({ navigateTo, updateCustomerData }: any) {
     return (
       <div data-testid="welcome-screen">
