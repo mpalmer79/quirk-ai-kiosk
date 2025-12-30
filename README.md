@@ -54,10 +54,33 @@ The QUIRK AI Kiosk is a production-ready monorepo powering Quirk Auto Dealers' i
 | **Live Inventory** | Real-time PBS inventory integration with 250+ Chevrolet vehicles |
 | **Trade-In Estimator** | 5-step guided flow with VIN decode, payoff/lender capture, condition rating, and photo upload |
 | **Payment Calculator** | Finance and lease calculators with real-time payment estimates |
-| **Sales Manager Dashboard** | Real-time 4-square worksheet with chat transcript viewing and session monitoring |
+| **Sales Manager Dashboard** | Real-time Digital Worksheet with chat transcript viewing, session monitoring, and manager notes |
+| **Staff Notifications** | Real-time Slack, SMS, and email alerts when customers request assistance |
 | **Model Budget Selector** | Visual model selection with cab type, color preferences, and budget filtering |
 | **Stock Lookup** | Direct stock number search for quick vehicle access |
 | **Protection Packages** | F&I product presentation for GAP, extended warranty, and maintenance plans |
+| **GM Model Decoder** | Automatic decoding of GM model numbers (CK10543 → Silverado 1500 Crew Cab 4WD) |
+
+---
+
+## Recent Improvements (December 2025)
+
+### Staff Notification System
+- **Slack Integration**: Real-time notifications to `#chevynh-sales-kiosk` when customers request assistance
+- **Email Backup**: SendGrid/SMTP integration for notification redundancy
+- **SMS Support**: Twilio integration for mobile alerts to sales staff
+- **"Speak with a sales consultant" Button**: Prominent button on inventory pages and AI chat for instant staff notification
+
+### AI Assistant Enhancements
+- **GM Model Number Decoder**: 32+ model codes mapped (trucks, SUVs, EVs, sports cars, commercial)
+- **Service Customer Flow**: Intelligent conversation rules that build rapport before showing inventory
+- **MSRP Display Priority**: All vehicle cards now show MSRP first, then sale price
+- **Transcript Notice**: "Transcript available upon request" displayed below chat input
+
+### Sales Manager Dashboard
+- **Manager Notes with Save**: Persistent notes per session with save button
+- **Chat History Extraction**: Automatically extracts vehicles, trade-ins, and payment preferences from AI conversations
+- **Digital Worksheet**: Full 4-square worksheet with editable fields
 
 ---
 
@@ -78,6 +101,12 @@ The QUIRK AI Kiosk is a production-ready monorepo powering Quirk Auto Dealers' i
 │  │  Railway/    │    │  PostgreSQL  │    │   Claude     │      │
 │  │  Vercel      │    │  + JSON FB   │    │   API        │      │
 │  └──────────────┘    └──────────────┘    └──────────────┘      │
+│                             │                                   │
+│                             ▼                                   │
+│                      ┌──────────────┐                          │
+│                      │ Notifications│                          │
+│                      │ Slack/Email  │                          │
+│                      └──────────────┘                          │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -89,6 +118,7 @@ The QUIRK AI Kiosk is a production-ready monorepo powering Quirk Auto Dealers' i
 | **AI Service** | Anthropic Claude API | Integrated via Backend |
 | **Database** | PostgreSQL (prod) / JSON (fallback) | Railway Managed |
 | **TTS** | ElevenLabs API (optional) | Via Backend |
+| **Notifications** | Slack Webhooks, SendGrid, Twilio | Via Backend |
 
 ---
 
@@ -99,16 +129,23 @@ quirk-ai-kiosk/
 ├── frontend/                    # React Kiosk Application
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── AIAssistant.tsx         # Claude-powered chat with voice & TTS
-│   │   │   ├── Kioskapp.tsx            # Main kiosk container & routing
+│   │   │   ├── AIAssistant/            # Claude-powered chat module
+│   │   │   │   ├── AIAssistant.tsx     # Main AI chat with voice & TTS
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── ChatInput.tsx   # Input with consultant button
+│   │   │   │   │   ├── Header.tsx      # Audio controls
+│   │   │   │   │   └── VehicleCard.tsx # In-chat vehicle cards
+│   │   │   │   └── styles.ts           # Component styles
+│   │   │   ├── Kioskapp.tsx            # Main container & routing
 │   │   │   ├── Inventoryresults.tsx    # Vehicle grid with filtering
 │   │   │   ├── Vehicledetail.tsx       # Individual vehicle view
 │   │   │   ├── VehicleCard.tsx         # Reusable vehicle display card
+│   │   │   ├── VehicleComparison.tsx   # Side-by-side comparison
 │   │   │   ├── ModelBudgetSelector.tsx # Model/cab/color/budget flow
 │   │   │   ├── TradeInEstimator.tsx    # 5-step trade-in with photo upload
 │   │   │   ├── Paymentcalculator.js    # Finance/lease calculator
 │   │   │   ├── Protectionpackages.tsx  # F&I product presentation
-│   │   │   ├── SalesManagerDashboard.tsx # Admin 4-square worksheet
+│   │   │   ├── SalesManagerDashboard.tsx # Admin Digital Worksheet
 │   │   │   ├── Stocklookup.tsx         # Stock number search
 │   │   │   ├── Trafficlog.tsx          # Session analytics view
 │   │   │   ├── Welcomescreen.tsx       # Kiosk entry point
@@ -134,6 +171,7 @@ quirk-ai-kiosk/
 │   │   ├── core/
 │   │   │   ├── recommendation_engine.py # Weighted similarity scoring
 │   │   │   ├── security.py             # API key management, sanitization
+│   │   │   ├── settings.py             # Pydantic settings with notifications
 │   │   │   ├── cache.py                # Response caching
 │   │   │   ├── exceptions.py           # Custom exception classes
 │   │   │   └── logging.py              # Structured logging
@@ -141,6 +179,7 @@ quirk-ai-kiosk/
 │   │   │   ├── inventory.py            # /api/v1/inventory
 │   │   │   ├── ai.py                   # /api/v1/ai (Claude chat)
 │   │   │   ├── ai_v2.py                # /api/v2/ai (structured outputs)
+│   │   │   ├── ai_v3.py                # /api/v3/ai (tools, memory, notifications)
 │   │   │   ├── recommendations.py      # /api/v1/recommendations
 │   │   │   ├── recommendations_v2.py   # /api/v2/recommendations
 │   │   │   ├── smart_recommendations.py # /api/v3/smart (AI-enhanced)
@@ -151,6 +190,9 @@ quirk-ai-kiosk/
 │   │   │   ├── photo_analysis.py       # Trade-in photo processing
 │   │   │   └── tts.py                  # ElevenLabs TTS integration
 │   │   ├── services/
+│   │   │   ├── notifications.py        # Slack, SMS, Email notifications
+│   │   │   ├── conversation_state.py   # Session state management
+│   │   │   ├── vehicle_retriever.py    # Semantic vehicle search
 │   │   │   ├── entity_extraction.py    # NLP entity extraction
 │   │   │   ├── inventory_enrichment.py # Derive missing vehicle fields
 │   │   │   └── smart_recommendations.py # Conversation-aware recs
@@ -186,6 +228,82 @@ quirk-ai-kiosk/
 
 ---
 
+## Staff Notification System
+
+The kiosk can notify sales staff in real-time when customers need assistance.
+
+### Notification Channels
+
+| Channel | Configuration | Use Case |
+|---------|--------------|----------|
+| **Slack** | `SLACK_WEBHOOK_DEFAULT` | Primary - instant push to sales channel |
+| **Email** | `SENDGRID_API_KEY` or SMTP | Backup - paper trail |
+| **SMS** | Twilio credentials | Staff on the floor |
+
+### Environment Variables
+
+```bash
+# Slack (Primary)
+SLACK_WEBHOOK_DEFAULT=https://hooks.slack.com/services/T.../B.../xxx
+SLACK_WEBHOOK_SALES=https://hooks.slack.com/services/...     # Optional team-specific
+SLACK_WEBHOOK_APPRAISAL=https://hooks.slack.com/services/... # Optional
+SLACK_WEBHOOK_FINANCE=https://hooks.slack.com/services/...   # Optional
+
+# Email (via SendGrid - recommended)
+SENDGRID_API_KEY=SG.xxxxxxxx
+EMAIL_FROM_ADDRESS=kiosk@quirkchevrolet.com
+EMAIL_FROM_NAME=Quirk AI Kiosk
+EMAIL_NOTIFY_SALES=sales@quirkchevrolet.com
+EMAIL_NOTIFY_DEFAULT=manager@quirkchevrolet.com
+
+# Email (via SMTP - alternative)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+
+# SMS (via Twilio)
+TWILIO_ACCOUNT_SID=ACxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_PHONE_NUMBER=+1234567890
+SMS_NOTIFY_SALES=+1234567890,+0987654321
+```
+
+### Notification Flow
+
+1. Customer taps "Speak with a sales consultant" button
+2. Frontend calls `/api/v3/ai/notify-staff`
+3. Backend sends notifications to all configured channels
+4. Staff receives alert with:
+   - Customer name (if known)
+   - Vehicle of interest (stock number)
+   - Budget and trade-in info
+   - Link to Sales Manager Dashboard
+
+---
+
+## GM Model Number Decoder
+
+The AI assistant automatically decodes GM model numbers from inventory data.
+
+### Supported Model Codes
+
+| Code | Vehicle |
+|------|---------|
+| CK10543 | Silverado 1500 Crew Cab Short Box 4WD |
+| CK10743 | Silverado 1500 Crew Cab Standard Box 4WD |
+| CK20743 | Silverado 2500HD Crew Cab Standard Box 4WD |
+| CK30743 | Silverado 3500HD Crew Cab Standard Box 4WD |
+| CK10706 | Tahoe 4WD |
+| CK10906 | Suburban 4WD |
+| 1PT26 | Equinox AWD LT |
+| 1MB48 | Equinox EV AWD |
+| 1YG07 | Corvette E-Ray |
+| 1YR07 | Corvette ZR1 |
+| ... | 32+ codes supported |
+
+---
+
 ## Security Features
 
 The application implements production-grade security measures:
@@ -193,11 +311,12 @@ The application implements production-grade security measures:
 | Feature | Implementation |
 |---------|----------------|
 | **API Key Protection** | `SecretValue` wrapper prevents accidental logging of secrets |
-| **Rate Limiting** | slowapi with configurable limits per endpoint |
+| **Rate Limiting** | slowapi with configurable limits per endpoint (30/min for AI) |
 | **Input Sanitization** | XSS prevention, control character removal, length limits |
 | **CORS Configuration** | Environment-based origin allowlists (strict in production) |
 | **Request Tracking** | Unique request IDs for audit trails |
 | **Health Checks** | Kubernetes-ready `/live` and `/ready` endpoints |
+| **Phone Lookup Throttling** | Per-session rate limiting for phone number lookups |
 
 ```python
 # Example: Secrets are never logged in plain text
@@ -223,6 +342,15 @@ Interactive API documentation is auto-generated by FastAPI and available at:
 
 ## API Reference
 
+### V3 Endpoints (Latest - AI with Tools)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v3/ai/chat` | POST | Intelligent AI chat with tools and memory |
+| `/api/v3/ai/notify-staff` | POST | Trigger staff notifications (Slack/Email/SMS) |
+| `/api/v3/ai/state/{session_id}` | GET | Get conversation state |
+| `/api/v3/ai/lookup/phone/{phone}` | GET | Look up previous conversation by phone |
+
 ### V1 Endpoints (Core)
 
 | Endpoint | Method | Description |
@@ -231,237 +359,80 @@ Interactive API documentation is auto-generated by FastAPI and available at:
 | `/api/v1/inventory/stock/{stock_number}` | GET | Get vehicle by stock number |
 | `/api/v1/inventory/vin/{vin}` | GET | Get vehicle by VIN |
 | `/api/v1/inventory/search` | POST | Search with preferences |
-| `/api/v1/inventory/stats` | GET | Inventory statistics |
-| `/api/v1/recommendations/{stock_number}` | GET | Similar vehicle recommendations |
-| `/api/v1/ai/chat` | POST | AI assistant conversation |
-| `/api/v1/leads/handoff` | POST | Submit customer lead |
-| `/api/v1/leads/test-drive` | POST | Schedule test drive |
-| `/api/v1/traffic/session` | POST | Log/update kiosk session |
-| `/api/v1/traffic/log` | GET | Get session history (admin) |
-| `/api/v1/traffic/stats` | GET | Traffic statistics |
-| `/api/v1/traffic/active` | GET | Active sessions for dashboard |
-| `/api/v1/trade-in/decode/{vin}` | GET | Decode VIN via NHTSA |
-| `/api/v1/tts/speak` | POST | Text-to-speech (ElevenLabs) |
+| `/api/v1/recommendations/quiz` | POST | Quiz-based recommendations |
+| `/api/v1/trade-in/vin/{vin}` | GET | Decode VIN for trade-in |
+| `/api/v1/trade-in/estimate` | POST | Get trade-in valuation |
+| `/api/v1/leads` | POST | Submit lead to CRM |
+| `/api/v1/tts/speak` | POST | Generate speech audio |
 
-### V2 Endpoints (Enhanced)
+### Traffic & Analytics
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v2/ai/chat` | POST | Structured AI responses with intent detection |
-| `/api/v2/recommendations/{stock_number}` | GET | Enhanced recommendations |
-| `/api/v2/recommendations/personalized` | POST | Browsing history-based recommendations |
-
-### V3 Endpoints (Smart AI)
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v3/smart/from-conversation` | POST | Recommendations from chat context |
-| `/api/v3/smart/similar/{stock_number}` | POST | AI-enhanced similar vehicles |
-| `/api/v3/smart/extract-entities` | POST | Extract budget, preferences from text |
-
-### Health & Monitoring
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Comprehensive health check |
-| `/api/health/live` | GET | Kubernetes liveness probe |
-| `/api/health/ready` | GET | Kubernetes readiness probe |
+| `/api/v1/traffic/sessions` | GET | List active kiosk sessions |
+| `/api/v1/traffic/sessions/{id}` | GET | Get session details |
+| `/api/v1/traffic/stats` | GET | Aggregate statistics |
+| `/api/v1/analytics/events` | POST | Log analytics events |
 
 ---
 
-## Component Features
+## Environment Variables
 
-### AI Assistant (AIAssistant.tsx)
+### Required
 
-- Claude-powered natural language conversation
-- **Text-to-Speech**: ElevenLabs audio responses for accessibility
-- **Voice Input**: Web Speech API for hands-free interaction
-- **Smart Inventory Search**: Color + model keyword extraction (e.g., "blue Equinox")
-- **Entity Extraction**: Automatically captures budget, preferences, trade-in details
-- **Objection Handling**: Pre-built responses for common customer concerns
-- **Suggested Prompts**: Pre-built conversation starters
-- **Vehicle Cards**: Inline vehicle recommendations with direct navigation
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Claude API key for AI features |
 
-### Trade-In Estimator (TradeInEstimator.tsx)
+### Database
 
-5-step guided flow:
-1. **Vehicle Info**: Year, make, model, trim, mileage, VIN decode
-2. **Ownership**: Payoff status (owned outright vs. financed/leased)
-3. **Payoff Details**: Amount owed, monthly payment, lender selection
-4. **Condition**: 4-tier rating (Excellent/Good/Fair/Poor) with photo upload
-5. **Results**: Estimate range with equity calculation
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string (optional - falls back to JSON) |
 
-Key features:
-- VIN auto-decode via NHTSA API
-- 15+ major lender presets
-- Photo documentation for 5 vehicle angles
-- Equity preview (estimate - payoff)
-- Data flows to Sales Manager Dashboard
+### Authentication
 
-### Sales Manager Dashboard (SalesManagerDashboard.tsx)
+| Variable | Description |
+|----------|-------------|
+| `JWT_SECRET_KEY` | Secret for JWT token signing (min 32 chars) |
+| `ADMIN_API_KEY` | API key for dashboard access |
 
-- **Real-time Session List**: Active kiosk sessions with auto-refresh (5s)
-- **4-Square Worksheet**: Traditional deal structure view
-  - Vehicle Interest: Model, cab, colors selected
-  - Budget: Min/max range, down payment percentage
-  - Trade-In: Vehicle details, payoff amount, monthly payment, lender
-  - Selected Vehicle: Stock, year, make, model, trim, price
-- **Chat Transcript Viewer**: Full AI conversation history per session
-- **Customer Info Bar**: Name, phone, session timing
-- **Step Tracking**: Human-readable step labels
+### Notifications
 
-### Model Budget Selector (ModelBudgetSelector.tsx)
+| Variable | Description |
+|----------|-------------|
+| `SLACK_WEBHOOK_DEFAULT` | Slack webhook URL for notifications |
+| `SENDGRID_API_KEY` | SendGrid API key for email |
+| `TWILIO_ACCOUNT_SID` | Twilio account for SMS |
+| `TWILIO_AUTH_TOKEN` | Twilio auth token |
+| `TWILIO_PHONE_NUMBER` | Twilio phone number |
 
-- Visual model tile selection (Trucks, SUVs, Cars, Electric)
-- Cab type selection for trucks (Regular, Double, Crew)
-- GM color palette with color-accurate vehicle images
-- Budget slider with min/max range
-- Down payment percentage selector
+### Optional Services
 
----
-
-## AI Features
-
-### Conversational AI (Claude)
-
-The AI Assistant uses Anthropic's Claude with showroom-specific behaviors:
-
-- **Showroom Context**: Understands customer is already in-store
-- **Never Says "Come In"**: AI acts as in-person salesperson
-- **Trade-In Flow**: Guides through data collection without giving valuations
-- **Vehicle Recommendations**: Suggests based on stated needs
-- **Staff Handoff Triggers**: Detects when to involve sales, appraisal, or finance
-
-### Entity Extraction
-
-Structured data automatically extracted from conversations:
-
-| Entity Type | Examples | Extracted Fields |
-|-------------|----------|------------------|
-| **Budget** | "under 50k", "$600/month" | max_price, monthly_payment |
-| **Trade-In** | "trading my 2019 F-150" | year, make, model |
-| **Payoff** | "$15k left on my loan" | payoff_amount, has_payoff |
-| **Lender** | "financed through Chase" | lender |
-| **Vehicle Type** | "need a truck for towing" | body_style, use_case |
-| **Family Size** | "I have 3 kids" | min_seating |
-| **Urgency** | "need something today" | urgency: ready_to_buy |
-| **Features** | "must have leather seats" | must_have_features |
-| **Fuel Preference** | "want electric" | fuel_preference |
-| **Drivetrain** | "need AWD for winter" | drivetrain_preference |
-
-### Smart Recommendations
-
-Recommendations use weighted scoring across multiple factors:
-
-| Factor | Weight | Description |
-|--------|--------|-------------|
-| Body Style Match | 2.0x | SUV, Truck, Sedan alignment |
-| Price Range | 1.5x | Within budget constraints |
-| Fuel Type | 1.5x | Gas, Electric, Hybrid match |
-| Drivetrain | 1.0x | AWD, 4WD, FWD preference |
-| Feature Overlap | 1.0x | Must-have features present |
-| Performance | 0.75x | Sport/performance alignment |
-| Year | 0.5x | Model year proximity |
-| Luxury | 0.5x | Trim level alignment |
-
----
-
-## Local Development
-
-### Prerequisites
-
-- Node.js 18+
-- Python 3.11+
-- Docker (optional)
-
-### Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm start
-```
-
-Frontend runs at `http://localhost:3000`
-
-### Backend Setup
-
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-Backend runs at `http://localhost:8000`
-
-### Environment Variables
-
-**Frontend** (`frontend/.env.development`):
-```env
-REACT_APP_API_URL=http://localhost:8000/api
-REACT_APP_KIOSK_ID=DEV-KIOSK-001
-REACT_APP_DEALERSHIP=Quirk Chevrolet
-```
-
-**Backend** (`backend/.env.development`):
-```env
-ENVIRONMENT=development
-HOST=0.0.0.0
-PORT=8000
-ANTHROPIC_API_KEY=sk-ant-your-key-here
-ELEVENLABS_API_KEY=your-elevenlabs-key        # Optional - for TTS
-DATABASE_URL=postgresql://user:pass@host/db   # Optional - uses JSON fallback if not set
-PBS_API_KEY=your-pbs-key                      # Optional - for live inventory
-CRM_API_KEY=your-crm-key                      # Optional - for lead submission
-CORS_ORIGINS=http://localhost:3000            # Comma-separated for multiple
-```
-
-### Running Tests
-
-```bash
-# Backend unit tests
-cd backend
-pytest -v
-
-# Backend with coverage
-pytest --cov=app --cov-report=html
-
-# Frontend unit tests
-cd frontend
-npm test
-
-# Frontend E2E tests (Playwright)
-npm run test:e2e
-```
-
-### Docker Compose
-
-```bash
-# Start all services
-docker-compose up --build
-
-# Start specific service
-docker-compose up backend
-
-# View logs
-docker-compose logs -f backend
-
-# Stop all services
-docker-compose down
-```
+| Variable | Description |
+|----------|-------------|
+| `ELEVENLABS_API_KEY` | ElevenLabs API for HD TTS |
+| `ELEVENLABS_VOICE_ID` | Voice ID for TTS |
+| `PBS_API_KEY` | PBS inventory API key |
+| `CRM_API_KEY` | CRM integration key |
 
 ---
 
 ## Deployment
 
-### Railway (Current Production)
+### Railway (Recommended)
 
-The project is deployed on Railway with automatic deployments from the `main` branch.
+Both frontend and backend are configured for Railway deployment:
 
-| Service | Railway URL |
-|---------|-------------|
-| Backend | `quirk-backend-production.up.railway.app` |
-| Frontend | `quirk-frontend-production.up.railway.app` |
+```bash
+# Backend deploys from /backend directory
+# Frontend deploys from /frontend directory
+# Set environment variables in Railway dashboard
+```
+
+**Production URLs:**
+- Frontend: https://quirk-frontend-production.up.railway.app
+- Backend: https://quirk-backend-production.up.railway.app
 
 ### Alternative Deployment Options
 
@@ -511,8 +482,10 @@ The system loads vehicle inventory from `backend/data/inventory.xlsx` (PBS expor
 | Year | Model year | 2025 |
 | Make | Manufacturer | Chevrolet |
 | Model | Vehicle model | Silverado 1500 |
+| Model Number | GM model code | CK10543 |
 | Trim | Trim level | LT |
-| MSRP | Price | 52000 |
+| MSRP | Manufacturer price | 52000 |
+| Sale Price | Discounted price | 48500 |
 | Body | Body description with drivetrain | 4WD Crew Cab 147" |
 | Body Type | Category code | PKUP, APURP, VAN |
 
@@ -524,6 +497,7 @@ Missing fields are automatically derived:
 - **Fuel Type**: Detected from Model name (EV → Electric)
 - **Features**: Inferred from Trim (Z71 → Off-Road Package)
 - **Seating/Towing**: Looked up by model
+- **Model Description**: Decoded from GM Model Number
 
 ---
 
@@ -543,6 +517,7 @@ Session data structure includes:
 - Trade-in (vehicle, payoff, lender, monthly payment)
 - Chat history (full AI conversation)
 - Selected vehicle
+- Staff notification status
 - Action timestamps
 
 ---
@@ -581,6 +556,14 @@ echo $ANTHROPIC_API_KEY
 docker-compose logs backend | grep -i anthropic
 ```
 
+**Slack notifications not working**
+```bash
+# Test webhook directly
+curl -X POST -H 'Content-type: application/json' \
+  --data '{"text":"Test from kiosk"}' \
+  $SLACK_WEBHOOK_DEFAULT
+```
+
 **Database connection issues**
 ```bash
 # Test PostgreSQL connection
@@ -615,6 +598,7 @@ curl http://localhost:8000/api/health/ready
 | **TypeScript** | Some components still in JavaScript |
 | **State Management** | Prop drilling - no global state (Context/Redux) |
 | **Styling** | Inline styles only - no CSS framework |
+| **Notifications** | Push-based alerts work; real-time dashboard updates are pull-based |
 
 ### Future Improvements
 
@@ -625,7 +609,9 @@ curl http://localhost:8000/api/health/ready
 - [ ] Implement offline mode with service workers
 - [ ] Add multi-language support (i18n)
 - [ ] PBS real-time inventory sync
-- [ ] CRM integration (VinSolutions, DealerSocket)
+- [ ] VIN Solutions CRM integration (ADF/XML format)
+- [ ] Appointment scheduling tool
+- [ ] Incentives data integration
 
 ---
 
@@ -636,7 +622,8 @@ curl http://localhost:8000/api/health/ready
 - Response caching for inventory queries
 - Connection pooling for PostgreSQL
 - Async/await throughout for non-blocking I/O
-- Rate limiting to prevent abuse
+- Rate limiting to prevent abuse (30 requests/min for AI)
+- Retry logic for external API calls
 
 ### Frontend Optimizations
 
@@ -644,6 +631,7 @@ curl http://localhost:8000/api/health/ready
 - Lazy loading for route components
 - Image optimization for vehicle photos
 - Session storage for client-side state
+- localStorage for session persistence
 
 ### Recommended Specs
 
