@@ -297,6 +297,42 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     navigateTo('welcome');
   };
 
+  // Handle request for sales consultant (triggers Slack notification)
+  const handleRequestConsultant = async () => {
+    try {
+      // Call the notify_staff endpoint
+      const response = await api.notifyStaff({
+        notification_type: 'sales',
+        message: 'Customer at kiosk requested to speak with a sales consultant',
+        vehicle_stock: customerData?.selectedVehicle?.stockNumber
+      });
+      
+      // Add a message to the chat confirming the request
+      const confirmMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: '✅ I\'ve notified our sales team that you\'d like to speak with someone. A sales consultant will be with you shortly! In the meantime, feel free to continue browsing or ask me any questions.',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, confirmMessage]);
+      
+      // Speak the confirmation if audio is enabled
+      if (audioEnabled && ttsAvailable) {
+        speakText(confirmMessage.content);
+      }
+    } catch (error) {
+      console.error('Failed to notify staff:', error);
+      // Still show a message even if notification fails
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'I\'m having trouble reaching our team right now. Please speak with any of our associates on the showroom floor, or I can continue helping you here!',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
+  };
+
   // Toggle audio
   const toggleAudio = () => {
     if (audioEnabled) {
@@ -367,6 +403,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         isListening={isListening}
         isLoading={isLoading}
         onStartOver={handleStartOver}
+        onRequestConsultant={handleRequestConsultant}
       />
 
       {/* Animations */}
