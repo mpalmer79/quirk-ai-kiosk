@@ -26,7 +26,7 @@ const createMockVehicle = (overrides = {}) => ({
   price: 52000,
   salePrice: 52000,
   sale_price: 52000,
-  msrp: 54000,
+  msrp: 54000,  // Component now shows MSRP first
   mileage: 0,
   engine: '5.3L V8',
   transmission: 'Automatic',
@@ -75,7 +75,7 @@ describe('VehicleCard Component', () => {
 
     test('renders formatted price', () => {
       renderVehicleCard();
-      expect(screen.getByText('$52,000')).toBeInTheDocument();
+      expect(screen.getByText('$54,000')).toBeInTheDocument();  // Shows MSRP first
     });
 
     test('renders status badge', () => {
@@ -175,23 +175,23 @@ describe('VehicleCard Component', () => {
   describe('Price Formatting', () => {
     test('formats price with dollar sign and commas', () => {
       renderVehicleCard();
-      expect(screen.getByText('$52,000')).toBeInTheDocument();
+      expect(screen.getByText('$54,000')).toBeInTheDocument();  // Shows MSRP first
     });
 
     test('formats large prices correctly', () => {
-      const vehicle = createMockVehicle({ price: 125999 });
+      const vehicle = createMockVehicle({ msrp: 125999, price: 120000 });
       renderVehicleCard(vehicle);
-      expect(screen.getByText('$125,999')).toBeInTheDocument();
+      expect(screen.getByText('$125,999')).toBeInTheDocument();  // Shows MSRP first
     });
 
     test('handles zero price', () => {
-      const vehicle = createMockVehicle({ price: 0, salePrice: 0, sale_price: 0 });
+      const vehicle = createMockVehicle({ msrp: 0, price: 0, salePrice: 0, sale_price: 0 });
       renderVehicleCard(vehicle);
       expect(screen.getByText('$0')).toBeInTheDocument();
     });
 
-    test('uses salePrice if price not available', () => {
-      const vehicle = createMockVehicle({ price: undefined, salePrice: 48000 });
+    test('uses salePrice if msrp not available', () => {
+      const vehicle = createMockVehicle({ msrp: undefined, price: undefined, salePrice: 48000 });
       renderVehicleCard(vehicle);
       expect(screen.getByText('$48,000')).toBeInTheDocument();
     });
@@ -249,6 +249,7 @@ describe('VehicleCard Component', () => {
         body_style: 'Coupe',
         exteriorColor: 'Torch Red',
         exterior_color: 'Torch Red',
+        msrp: 85000,
         price: 85000,
       });
       (getVehicleImageUrl as jest.Mock).mockReturnValue(null);
