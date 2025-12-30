@@ -1281,6 +1281,86 @@ async def intelligent_chat(
 
 
 # =============================================================================
+# NOTIFY STAFF ENDPOINT
+# =============================================================================
+
+class NotifyStaffRequest(BaseModel):
+    """Request to notify staff"""
+    notification_type: str = Field(default="sales", description="Type: sales, appraisal, or finance")
+    message: str = Field(description="Message describing what customer needs")
+    vehicle_stock: Optional[str] = Field(default=None, description="Stock number if applicable")
+
+
+@router.post("/notify-staff")
+async def notify_staff_endpoint(
+    request: NotifyStaffRequest,
+    http_request: Request
+):
+    """
+    Notify staff when customer requests assistance.
+    Sends notifications via Slack, SMS, and/or Email.
+    """
+    # Get session ID from header
+    session_id = http_request.headers.get("X-Session-ID", "unknown")
+    
+    # Get state manager to retrieve customer info
+    state_manager = get_state_manager()
+    state = state_manager.get_state(session_id)
+    
+    # Build additional context from state
+    additional_context = {}
+    customer_name = None
+    
+    if state:
+        customer_name = state.customer_name
+        if state.budget_max:
+            additional_context["budget"] = state.budget_max
+        if state.trade_model:
+            additional_context["trade_in"] = f"{state.trade_year or ''} {state.trade_make or ''} {state.trade_model}".strip()
+        if state.vehicle_preferences:
+            additional_context["preferences"] = state.vehicle_preferences
+    
+    # Send notification
+    try:
+        notification_service = get_notification_service()
+        result = await notification_service.notify_staff(
+            notification_type=request.notification_type,
+            message=request.message,
+            session_id=session_id,
+            vehicle_stock=request.vehicle_stock,
+            customer_name=customer_name,
+            additional_context=additional_context
+        )
+        
+        # Update state if we have one
+        if state:
+            state.staff_notified = True
+            state.staff_notification_type = request.notification_type
+            if request.notification_type == "appraisal":
+                state.appraisal_requested = True
+            elif request.notification_type == "sales":
+                state.test_drive_requested = True
+            state_manager.save_state(state)
+        
+        return {
+            "success": True,
+            "slack_sent": result.get("slack_sent", False),
+            "sms_sent": result.get("sms_sent", False),
+            "email_sent": result.get("email_sent", False),
+            "errors": result.get("errors", [])
+        }
+    except Exception as e:
+        logger.error(f"Failed to send staff notification: {e}")
+        return {
+            "success": False,
+            "slack_sent": False,
+            "sms_sent": False,
+            "email_sent": False,
+            "errors": [str(e)]
+        }
+
+
+# =============================================================================
 # ADDITIONAL ENDPOINTS
 # =============================================================================
 
