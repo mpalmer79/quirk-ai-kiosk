@@ -35,11 +35,13 @@ jest.mock('../components/Stocklookup', () => {
 });
 
 jest.mock('../components/ModelBudgetSelector', () => {
-  return function MockModelBudgetSelector({ navigateTo }: any) {
+  return function MockModelBudgetSelector({ navigateTo, subRoute }: any) {
     return (
       <div data-testid="model-budget-screen">
         <span>Model Budget Screen</span>
+        <span data-testid="sub-route">{subRoute || 'category'}</span>
         <button onClick={() => navigateTo('inventory')}>See Results</button>
+        <button onClick={() => navigateTo('modelBudget/model/trucks')}>Select Trucks</button>
       </div>
     );
   };
@@ -199,7 +201,7 @@ const renderKioskApp = () => {
 };
 
 // Helper to simulate browser back button
-const simulatePopState = (state: { screen: string; index: number } | null) => {
+const simulatePopState = (state: { screen: string; subRoute?: string; fullRoute?: string; index: number } | null) => {
   const event = new PopStateEvent('popstate', { state });
   window.dispatchEvent(event);
 };
@@ -263,7 +265,7 @@ describe('KioskApp Component', () => {
     test('sets initial browser history state', () => {
       renderKioskApp();
       expect(window.history.replaceState).toHaveBeenCalledWith(
-        { screen: 'welcome', index: 0 },
+        expect.objectContaining({ screen: 'welcome', index: 0 }),
         '',
         '#welcome'
       );
@@ -304,7 +306,7 @@ describe('KioskApp Component', () => {
       });
     });
 
-    test('navigates to Model Budget screen', async () => {
+    test('navigates to Model Budget screen with default subRoute', async () => {
       renderKioskApp();
       
       fireEvent.click(screen.getByText('Go to Model Budget'));
@@ -315,6 +317,27 @@ describe('KioskApp Component', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('model-budget-screen')).toBeInTheDocument();
+        expect(screen.getByTestId('sub-route')).toHaveTextContent('category');
+      });
+    });
+
+    test('navigates to Model Budget with sub-route', async () => {
+      renderKioskApp();
+      
+      // First go to Model Budget
+      fireEvent.click(screen.getByText('Go to Model Budget'));
+      act(() => { jest.advanceTimersByTime(200); });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('model-budget-screen')).toBeInTheDocument();
+      });
+
+      // Navigate to sub-route
+      fireEvent.click(screen.getByText('Select Trucks'));
+      act(() => { jest.advanceTimersByTime(200); });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sub-route')).toHaveTextContent('model/trucks');
       });
     });
 
@@ -555,7 +578,7 @@ describe('KioskApp Component', () => {
 
       // Simulate browser back button
       act(() => {
-        simulatePopState({ screen: 'welcome', index: 0 });
+        simulatePopState({ screen: 'welcome', fullRoute: 'welcome', index: 0 });
         jest.advanceTimersByTime(200);
       });
 
@@ -594,7 +617,7 @@ describe('KioskApp Component', () => {
 
       // Go back via popstate
       act(() => {
-        simulatePopState({ screen: 'welcome', index: 0 });
+        simulatePopState({ screen: 'welcome', fullRoute: 'welcome', index: 0 });
         jest.advanceTimersByTime(200);
       });
 
