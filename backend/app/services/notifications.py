@@ -30,7 +30,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger("quirk_kiosk.notifications")
 
@@ -176,7 +176,7 @@ class NotificationService:
             "customer_name": customer_name or "Guest Customer",
             "dashboard_url": dashboard_url,
             "additional_context": additional_context or {},
-            "timestamp": datetime.now().strftime("%I:%M %p")
+            "timestamp": datetime.now(timezone(timedelta(hours=-5))).strftime("%I:%M %p EST")
         }
     
     async def _send_slack(self, notification_type: str, notification: Dict[str, Any]) -> Dict[str, Any]:
