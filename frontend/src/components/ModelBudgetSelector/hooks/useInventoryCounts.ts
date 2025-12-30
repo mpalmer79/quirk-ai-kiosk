@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../api';
 import { BASE_CATEGORIES, modelMatches } from '../../../types/vehicleCategories';
-import type { Vehicle, VehicleCategories } from '../../../types';
+import type { Vehicle, VehicleCategories, AvailableModel } from '../../../types';
 
 // Inventory count by model name
 type InventoryByModel = Record<string, number>;
@@ -65,17 +65,18 @@ export const useInventoryCounts = (): UseInventoryCountsResult => {
           
           // Only include categories with inventory (or all if no inventory data)
           if (categoryCount > 0 || Object.keys(counts).length === 0) {
+            const models: AvailableModel[] = category.modelNames.map((modelName) => ({
+              name: modelName,
+              count: counts[modelName] || 0,
+              image: `/images/models/${modelName.toLowerCase().replace(/\s+/g, '-')}.webp`,
+              cabOptions: category.cabOptions?.[modelName],
+            }));
+
             categories[key] = {
               name: category.name,
               icon: category.icon,
               image: category.image,
-              count: categoryCount,
-              models: category.modelNames.map((modelName) => ({
-                name: modelName,
-                image: `/images/models/${modelName.toLowerCase().replace(/\s+/g, '-')}.webp`,
-                cabOptions: category.cabOptions?.[modelName] || null,
-                towingCapacity: category.towingCapacity?.[modelName] || null,
-              })),
+              models,
             };
           }
         });
@@ -90,17 +91,18 @@ export const useInventoryCounts = (): UseInventoryCountsResult => {
         // Still build categories from BASE_CATEGORIES even on error
         const categories: VehicleCategories = {};
         Object.entries(BASE_CATEGORIES).forEach(([key, category]) => {
+          const models: AvailableModel[] = category.modelNames.map((modelName) => ({
+            name: modelName,
+            count: 0,
+            image: `/images/models/${modelName.toLowerCase().replace(/\s+/g, '-')}.webp`,
+            cabOptions: category.cabOptions?.[modelName],
+          }));
+
           categories[key] = {
             name: category.name,
             icon: category.icon,
             image: category.image,
-            count: 0,
-            models: category.modelNames.map((modelName) => ({
-              name: modelName,
-              image: `/images/models/${modelName.toLowerCase().replace(/\s+/g, '-')}.webp`,
-              cabOptions: category.cabOptions?.[modelName] || null,
-              towingCapacity: category.towingCapacity?.[modelName] || null,
-            })),
+            models,
           };
         });
         setVehicleCategories(categories);
