@@ -9,6 +9,7 @@ interface ChatInputProps {
   isListening: boolean;
   isLoading: boolean;
   onStartOver: () => void;
+  onRequestConsultant?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -19,6 +20,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isListening,
   isLoading,
   onStartOver,
+  onRequestConsultant,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -76,8 +78,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </button>
       </div>
       
-      {/* Start Over Button */}
-      <div style={styles.startOverContainer}>
+      {/* Transcript Notice - moved under chat input */}
+      <div style={{
+        textAlign: 'center' as const,
+        padding: '8px 0',
+        fontSize: '12px',
+        color: '#1a1a2e',
+        fontStyle: 'italic'
+      }}>
+        Transcript available upon request
+      </div>
+      
+      {/* Buttons Row */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '8px 0 16px 0'
+      }}>
+        {/* Start Over Button */}
         <button style={styles.startOverButton} onClick={onStartOver}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -85,17 +105,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </svg>
           Start Over
         </button>
-      </div>
-      
-      {/* Transcript Notice */}
-      <div style={{
-        textAlign: 'center' as const,
-        padding: '8px 0 16px 0',
-        fontSize: '12px',
-        color: '#6b7280',
-        fontStyle: 'italic'
-      }}>
-        Transcript available upon request
+        
+        {/* Speak with Sales Consultant Button */}
+        {onRequestConsultant && (
+          <button
+            onClick={onRequestConsultant}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              backgroundColor: '#0077b6',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#005f8a'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#0077b6'}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            Speak with a sales consultant
+          </button>
+        )}
       </div>
     </>
   );
