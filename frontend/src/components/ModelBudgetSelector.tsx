@@ -317,66 +317,68 @@ const ModelBudgetSelector: React.FC<KioskComponentProps> = ({
         <h1 style={styles.stepTitle}>What type of vehicle are you looking for?</h1>
         <p style={styles.stepSubtitle}>Select a category to get started</p>
       </div>
-      <div style={styles.categoryGrid}>
-        {Object.entries(VEHICLE_CATEGORIES).map(([key, category]) => (
-          <button key={key} style={styles.categoryCard} onClick={() => handleCategorySelect(key)}>
-            {/* Image container with fallback to emoji */}
-            {category.image ? (
-              <div style={styles.categoryImageContainer as React.CSSProperties}>
-                <img 
-                  src={category.image} 
-                  alt={category.name}
-                  style={styles.categoryImage as React.CSSProperties}
-                  onError={(e) => {
-                    // Hide broken image, show fallback
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    const parent = (e.target as HTMLImageElement).parentElement;
-                    if (parent) {
-                      const fallback = parent.querySelector('[data-fallback]') as HTMLElement;
-                      if (fallback) fallback.style.display = 'flex';
-                    }
-                  }}
-                />
-                <div 
-                  data-fallback
-                  style={{ 
-                    ...styles.categoryImagePlaceholder as React.CSSProperties, 
-                    display: 'none',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                  }}
-                >
+      <div style={styles.categorySelectionCard}>
+        <div style={styles.categoryGrid}>
+          {Object.entries(VEHICLE_CATEGORIES).map(([key, category]) => (
+            <button key={key} style={styles.categoryCard} onClick={() => handleCategorySelect(key)}>
+              {/* Image container with fallback to emoji */}
+              {category.image ? (
+                <div style={styles.categoryImageContainer as React.CSSProperties}>
+                  <img 
+                    src={category.image} 
+                    alt={category.name}
+                    style={styles.categoryImage as React.CSSProperties}
+                    onError={(e) => {
+                      // Hide broken image, show fallback
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const parent = (e.target as HTMLImageElement).parentElement;
+                      if (parent) {
+                        const fallback = parent.querySelector('[data-fallback]') as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }
+                    }}
+                  />
+                  <div 
+                    data-fallback
+                    style={{ 
+                      ...styles.categoryImagePlaceholder as React.CSSProperties, 
+                      display: 'none',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                    }}
+                  >
+                    <span style={styles.categoryFallbackIcon as React.CSSProperties}>{category.icon}</span>
+                  </div>
+                  <div style={styles.categoryImageOverlay as React.CSSProperties} />
+                </div>
+              ) : (
+                <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
                   <span style={styles.categoryFallbackIcon as React.CSSProperties}>{category.icon}</span>
                 </div>
-                <div style={styles.categoryImageOverlay as React.CSSProperties} />
+              )}
+              {/* Text content below image */}
+              <div style={styles.categoryContent as React.CSSProperties}>
+                <div style={styles.categoryName}>{category.name}</div>
+                <div style={styles.categoryCount}>{category.models.length} models</div>
               </div>
-            ) : (
-              <div style={styles.categoryImagePlaceholder as React.CSSProperties}>
-                <span style={styles.categoryFallbackIcon as React.CSSProperties}>{category.icon}</span>
-              </div>
-            )}
-            {/* Text content below image */}
-            <div style={styles.categoryContent as React.CSSProperties}>
-              <div style={styles.categoryName}>{category.name}</div>
-              <div style={styles.categoryCount}>{category.models.length} models</div>
-            </div>
-          </button>
-        ))}
-      </div>
-      
-      {resetJourney && (
-        <div style={styles.startOverContainer}>
-          <button style={styles.startOverButton} onClick={resetJourney}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-            </svg>
-            Start Over
-          </button>
+            </button>
+          ))}
         </div>
-      )}
+        
+        {resetJourney && (
+          <div style={styles.startOverContainer}>
+            <button style={styles.startOverButton} onClick={resetJourney}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+              </svg>
+              Start Over
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 
