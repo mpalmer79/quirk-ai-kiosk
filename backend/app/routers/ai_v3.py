@@ -70,7 +70,7 @@ logger = logging.getLogger("quirk_ai.intelligent")
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 PROMPT_VERSION = "3.7.0"  # Added Digital Worksheet tool
-MODEL_NAME = "claude-sonnet-4-20241022"
+MODEL_NAME = "claude-sonnet-3-5-20241022"  # Current stable Sonnet 3.5
 MAX_CONTEXT_TOKENS = 4000
 
 # Retry configuration
