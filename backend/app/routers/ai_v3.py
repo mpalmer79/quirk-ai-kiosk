@@ -356,6 +356,58 @@ TOOLS = [
             },
             "required": ["phone_number"]
         }
+    },
+    {
+        "name": "check_vehicle_affordability",
+        "description": """Check if a customer can afford a SPECIFIC vehicle they're asking about.
+
+USE THIS TOOL WHEN customer asks:
+- "Can I afford the [vehicle/trim]?" (e.g., "Can I afford the 3LZ?")
+- "Is the [vehicle] in my budget?"
+- "What would my payment be on that one?"
+- References a vehicle by trim (3LZ, 1LT, Z71, RST, High Country) + gives budget info
+
+CRITICAL: When customer references a vehicle from the conversation (like "the 3LZ" or "that Corvette"), 
+you MUST identify the correct stock number from the conversation history and use it here.
+
+This calculates their max affordable price AND compares to the specific vehicle's price.
+Returns a clear YES/NO answer with payment details.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "stock_number": {
+                    "type": "string",
+                    "description": "Stock number of the vehicle to check (e.g., M39196). REQUIRED when customer references a specific vehicle from conversation."
+                },
+                "vehicle_price": {
+                    "type": "number",
+                    "description": "Price of the vehicle if stock number is unknown."
+                },
+                "vehicle_description": {
+                    "type": "string",
+                    "description": "Description of the vehicle (e.g., '2025 Corvette 3LZ') for the response."
+                },
+                "down_payment": {
+                    "type": "number",
+                    "description": "Customer's down payment amount in dollars"
+                },
+                "monthly_payment": {
+                    "type": "number",
+                    "description": "Customer's desired maximum monthly payment in dollars"
+                },
+                "apr": {
+                    "type": "number",
+                    "description": "Annual percentage rate (default 7.0)",
+                    "default": 7.0
+                },
+                "term_months": {
+                    "type": "integer",
+                    "description": "Loan term in months (default 84)",
+                    "default": 84
+                }
+            },
+            "required": ["down_payment", "monthly_payment"]
+        }
     }
 ]
 
@@ -450,20 +502,45 @@ SEARCH TIPS:
 
 ⚠️ NEVER GUESS ON SPECIFICATIONS - If you're not 100% certain, SEARCH FIRST then answer confidently!
 
-💰 BUDGET QUALIFICATION (MANDATORY!):
+💰 BUDGET & AFFORDABILITY CHECKS (MANDATORY!):
 
-SCENARIO A - Customer gives DOWN PAYMENT + MONTHLY PAYMENT:
-⚠️ STOP! You MUST use calculate_budget tool FIRST:
+SCENARIO A - Customer asks "CAN I AFFORD [specific vehicle]?":
+⚠️ This is the HIGHEST PRIORITY scenario! STOP and think:
+1. What vehicle are they asking about? Look at conversation history!
+   - "Can I afford the 3LZ?" → Find the 3LZ vehicle you discussed (e.g., Corvette 3LZ Stock #M39196)
+   - "Is that Tahoe in my budget?" → The Tahoe you showed them earlier
+   - "What about the red one?" → The red vehicle from recent discussion
+2. Call check_vehicle_affordability with:
+   - stock_number: The vehicle's stock number from conversation
+   - down_payment: Amount they mentioned
+   - monthly_payment: Amount they mentioned
+3. Give a DIRECT YES/NO answer based on the result
+4. If NO, explain the gap and offer alternatives within budget
+
+EXAMPLE - CORRECT FLOW:
+Customer earlier saw: 2025 Corvette 3LZ - Stock #M39196 - $130,575
+Customer asks: "I have $20,000 to put down and want to be under $1000 for my monthly payment. Can I afford the 3LZ?"
+
+STEP 1: Recognize "3LZ" = the Corvette 3LZ (Stock #M39196, $130,575) from conversation
+STEP 2: Call check_vehicle_affordability(stock_number="M39196", down_payment=20000, monthly_payment=1000)
+STEP 3: Tool returns: Max affordable ~$85,765, vehicle costs $130,575, OVER BUDGET by ~$44,810
+STEP 4: Respond honestly: "Let me check that for you... Unfortunately, with $20,000 down and $1,000/month, your maximum budget is around $85,765. The 3LZ at $130,575 is about $45,000 over that. But here's what we CAN do..."
+
+WRONG: Search for random vehicles when customer asks about a SPECIFIC one ❌
+RIGHT: Check the SPECIFIC vehicle's affordability, then answer directly ✅
+
+SCENARIO B - Customer gives DOWN PAYMENT + MONTHLY PAYMENT (no specific vehicle):
+⚠️ Use calculate_budget tool FIRST:
 1. Call calculate_budget(down_payment=X, monthly_payment=Y)
 2. Wait for result showing max vehicle price
 3. Call search_inventory with that max_price
 4. Show ONLY vehicles under budget
 
-Example: "$10,000 down, $600/month"
+Example: "$10,000 down, $600/month - what can I get?"
 - FIRST: calculate_budget(down_payment=10000, monthly_payment=600) → ~$49,750 max
 - THEN: search_inventory(query="...", max_price=49750)
 
-SCENARIO B - Customer states DIRECT BUDGET ("under $50K", "below $40,000"):
+SCENARIO C - Customer states DIRECT BUDGET ("under $50K", "below $40,000"):
 ⚠️ ALWAYS extract and pass max_price to search_inventory:
 - "under $50K" → search_inventory(query="...", max_price=50000)
 - "below $40,000" → search_inventory(query="...", max_price=40000)
@@ -815,6 +892,117 @@ async def execute_tool(
 
 IMPORTANT: Use max_price of {int(max_vehicle_price)} when searching inventory.
 DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may add tax."""
+        
+        return (result, vehicles_to_show, staff_notified)
+    
+    elif tool_name == "check_vehicle_affordability":
+        # Get budget parameters
+        down_payment = tool_input.get("down_payment", 0)
+        monthly_payment = tool_input.get("monthly_payment", 0)
+        apr = tool_input.get("apr", 7.0)
+        term_months = tool_input.get("term_months", 84)
+        
+        # Calculate max affordable price using same formula as calculate_budget
+        monthly_rate = apr / 100 / 12
+        if monthly_rate > 0:
+            pv_factor = (1 - (1 + monthly_rate) ** -term_months) / monthly_rate
+            financed_amount = monthly_payment * pv_factor
+        else:
+            financed_amount = monthly_payment * term_months
+            pv_factor = term_months  # Fallback for 0% APR
+        
+        max_affordable = down_payment + financed_amount
+        
+        # Get vehicle price - either from stock number or direct input
+        vehicle_price = tool_input.get("vehicle_price", 0)
+        stock_number = tool_input.get("stock_number")
+        vehicle_desc = tool_input.get("vehicle_description", "this vehicle")
+        
+        if stock_number and not vehicle_price:
+            vehicle = retriever.get_vehicle_by_stock(stock_number)
+            if vehicle:
+                vehicle_price = vehicle.get('MSRP') or vehicle.get('msrp') or vehicle.get('price', 0)
+                year = vehicle.get('Year') or vehicle.get('year', '')
+                model = vehicle.get('Model') or vehicle.get('model', '')
+                trim = vehicle.get('Trim') or vehicle.get('trim', '')
+                color = vehicle.get('exteriorColor') or vehicle.get('Exterior Color', '')
+                vehicle_desc = f"{year} {model} {trim} ({color})".strip()
+                
+                # Add vehicle to show list
+                vehicles_to_show = [ScoredVehicle(
+                    vehicle=vehicle,
+                    score=100,
+                    match_reasons=["Affordability check requested"],
+                    preference_matches={}
+                )]
+            else:
+                logger.warning(f"Vehicle not found for affordability check: {stock_number}")
+        
+        # Calculate the difference
+        difference = max_affordable - vehicle_price
+        can_afford = difference >= 0
+        
+        # Update state with budget info
+        state.budget_max = max_affordable
+        state.down_payment = down_payment
+        state.monthly_payment_target = monthly_payment
+        
+        # Calculate actual monthly payment for this vehicle
+        actual_finance_amount = vehicle_price - down_payment
+        if monthly_rate > 0 and pv_factor > 0:
+            actual_monthly = actual_finance_amount / pv_factor
+        else:
+            actual_monthly = actual_finance_amount / term_months
+        
+        if can_afford:
+            result = f"""AFFORDABILITY CHECK: ✅ YES - WITHIN BUDGET!
+
+Vehicle: {vehicle_desc}
+Stock #: {stock_number or 'N/A'}
+Vehicle Price: ${vehicle_price:,.0f}
+
+Customer's Budget:
+- Down Payment: ${down_payment:,.0f}
+- Target Monthly Payment: ${monthly_payment:,.0f}/month
+- Max Affordable Price: ${max_affordable:,.0f}
+
+RESULT: ✅ Customer CAN afford this vehicle!
+- Budget headroom: ${difference:,.0f} under their max
+- Actual monthly payment would be: ~${actual_monthly:,.0f}/month (under their ${monthly_payment:,.0f} target)
+
+RESPONSE GUIDANCE: Confirm they can afford it, mention the actual payment is even lower than their target, and offer to proceed with next steps (test drive, financing details, etc.)
+
+DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may add tax."""
+        else:
+            # Calculate what would be needed to afford this vehicle
+            needed_down = vehicle_price - financed_amount
+            needed_monthly = actual_finance_amount / pv_factor if pv_factor > 0 else actual_finance_amount / term_months
+            
+            result = f"""AFFORDABILITY CHECK: ❌ OVER BUDGET
+
+Vehicle: {vehicle_desc}
+Stock #: {stock_number or 'N/A'}
+Vehicle Price: ${vehicle_price:,.0f}
+
+Customer's Budget:
+- Down Payment: ${down_payment:,.0f}
+- Target Monthly Payment: ${monthly_payment:,.0f}/month
+- Max Affordable Price: ${max_affordable:,.0f}
+
+RESULT: ❌ This vehicle is ${abs(difference):,.0f} OVER their budget.
+- To afford this vehicle, they would need EITHER:
+  • Increase down payment to ~${needed_down:,.0f} (add ${needed_down - down_payment:,.0f})
+  • Increase monthly payment to ~${needed_monthly:,.0f}/month
+
+RESPONSE GUIDANCE:
+1. Be honest but empathetic - don't make them feel bad
+2. Explain the gap clearly (${abs(difference):,.0f} over budget)
+3. Offer OPTIONS:
+   - Can they stretch the down payment or monthly?
+   - Show similar vehicles WITHIN their ${max_affordable:,.0f} budget
+4. Use search_inventory(max_price={int(max_affordable)}) to find alternatives
+
+DO NOT just show random vehicles without addressing their question about THIS specific vehicle first."""
         
         return (result, vehicles_to_show, staff_notified)
     
