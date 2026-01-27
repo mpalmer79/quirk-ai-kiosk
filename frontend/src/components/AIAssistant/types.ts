@@ -7,6 +7,7 @@ export interface Message {
   vehicles?: Vehicle[];
   showDealerInfo?: boolean;
   timestamp: Date;
+  worksheetId?: string;
 }
 
 export interface ExtractedData {
