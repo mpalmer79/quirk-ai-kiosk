@@ -166,7 +166,7 @@ jest.mock('../components/VehicleComparison', () => {
 });
 
 // Mock the API module - CRITICAL: Must include all functions used by KioskApp
-jest.mock('../components/api', () => ({
+jest.mock('../api/api', () => ({
   __esModule: true,
   default: {
     getInventory: jest.fn().mockResolvedValue([]),
