@@ -79,19 +79,6 @@ interface DigitalWorksheetProps {
 
 const DEFAULT_API_URL = process.env.REACT_APP_API_URL || 'https://quirk-backend-production.up.railway.app';
 
-// Quirk brand colors
-const COLORS = {
-  primary: '#1a1a2e',      // Dark blue
-  accent: '#e94560',       // Quirk red
-  success: '#00bf63',      // Green
-  warning: '#ffc107',      // Yellow
-  background: '#f8f9fa',
-  cardBg: '#ffffff',
-  textPrimary: '#1a1a2e',
-  textSecondary: '#6c757d',
-  border: '#dee2e6',
-};
-
 // =============================================================================
 // COMPONENT
 // =============================================================================
@@ -262,15 +249,6 @@ const DigitalWorksheet: React.FC<DigitalWorksheetProps> = ({
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatCurrencyWithCents = (amount: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
     }).format(amount);
   };
 
