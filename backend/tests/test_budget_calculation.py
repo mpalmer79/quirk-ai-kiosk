@@ -441,5 +441,221 @@ class TestInventoryFiltering:
         assert not any(v["model"] == "Corvette" for v in affordable)
 
 
+# =============================================================================
+# CHECK VEHICLE AFFORDABILITY TESTS (New Tool)
+# =============================================================================
+
+def check_vehicle_affordability(
+    vehicle_price: float,
+    down_payment: float,
+    monthly_payment: float,
+    apr: float = 7.0,
+    term_months: int = 84
+) -> dict:
+    """
+    Check if a customer can afford a SPECIFIC vehicle.
+    
+    This is the logic behind the new check_vehicle_affordability tool.
+    Returns whether they can afford it and relevant details.
+    """
+    # Calculate max affordable price (same as calculate_max_vehicle_price)
+    monthly_rate = (apr / 100) / 12
+    
+    if monthly_rate > 0:
+        pv_factor = (1 - (1 + monthly_rate) ** -term_months) / monthly_rate
+        financed_amount = monthly_payment * pv_factor
+    else:
+        financed_amount = monthly_payment * term_months
+        pv_factor = term_months
+    
+    max_affordable = down_payment + financed_amount
+    
+    # Calculate actual monthly payment for this vehicle
+    actual_finance = vehicle_price - down_payment
+    if monthly_rate > 0 and pv_factor > 0:
+        actual_monthly = actual_finance / pv_factor
+    else:
+        actual_monthly = actual_finance / term_months
+    
+    # Determine affordability
+    difference = max_affordable - vehicle_price
+    can_afford = difference >= 0
+    
+    return {
+        "can_afford": can_afford,
+        "vehicle_price": vehicle_price,
+        "max_affordable": round(max_affordable, 2),
+        "difference": round(difference, 2),
+        "actual_monthly_payment": round(actual_monthly, 2),
+        "target_monthly_payment": monthly_payment,
+        "down_payment": down_payment,
+    }
+
+
+class TestCheckVehicleAffordability:
+    """Tests for the check_vehicle_affordability tool logic"""
+    
+    def test_corvette_3lz_affordability_over_budget(self):
+        """
+        Test case from the bug report:
+        Customer: $20,000 down, $1,000/month
+        Vehicle: 2025 Corvette 3LZ at $130,575
+        
+        Expected: NOT affordable (over budget by ~$44,810)
+        """
+        result = check_vehicle_affordability(
+            vehicle_price=130575,
+            down_payment=20000,
+            monthly_payment=1000,
+            apr=7.0,
+            term_months=84
+        )
+        
+        # Should NOT be affordable
+        assert result["can_afford"] is False
+        
+        # Max affordable should be around $85,765
+        assert 85000 < result["max_affordable"] < 86500
+        
+        # Should be over budget by about $44,810
+        assert result["difference"] < 0
+        assert abs(result["difference"]) > 44000
+        assert abs(result["difference"]) < 46000
+        
+        # Actual monthly would be much higher than target
+        assert result["actual_monthly_payment"] > result["target_monthly_payment"]
+    
+    def test_corvette_1lt_affordability_within_budget(self):
+        """
+        Same customer budget but checking the 1LT at $77,865
+        Expected: AFFORDABLE
+        """
+        result = check_vehicle_affordability(
+            vehicle_price=77865,
+            down_payment=20000,
+            monthly_payment=1000,
+            apr=7.0,
+            term_months=84
+        )
+        
+        # Should be affordable
+        assert result["can_afford"] is True
+        
+        # Should have headroom
+        assert result["difference"] > 0
+        
+        # Actual monthly should be under target
+        assert result["actual_monthly_payment"] < result["target_monthly_payment"]
+    
+    def test_affordable_vehicle(self):
+        """Test a vehicle that IS affordable"""
+        # $10,000 down, $600/month → max ~$49,470
+        # Equinox at $35,000 should be affordable
+        result = check_vehicle_affordability(
+            vehicle_price=35000,
+            down_payment=10000,
+            monthly_payment=600,
+            apr=7.0,
+            term_months=84
+        )
+        
+        assert result["can_afford"] is True
+        assert result["difference"] > 0  # Has headroom
+        assert result["actual_monthly_payment"] < result["target_monthly_payment"]
+    
+    def test_exactly_at_budget(self):
+        """Test vehicle price exactly at max affordable"""
+        # Calculate max first
+        budget = calculate_max_vehicle_price(5000, 500, 7.0, 84)
+        max_price = budget["max_vehicle_price"]
+        
+        result = check_vehicle_affordability(
+            vehicle_price=max_price,
+            down_payment=5000,
+            monthly_payment=500,
+            apr=7.0,
+            term_months=84
+        )
+        
+        # Should be exactly affordable (or just barely)
+        assert result["can_afford"] is True
+        assert abs(result["difference"]) < 1  # Essentially zero
+    
+    def test_slightly_over_budget(self):
+        """Test vehicle just $1000 over budget"""
+        budget = calculate_max_vehicle_price(5000, 500, 7.0, 84)
+        over_budget_price = budget["max_vehicle_price"] + 1000
+        
+        result = check_vehicle_affordability(
+            vehicle_price=over_budget_price,
+            down_payment=5000,
+            monthly_payment=500,
+            apr=7.0,
+            term_months=84
+        )
+        
+        assert result["can_afford"] is False
+        assert -1100 < result["difference"] < -900
+    
+    def test_1lt_vs_3lz_comparison(self):
+        """Compare affordability of 1LT ($77,865) vs 3LZ ($130,575) Corvette"""
+        down = 20000
+        monthly = 1000
+        
+        # 1LT at $77,865
+        result_1lt = check_vehicle_affordability(
+            vehicle_price=77865,
+            down_payment=down,
+            monthly_payment=monthly
+        )
+        
+        # 3LZ at $130,575
+        result_3lz = check_vehicle_affordability(
+            vehicle_price=130575,
+            down_payment=down,
+            monthly_payment=monthly
+        )
+        
+        # 1LT should be affordable, 3LZ should not
+        assert result_1lt["can_afford"] is True
+        assert result_3lz["can_afford"] is False
+        
+        # Both should have same max_affordable (same budget)
+        assert result_1lt["max_affordable"] == result_3lz["max_affordable"]
+    
+    def test_what_it_takes_to_afford_corvette_3lz(self):
+        """Calculate what's needed to afford the $130,575 Corvette 3LZ"""
+        vehicle_price = 130575
+        
+        # Option 1: Keep $1000/month, increase down payment
+        # We need to finance less, so need more down
+        budget_1k = calculate_max_vehicle_price(0, 1000, 7.0, 84)
+        max_finance = budget_1k["financed_amount"]  # ~$65,765
+        needed_down = vehicle_price - max_finance  # ~$64,810
+        
+        result_high_down = check_vehicle_affordability(
+            vehicle_price=vehicle_price,
+            down_payment=needed_down,
+            monthly_payment=1000
+        )
+        
+        assert result_high_down["can_afford"] is True
+        
+        # Option 2: Keep $20,000 down, calculate needed monthly
+        # Using reverse calculation
+        financed_needed = vehicle_price - 20000  # $110,575
+        monthly_rate = 0.07 / 12
+        pv_factor = (1 - (1 + monthly_rate) ** -84) / monthly_rate
+        needed_monthly = financed_needed / pv_factor  # ~$1,682
+        
+        result_high_monthly = check_vehicle_affordability(
+            vehicle_price=vehicle_price,
+            down_payment=20000,
+            monthly_payment=needed_monthly
+        )
+        
+        assert result_high_monthly["can_afford"] is True
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
