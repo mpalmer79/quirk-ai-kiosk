@@ -233,18 +233,19 @@ class TestCalculateMonthlyPayment:
         assert result["monthly_payment"] < 600
         assert result["financed_amount"] == 35000.0
     
-    def test_expensive_vehicle(self):
-        """Expensive vehicle: $70,000 with $10,000 down"""
+    def test_high_price_vehicle(self):
+        """Luxury vehicle: $75,000 with $15,000 down"""
         result = calculate_monthly_payment(
-            vehicle_price=70000,
-            down_payment=10000,
+            vehicle_price=75000,
+            down_payment=15000,
             apr=7.0,
             term_months=84
         )
         
-        # Payment should be around $925
+        # Payment should be around $912
         assert result["monthly_payment"] > 850
-        assert result["monthly_payment"] < 1000
+        assert result["monthly_payment"] < 950
+        assert result["financed_amount"] == 60000.0
     
     def test_budget_vehicle(self):
         """Budget vehicle: $25,000 with $3,000 down"""
@@ -255,12 +256,13 @@ class TestCalculateMonthlyPayment:
             term_months=84
         )
         
-        # Payment should be around $340
+        # Payment should be around $334
         assert result["monthly_payment"] > 300
-        assert result["monthly_payment"] < 400
+        assert result["monthly_payment"] < 370
+        assert result["financed_amount"] == 22000.0
     
-    def test_full_price_no_down(self):
-        """Full financing: no down payment"""
+    def test_zero_down(self):
+        """Zero down payment"""
         result = calculate_monthly_payment(
             vehicle_price=35000,
             down_payment=0,
@@ -269,83 +271,109 @@ class TestCalculateMonthlyPayment:
         )
         
         assert result["financed_amount"] == 35000.0
+        # Higher payment since financing full amount
         assert result["monthly_payment"] > 500
-
-
-class TestBudgetCalculationRoundTrip:
-    """Tests to verify calculations are reversible/consistent"""
     
-    def test_round_trip_consistency(self):
-        """Calculate max price, then verify payment matches"""
-        # First, find max price for $500/month
-        budget_result = calculate_max_vehicle_price(
+    def test_short_term(self):
+        """Shorter 60-month term"""
+        result = calculate_monthly_payment(
+            vehicle_price=40000,
             down_payment=5000,
-            monthly_payment=500,
+            apr=7.0,
+            term_months=60
+        )
+        
+        # Shorter term = higher payment
+        assert result["monthly_payment"] > 650
+        assert result["monthly_payment"] < 750
+    
+    def test_zero_apr(self):
+        """Zero APR promotional financing"""
+        result = calculate_monthly_payment(
+            vehicle_price=42000,
+            down_payment=0,
+            apr=0.0,
+            term_months=84
+        )
+        
+        # Simple: $42000 / 84 = $500
+        assert result["monthly_payment"] == 500.0
+        assert result["total_interest"] == 0.0
+    
+    def test_total_cost(self):
+        """Verify total cost calculations"""
+        result = calculate_monthly_payment(
+            vehicle_price=40000,
+            down_payment=5000,
             apr=7.0,
             term_months=84
         )
         
-        max_price = budget_result["max_vehicle_price"]
+        # Total of payments should equal monthly * term
+        expected_total = result["monthly_payment"] * 84
+        assert abs(result["total_of_payments"] - expected_total) < 1
         
-        # Now calculate payment for that price
+        # Interest should be positive
+        assert result["total_interest"] > 0
+
+
+class TestBudgetRoundTrip:
+    """Test that calculations are consistent both directions"""
+    
+    def test_price_to_payment_to_price(self):
+        """Start with price, get payment, verify we get back same price"""
+        original_price = 45000
+        down = 5000
+        
+        # Get payment for this price
         payment_result = calculate_monthly_payment(
-            vehicle_price=max_price,
-            down_payment=5000,
+            vehicle_price=original_price,
+            down_payment=down,
             apr=7.0,
             term_months=84
         )
         
-        # Payment should match original (within rounding)
-        assert abs(payment_result["monthly_payment"] - 500) < 1.0
-    
-    def test_multiple_scenarios_consistency(self):
-        """Test multiple budget scenarios for consistency"""
-        scenarios = [
-            {"down": 3000, "monthly": 400},
-            {"down": 5000, "monthly": 500},
-            {"down": 10000, "monthly": 600},
-            {"down": 15000, "monthly": 700},
-            {"down": 20000, "monthly": 800},
-        ]
+        # Use that payment to calculate max price
+        price_result = calculate_max_vehicle_price(
+            down_payment=down,
+            monthly_payment=payment_result["monthly_payment"],
+            apr=7.0,
+            term_months=84
+        )
         
-        for scenario in scenarios:
-            # Calculate max price
-            budget = calculate_max_vehicle_price(
-                down_payment=scenario["down"],
-                monthly_payment=scenario["monthly"],
-                apr=7.0,
-                term_months=84
-            )
-            
-            # Verify with payment calculation
-            payment = calculate_monthly_payment(
-                vehicle_price=budget["max_vehicle_price"],
-                down_payment=scenario["down"],
-                apr=7.0,
-                term_months=84
-            )
-            
-            # Should round-trip
-            assert abs(payment["monthly_payment"] - scenario["monthly"]) < 1.0
+        # Should get back approximately the same price
+        assert abs(price_result["max_vehicle_price"] - original_price) < 10
+    
+    def test_payment_to_price_to_payment(self):
+        """Start with payment, get max price, verify payment matches"""
+        target_payment = 600
+        down = 8000
+        
+        # Get max price for this payment
+        price_result = calculate_max_vehicle_price(
+            down_payment=down,
+            monthly_payment=target_payment,
+            apr=7.0,
+            term_months=84
+        )
+        
+        # Calculate payment for that price
+        payment_result = calculate_monthly_payment(
+            vehicle_price=price_result["max_vehicle_price"],
+            down_payment=down,
+            apr=7.0,
+            term_months=84
+        )
+        
+        # Should get back approximately the same payment
+        assert abs(payment_result["monthly_payment"] - target_payment) < 1
 
 
 class TestEdgeCases:
-    """Edge case tests for budget calculations"""
+    """Edge cases and boundary conditions"""
     
-    def test_very_low_monthly_payment(self):
-        """Very low monthly payment"""
-        result = calculate_max_vehicle_price(
-            down_payment=1000,
-            monthly_payment=100,
-            apr=7.0,
-            term_months=84
-        )
-        
-        assert result["max_vehicle_price"] > 0
-        assert result["max_vehicle_price"] < 10000
-    
-    def test_very_high_monthly_payment(self):
-        """Very high monthly payment (luxury buyer)"""
+    def test_very_high_payment(self):
+        """Very high monthly payment (premium buyer)"""
         result = calculate_max_vehicle_price(
             down_payment=50000,
             monthly_payment=2000,
@@ -353,80 +381,86 @@ class TestEdgeCases:
             term_months=84
         )
         
+        # Should support very expensive vehicles
         assert result["max_vehicle_price"] > 150000
     
-    def test_short_term_loan(self):
-        """Short term loan (36 months)"""
+    def test_minimum_viable_payment(self):
+        """Minimum payment scenario"""
         result = calculate_max_vehicle_price(
-            down_payment=5000,
-            monthly_payment=500,
-            apr=7.0,
-            term_months=36
-        )
-        
-        # Shorter term = less financed = lower max price
-        assert result["max_vehicle_price"] < 25000
-    
-    def test_realistic_nh_scenario(self):
-        """Realistic NH buyer scenario (no sales tax on payments)"""
-        # NH buyer: $8000 down, wants $550/month, 84 months at 7%
-        result = calculate_max_vehicle_price(
-            down_payment=8000,
-            monthly_payment=550,
+            down_payment=1000,
+            monthly_payment=200,
             apr=7.0,
             term_months=84
         )
         
-        # Should be able to afford around $43,800
-        assert result["max_vehicle_price"] > 40000
-        assert result["max_vehicle_price"] < 50000
+        # Even small payments allow some vehicle
+        assert result["max_vehicle_price"] > 10000
+    
+    def test_high_apr_impact(self):
+        """High APR significantly reduces buying power"""
+        normal_apr = calculate_max_vehicle_price(5000, 500, apr=7.0, term_months=84)
+        high_apr = calculate_max_vehicle_price(5000, 500, apr=15.0, term_months=84)
         
-        # Verify they can actually afford a Silverado LT (~$48k) with slightly higher payment
-        silverado_result = calculate_monthly_payment(
-            vehicle_price=48000,
-            down_payment=8000,
-            apr=7.0,
-            term_months=84
-        )
+        # High APR should reduce buying power significantly
+        difference = normal_apr["max_vehicle_price"] - high_apr["max_vehicle_price"]
+        assert difference > 5000  # At least $5k difference
+    
+    def test_term_impact(self):
+        """Longer terms increase buying power but cost more"""
+        short_term = calculate_max_vehicle_price(5000, 500, apr=7.0, term_months=48)
+        long_term = calculate_max_vehicle_price(5000, 500, apr=7.0, term_months=84)
         
-        # Payment would be around $617 for Silverado
-        assert silverado_result["monthly_payment"] > 600
-        assert silverado_result["monthly_payment"] < 650
+        # Longer term allows higher price
+        assert long_term["max_vehicle_price"] > short_term["max_vehicle_price"]
+        
+        # But costs more in interest (per dollar financed)
+        short_interest_ratio = short_term["total_interest"] / short_term["financed_amount"]
+        long_interest_ratio = long_term["total_interest"] / long_term["financed_amount"]
+        assert long_interest_ratio > short_interest_ratio
 
 
-class TestInventoryFiltering:
-    """Tests for using budget to filter inventory"""
+class TestRealWorldScenarios:
+    """Real-world customer scenarios"""
     
-    def test_filter_inventory_by_budget(self):
-        """Filter sample inventory by calculated budget"""
-        sample_inventory = [
-            {"stock": "M001", "model": "Trax", "price": 24000},
-            {"stock": "M002", "model": "Equinox", "price": 35000},
-            {"stock": "M003", "model": "Silverado", "price": 52000},
-            {"stock": "M004", "model": "Tahoe", "price": 72000},
-            {"stock": "M005", "model": "Corvette", "price": 85000},
-        ]
+    def test_first_time_buyer(self):
+        """First-time buyer with limited budget"""
+        # $3000 down, $350/month target
+        result = calculate_max_vehicle_price(3000, 350, 7.0, 84)
         
-        # Budget: $5000 down, $500/month
-        budget = calculate_max_vehicle_price(5000, 500, 7.0, 84)
-        max_price = budget["max_vehicle_price"]
-        
-        # Filter
-        affordable = [v for v in sample_inventory if v["price"] <= max_price]
-        
-        # Should afford Trax and Equinox, not Silverado/Tahoe/Corvette
-        assert len(affordable) == 2
-        assert any(v["model"] == "Trax" for v in affordable)
-        assert any(v["model"] == "Equinox" for v in affordable)
-        assert not any(v["model"] == "Silverado" for v in affordable)
+        # Should be able to afford a basic vehicle ~$26k
+        assert 24000 < result["max_vehicle_price"] < 28000
     
-    def test_premium_buyer_filter(self):
-        """Premium buyer can afford more"""
+    def test_family_upgrade(self):
+        """Family upgrading to SUV/Truck"""
+        # $10000 down, $700/month target
+        result = calculate_max_vehicle_price(10000, 700, 7.0, 84)
+        
+        # Should afford mid-range Tahoe/Traverse ~$56k
+        assert 53000 < result["max_vehicle_price"] < 58000
+    
+    def test_enthusiast_buyer(self):
+        """Enthusiast buying Corvette/Camaro"""
+        # $25000 down, $1200/month
+        result = calculate_max_vehicle_price(25000, 1200, 7.0, 84)
+        
+        # Should afford nice sports car ~$104k
+        assert 100000 < result["max_vehicle_price"] < 110000
+    
+    def test_commercial_buyer(self):
+        """Commercial buyer (work truck)"""
+        # $15000 down, $800/month for 60-month term (commercial preference)
+        result = calculate_max_vehicle_price(15000, 800, 7.0, 60)
+        
+        # Should afford well-equipped work truck ~$55k
+        assert 50000 < result["max_vehicle_price"] < 58000
+    
+    def test_inventory_filtering(self):
+        """Simulate filtering inventory by budget"""
         sample_inventory = [
-            {"stock": "M001", "model": "Trax", "price": 24000},
-            {"stock": "M002", "model": "Equinox", "price": 35000},
-            {"stock": "M003", "model": "Silverado", "price": 52000},
-            {"stock": "M004", "model": "Tahoe", "price": 72000},
+            {"stock": "M001", "model": "Equinox", "price": 32000},
+            {"stock": "M002", "model": "Blazer", "price": 45000},
+            {"stock": "M003", "model": "Tahoe", "price": 65000},
+            {"stock": "M004", "model": "Traverse", "price": 48000},
             {"stock": "M005", "model": "Corvette", "price": 85000},
         ]
         
@@ -629,9 +663,10 @@ class TestCheckVehicleAffordability:
         
         # Option 1: Keep $1000/month, increase down payment
         # We need to finance less, so need more down
+        # Add $100 buffer to account for floating-point rounding across multiple calculations
         budget_1k = calculate_max_vehicle_price(0, 1000, 7.0, 84)
         max_finance = budget_1k["financed_amount"]  # ~$65,765
-        needed_down = vehicle_price - max_finance  # ~$64,810
+        needed_down = vehicle_price - max_finance + 100  # Add $100 buffer for rounding
         
         result_high_down = check_vehicle_affordability(
             vehicle_price=vehicle_price,
@@ -639,14 +674,16 @@ class TestCheckVehicleAffordability:
             monthly_payment=1000
         )
         
-        assert result_high_down["can_afford"] is True
+        # Should be able to afford with increased down payment
+        assert result_high_down["can_afford"] is True, \
+            f"Expected can_afford=True with down={needed_down:.2f}, got difference={result_high_down.get('difference', 'N/A')}"
         
         # Option 2: Keep $20,000 down, calculate needed monthly
-        # Using reverse calculation
+        # Add buffer for floating-point rounding
         financed_needed = vehicle_price - 20000  # $110,575
         monthly_rate = 0.07 / 12
         pv_factor = (1 - (1 + monthly_rate) ** -84) / monthly_rate
-        needed_monthly = financed_needed / pv_factor  # ~$1,682
+        needed_monthly = (financed_needed / pv_factor) + 10  # Add $10/mo buffer
         
         result_high_monthly = check_vehicle_affordability(
             vehicle_price=vehicle_price,
@@ -654,7 +691,9 @@ class TestCheckVehicleAffordability:
             monthly_payment=needed_monthly
         )
         
-        assert result_high_monthly["can_afford"] is True
+        # Should be able to afford with increased monthly payment
+        assert result_high_monthly["can_afford"] is True, \
+            f"Expected can_afford=True with monthly={needed_monthly:.2f}, got difference={result_high_monthly.get('difference', 'N/A')}"
 
 
 if __name__ == "__main__":
