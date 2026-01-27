@@ -273,6 +273,7 @@ interface AIChatResponse {
   tools_used?: string[];
   staff_notified?: boolean;
   metadata?: Record<string, unknown>;
+  worksheet_id?: string;
 }
 
 // ============================================
