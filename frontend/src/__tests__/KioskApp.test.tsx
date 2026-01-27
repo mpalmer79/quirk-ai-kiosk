@@ -18,7 +18,7 @@ jest.mock('../components/Welcomescreen', () => {
         <button onClick={() => navigateTo('modelBudget')}>Go to Model Budget</button>
         <button onClick={() => navigateTo('stockLookup')}>Go to Stock Lookup</button>
         <button onClick={() => navigateTo('inventory', { bodyStyle: 'SUV' })}>Go to SUV Inventory</button>
-        <button onClick={() => navigateTo('trafficLog')}>Sales Desk</button>
+        <button onClick={() => navigateTo('trafficLog')} data-testid="welcome-sales-desk">Sales Desk</button>
         <button onClick={() => updateCustomerData({ name: 'Test Customer' })}>Set Name</button>
       </div>
     );
@@ -165,15 +165,19 @@ jest.mock('../components/VehicleComparison', () => {
   };
 });
 
-// Mock the API module - CRITICAL: Must return proper data structure
+// Mock the API module - CRITICAL: Must include all functions used by KioskApp
 jest.mock('../components/api', () => ({
   __esModule: true,
   default: {
-    getInventory: jest.fn().mockResolvedValue([]),  // Return empty array, not undefined
+    getInventory: jest.fn().mockResolvedValue([]),
     logTraffic: jest.fn().mockResolvedValue({ success: true }),
+    logTrafficSession: jest.fn().mockResolvedValue(undefined), // Add the actual function name used
     getVehicleByStock: jest.fn().mockResolvedValue(null),
     chat: jest.fn().mockResolvedValue({ response: 'Test response' }),
     getModels: jest.fn().mockResolvedValue([]),
+    getTrafficLog: jest.fn().mockResolvedValue({ sessions: [], total: 0 }),
+    getTrafficStats: jest.fn().mockResolvedValue({ total_sessions: 0 }),
+    getActiveSessions: jest.fn().mockResolvedValue({ sessions: [], count: 0 }),
   },
 }));
 
@@ -251,7 +255,9 @@ describe('KioskApp Component', () => {
     test('renders Sales Desk link on welcome screen', async () => {
       renderKioskApp();
       await waitFor(() => {
-        expect(screen.getByText('Sales Desk')).toBeInTheDocument();
+        // Use getAllByText since there may be multiple Sales Desk buttons (header + welcome screen)
+        const salesDeskButtons = screen.getAllByText('Sales Desk');
+        expect(salesDeskButtons.length).toBeGreaterThan(0);
       });
     });
 
@@ -562,16 +568,17 @@ describe('KioskApp Component', () => {
       renderKioskApp();
       
       await waitFor(() => {
-        expect(screen.getByText('Sales Desk')).toBeInTheDocument();
+        expect(screen.getByTestId('welcome-sales-desk')).toBeInTheDocument();
       });
       
       // Navigate to traffic log via Sales Desk
-      fireEvent.click(screen.getByText('Sales Desk'));
+      fireEvent.click(screen.getByTestId('welcome-sales-desk'));
       act(() => { jest.advanceTimersByTime(200); });
 
       await waitFor(() => {
         expect(screen.getByTestId('traffic-log-screen')).toBeInTheDocument();
       });
+      // Traffic log screen should not show back button (admin screen)
       expect(screen.queryByText('Back')).not.toBeInTheDocument();
     });
 
@@ -579,11 +586,11 @@ describe('KioskApp Component', () => {
       renderKioskApp();
       
       await waitFor(() => {
-        expect(screen.getByText('Sales Desk')).toBeInTheDocument();
+        expect(screen.getByTestId('welcome-sales-desk')).toBeInTheDocument();
       });
       
       // Navigate to traffic log then dashboard
-      fireEvent.click(screen.getByText('Sales Desk'));
+      fireEvent.click(screen.getByTestId('welcome-sales-desk'));
       act(() => { jest.advanceTimersByTime(200); });
 
       fireEvent.click(screen.getByText('Open Dashboard'));
@@ -797,10 +804,10 @@ describe('KioskApp Component', () => {
       renderKioskApp();
       
       await waitFor(() => {
-        expect(screen.getByText('Sales Desk')).toBeInTheDocument();
+        expect(screen.getByTestId('welcome-sales-desk')).toBeInTheDocument();
       });
       
-      fireEvent.click(screen.getByText('Sales Desk'));
+      fireEvent.click(screen.getByTestId('welcome-sales-desk'));
       act(() => { jest.advanceTimersByTime(200); });
 
       await waitFor(() => {
@@ -812,7 +819,9 @@ describe('KioskApp Component', () => {
       renderKioskApp();
       
       await waitFor(() => {
-        expect(screen.getByText('Sales Desk')).toBeInTheDocument();
+        // Multiple Sales Desk buttons on welcome screen (header + welcome)
+        const salesDeskButtons = screen.getAllByText('Sales Desk');
+        expect(salesDeskButtons.length).toBeGreaterThan(0);
       });
 
       // Navigate away
@@ -823,8 +832,8 @@ describe('KioskApp Component', () => {
         expect(screen.getByTestId('inventory-screen')).toBeInTheDocument();
       });
 
-      // Sales Desk should not be visible on non-welcome screens
-      expect(screen.queryByText('Sales Desk')).not.toBeInTheDocument();
+      // The welcome screen's Sales Desk button should not be visible
+      expect(screen.queryByTestId('welcome-sales-desk')).not.toBeInTheDocument();
     });
   });
 
@@ -850,20 +859,20 @@ describe('KioskApp Component', () => {
       });
 
       // Logging should have been called
-      expect(api.logTraffic).toHaveBeenCalled();
+      expect(api.logTrafficSession).toHaveBeenCalled();
     });
 
     test('does not log traffic on admin screens', async () => {
       const api = require('../components/api').default;
-      api.logTraffic.mockClear();
+      api.logTrafficSession.mockClear();
       renderKioskApp();
 
       await waitFor(() => {
-        expect(screen.getByText('Sales Desk')).toBeInTheDocument();
+        expect(screen.getByTestId('welcome-sales-desk')).toBeInTheDocument();
       });
 
       // Navigate to traffic log (admin screen)
-      fireEvent.click(screen.getByText('Sales Desk'));
+      fireEvent.click(screen.getByTestId('welcome-sales-desk'));
       act(() => { jest.advanceTimersByTime(200); });
 
       await waitFor(() => {
@@ -876,7 +885,7 @@ describe('KioskApp Component', () => {
       });
 
       // Traffic logging should not be triggered for admin screens
-      const calls = api.logTraffic.mock.calls;
+      const calls = api.logTrafficSession.mock.calls;
       const adminScreenCalls = calls.filter((call: any) => 
         call[0]?.screen === 'trafficLog' || call[0]?.screen === 'salesDashboard'
       );
@@ -902,7 +911,7 @@ describe('KioskApp Component', () => {
         jest.advanceTimersByTime(5000);
       });
 
-      expect(api.logTraffic).toHaveBeenCalled();
+      expect(api.logTrafficSession).toHaveBeenCalled();
     });
   });
 
@@ -989,11 +998,11 @@ describe('KioskApp Component', () => {
       renderKioskApp();
       
       await waitFor(() => {
-        expect(screen.getByText('Sales Desk')).toBeInTheDocument();
+        expect(screen.getByTestId('welcome-sales-desk')).toBeInTheDocument();
       });
       
       // Navigate to traffic log
-      fireEvent.click(screen.getByText('Sales Desk'));
+      fireEvent.click(screen.getByTestId('welcome-sales-desk'));
       act(() => { jest.advanceTimersByTime(200); });
 
       await waitFor(() => {
