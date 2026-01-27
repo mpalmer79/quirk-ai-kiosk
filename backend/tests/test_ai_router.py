@@ -205,13 +205,13 @@ class TestToolConfiguration:
 class TestModelConfiguration:
     """Tests for model configuration"""
     
-    def test_model_name_is_sonnet(self):
-    """Model should be Claude Sonnet"""
-    assert "claude-sonnet" in MODEL_NAME
-
-def test_model_has_version_date(self):
-    """Model should have a specific version date"""
-    assert "20241022" in MODEL_NAME
+    def test_model_name_is_sonnet_3_5(self):
+        """Model should be Claude Sonnet 3.5"""
+        assert "claude-sonnet-3-5" in MODEL_NAME
+    
+    def test_model_has_version_date(self):
+        """Model should have October 2024 version date"""
+        assert "20241022" in MODEL_NAME
 
 
 # =============================================================================
