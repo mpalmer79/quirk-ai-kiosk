@@ -13,6 +13,39 @@ from app.services.lead_scoring import (
 )
 
 
+def create_mock_state(**kwargs):
+    """Helper to create a properly configured mock state"""
+    state = MagicMock()
+    
+    # Set defaults for all attributes to avoid MagicMock comparison issues
+    defaults = {
+        'message_count': 0,
+        'customer_phone': None,
+        'customer_name': None,
+        'customer_email': None,
+        'down_payment': 0,
+        'budget_max': None,
+        'monthly_payment_target': None,
+        'trade_model': None,
+        'trade_payoff': None,
+        'interest_level': None,
+        'test_drive_requested': False,
+        'appraisal_requested': False,
+        'vehicles_discussed': [],
+        'session_duration_seconds': 0,
+    }
+    
+    # Apply defaults
+    for key, value in defaults.items():
+        setattr(state, key, value)
+    
+    # Override with provided values
+    for key, value in kwargs.items():
+        setattr(state, key, value)
+    
+    return state
+
+
 class TestLeadScorer:
     """Tests for LeadScorer service"""
     
@@ -26,16 +59,20 @@ class TestLeadScorer:
     
     def test_hot_lead_threshold(self, scorer):
         """Score 70+ should be HOT tier"""
-        # Create state with many positive signals
-        state = MagicMock()
-        state.message_count = 15
-        state.customer_phone = "6175551234"
-        state.customer_name = "John"
-        state.down_payment = 15000
-        state.budget_max = 50000
-        state.trade_model = "Equinox"
-        state.interest_level = MagicMock(value="high")
-        state.test_drive_requested = True
+        # Create mock with high interest level
+        interest = MagicMock()
+        interest.value = "high"
+        
+        state = create_mock_state(
+            message_count=15,
+            customer_phone="6175551234",
+            customer_name="John",
+            down_payment=15000,
+            budget_max=50000,
+            trade_model="Equinox",
+            interest_level=interest,
+            test_drive_requested=True,
+        )
         
         result = scorer.calculate_score(state=state)
         
@@ -45,20 +82,12 @@ class TestLeadScorer:
     
     def test_warm_lead_threshold(self, scorer):
         """Score 40-69 should be WARM tier"""
-        state = MagicMock()
-        state.message_count = 8
-        state.customer_phone = "6175551234"
-        state.down_payment = 5000
-        state.customer_name = None
-        state.customer_email = None
-        state.budget_max = None
-        state.monthly_payment_target = None
-        state.trade_model = None
-        state.interest_level = None
-        state.test_drive_requested = False
-        state.appraisal_requested = False
-        state.vehicles_discussed = []
-        state.session_duration_seconds = 0
+        state = create_mock_state(
+            message_count=8,
+            customer_phone="6175551234",
+            down_payment=5000,
+            budget_max=40000,  # Add budget to get more points
+        )
         
         result = scorer.calculate_score(state=state)
         
@@ -68,20 +97,9 @@ class TestLeadScorer:
     
     def test_cold_lead_threshold(self, scorer):
         """Score below 40 should be COLD tier"""
-        state = MagicMock()
-        state.message_count = 2
-        state.customer_phone = None
-        state.customer_name = None
-        state.customer_email = None
-        state.down_payment = 0
-        state.budget_max = None
-        state.monthly_payment_target = None
-        state.trade_model = None
-        state.interest_level = None
-        state.test_drive_requested = False
-        state.appraisal_requested = False
-        state.vehicles_discussed = []
-        state.session_duration_seconds = 0
+        state = create_mock_state(
+            message_count=2,
+        )
         
         result = scorer.calculate_score(state=state)
         
@@ -95,20 +113,9 @@ class TestLeadScorer:
     
     def test_high_engagement_scoring(self, scorer):
         """15+ messages should give high engagement points"""
-        state = MagicMock()
-        state.message_count = 20
-        state.customer_phone = None
-        state.customer_name = None
-        state.customer_email = None
-        state.down_payment = 0
-        state.budget_max = None
-        state.monthly_payment_target = None
-        state.trade_model = None
-        state.interest_level = None
-        state.test_drive_requested = False
-        state.appraisal_requested = False
-        state.vehicles_discussed = []
-        state.session_duration_seconds = 0
+        state = create_mock_state(
+            message_count=20,
+        )
         
         result = scorer.calculate_score(state=state)
         
@@ -117,20 +124,9 @@ class TestLeadScorer:
     
     def test_session_duration_scoring(self, scorer):
         """Long sessions should add points"""
-        state = MagicMock()
-        state.message_count = 0
-        state.session_duration_seconds = 700  # 11+ minutes
-        state.customer_phone = None
-        state.customer_name = None
-        state.customer_email = None
-        state.down_payment = 0
-        state.budget_max = None
-        state.monthly_payment_target = None
-        state.trade_model = None
-        state.interest_level = None
-        state.test_drive_requested = False
-        state.appraisal_requested = False
-        state.vehicles_discussed = []
+        state = create_mock_state(
+            session_duration_seconds=700,  # 11+ minutes
+        )
         
         result = scorer.calculate_score(state=state)
         
@@ -144,38 +140,16 @@ class TestLeadScorer:
     def test_down_payment_tiers(self, scorer):
         """Different down payment levels should score differently"""
         # $5k down
-        state1 = MagicMock()
-        state1.down_payment = 5000
-        state1.message_count = 0
-        state1.customer_phone = None
-        state1.customer_name = None
-        state1.customer_email = None
-        state1.budget_max = None
-        state1.monthly_payment_target = None
-        state1.trade_model = None
-        state1.interest_level = None
-        state1.test_drive_requested = False
-        state1.appraisal_requested = False
-        state1.vehicles_discussed = []
-        state1.session_duration_seconds = 0
+        state1 = create_mock_state(
+            down_payment=5000,
+        )
         
         result1 = scorer.calculate_score(state=state1)
         
         # $15k down
-        state2 = MagicMock()
-        state2.down_payment = 15000
-        state2.message_count = 0
-        state2.customer_phone = None
-        state2.customer_name = None
-        state2.customer_email = None
-        state2.budget_max = None
-        state2.monthly_payment_target = None
-        state2.trade_model = None
-        state2.interest_level = None
-        state2.test_drive_requested = False
-        state2.appraisal_requested = False
-        state2.vehicles_discussed = []
-        state2.session_duration_seconds = 0
+        state2 = create_mock_state(
+            down_payment=15000,
+        )
         
         result2 = scorer.calculate_score(state=state2)
         
@@ -186,40 +160,17 @@ class TestLeadScorer:
     def test_trade_in_scoring(self, scorer):
         """Trade-in with payoff knowledge should score higher"""
         # Trade without payoff
-        state1 = MagicMock()
-        state1.trade_model = "Equinox"
-        state1.trade_payoff = None
-        state1.message_count = 0
-        state1.customer_phone = None
-        state1.customer_name = None
-        state1.customer_email = None
-        state1.down_payment = 0
-        state1.budget_max = None
-        state1.monthly_payment_target = None
-        state1.interest_level = None
-        state1.test_drive_requested = False
-        state1.appraisal_requested = False
-        state1.vehicles_discussed = []
-        state1.session_duration_seconds = 0
+        state1 = create_mock_state(
+            trade_model="Equinox",
+        )
         
         result1 = scorer.calculate_score(state=state1)
         
         # Trade with payoff
-        state2 = MagicMock()
-        state2.trade_model = "Equinox"
-        state2.trade_payoff = 12000
-        state2.message_count = 0
-        state2.customer_phone = None
-        state2.customer_name = None
-        state2.customer_email = None
-        state2.down_payment = 0
-        state2.budget_max = None
-        state2.monthly_payment_target = None
-        state2.interest_level = None
-        state2.test_drive_requested = False
-        state2.appraisal_requested = False
-        state2.vehicles_discussed = []
-        state2.session_duration_seconds = 0
+        state2 = create_mock_state(
+            trade_model="Equinox",
+            trade_payoff=12000,
+        )
         
         result2 = scorer.calculate_score(state=state2)
         
@@ -263,20 +214,11 @@ class TestLeadScorer:
     
     def test_phone_is_most_valuable_contact(self, scorer):
         """Phone number should be worth more than email"""
-        state = MagicMock()
-        state.customer_phone = "6175551234"
-        state.customer_email = "test@example.com"
-        state.customer_name = "John"
-        state.message_count = 0
-        state.down_payment = 0
-        state.budget_max = None
-        state.monthly_payment_target = None
-        state.trade_model = None
-        state.interest_level = None
-        state.test_drive_requested = False
-        state.appraisal_requested = False
-        state.vehicles_discussed = []
-        state.session_duration_seconds = 0
+        state = create_mock_state(
+            customer_phone="6175551234",
+            customer_email="test@example.com",
+            customer_name="John",
+        )
         
         result = scorer.calculate_score(state=state)
         
@@ -315,21 +257,25 @@ class TestLeadScorer:
     
     def test_score_capped_at_100(self, scorer):
         """Score should never exceed 100"""
-        state = MagicMock()
-        state.message_count = 20
-        state.customer_phone = "6175551234"
-        state.customer_email = "test@example.com"
-        state.customer_name = "John"
-        state.down_payment = 25000
-        state.budget_max = 60000
-        state.monthly_payment_target = 700
-        state.trade_model = "Tahoe"
-        state.trade_payoff = 15000
-        state.interest_level = MagicMock(value="high")
-        state.test_drive_requested = True
-        state.appraisal_requested = True
-        state.vehicles_discussed = ["Silverado"]
-        state.session_duration_seconds = 900
+        interest = MagicMock()
+        interest.value = "high"
+        
+        state = create_mock_state(
+            message_count=20,
+            customer_phone="6175551234",
+            customer_email="test@example.com",
+            customer_name="John",
+            down_payment=25000,
+            budget_max=60000,
+            monthly_payment_target=700,
+            trade_model="Tahoe",
+            trade_payoff=15000,
+            interest_level=interest,
+            test_drive_requested=True,
+            appraisal_requested=True,
+            vehicles_discussed=["Silverado"],
+            session_duration_seconds=900,
+        )
         
         worksheet_data = {
             "status": "ready",
@@ -402,20 +348,10 @@ class TestLeadScorer:
     
     def test_lead_score_to_dict(self, scorer):
         """LeadScore should serialize properly"""
-        state = MagicMock()
-        state.message_count = 10
-        state.customer_phone = "6175551234"
-        state.customer_name = None
-        state.customer_email = None
-        state.down_payment = 0
-        state.budget_max = None
-        state.monthly_payment_target = None
-        state.trade_model = None
-        state.interest_level = None
-        state.test_drive_requested = False
-        state.appraisal_requested = False
-        state.vehicles_discussed = []
-        state.session_duration_seconds = 0
+        state = create_mock_state(
+            message_count=10,
+            customer_phone="6175551234",
+        )
         
         result = scorer.calculate_score(state=state)
         data = result.to_dict()
