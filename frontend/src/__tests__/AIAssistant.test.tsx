@@ -9,7 +9,26 @@ jest.mock('../components/api', () => ({
   logTrafficSession: jest.fn(),
   getTTSStatus: jest.fn().mockResolvedValue({ available: false }),
   textToSpeech: jest.fn(),
+  notifyStaff: jest.fn().mockResolvedValue({ success: true }),
 }));
+
+// Mock DigitalWorksheet component to avoid CSS imports and fetch calls in tests
+jest.mock('../components/DigitalWorksheet', () => {
+  return function MockDigitalWorksheet({ worksheetId, onReady, onClose }: {
+    worksheetId: string;
+    sessionId: string;
+    onReady?: (id: string) => void;
+    onClose?: () => void;
+  }) {
+    return (
+      <div data-testid="mock-digital-worksheet">
+        <span>Mock Worksheet: {worksheetId}</span>
+        <button onClick={() => onReady?.(worksheetId)}>Mock Ready</button>
+        <button onClick={onClose}>Mock Close</button>
+      </div>
+    );
+  };
+});
 
 import api from '../components/api';
 
