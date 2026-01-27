@@ -339,8 +339,8 @@ describe('SalesManagerDashboard Component', () => {
     });
   });
 
-  describe('All Sessions Button', () => {
-    test('displays All Sessions button when session selected', async () => {
+  describe('Back Button', () => {
+    test('displays Back button when session selected', async () => {
       await renderDashboard();
       
       await waitFor(() => {
@@ -352,11 +352,11 @@ describe('SalesManagerDashboard Component', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText(/All Sessions/)).toBeInTheDocument();
+        expect(screen.getByText(/← Back/)).toBeInTheDocument();
       });
     });
 
-    test('clicking All Sessions clears selected session', async () => {
+    test('clicking Back clears selected session', async () => {
       await renderDashboard();
 
       // First select a session
@@ -372,9 +372,9 @@ describe('SalesManagerDashboard Component', () => {
         expect(screen.getByText(/Digital Worksheet/)).toBeInTheDocument();
       });
 
-      // Click All Sessions
+      // Click Back
       await act(async () => {
-        fireEvent.click(screen.getByText(/All Sessions/));
+        fireEvent.click(screen.getByText(/← Back/));
       });
 
       await waitFor(() => {
