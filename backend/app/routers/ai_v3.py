@@ -9,30 +9,32 @@ Key Features:
 - Dynamic context building
 - Outcome tracking for learning
 - Rate limiting (30 requests/minute per session)
+
+This module has been refactored for maintainability:
+- Tools defined in: app/ai/tools.py
+- System prompt in: app/ai/prompts.py
+- Tool execution in: app/ai/tool_executor.py
+- Helpers in: app/ai/helpers.py
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import httpx
-import json
 import re
 import logging
 import asyncio
 import random
 from datetime import datetime
-from enum import Enum
 
 # Rate limiting
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 # Core services
 from app.services.conversation_state import (
     ConversationStateManager,
     ConversationState,
-    ConversationStage,
-    InterestLevel,
+    ConversationOutcome,
     get_state_manager
 )
 from app.services.vehicle_retriever import (
@@ -45,11 +47,20 @@ from app.services.outcome_tracker import (
     ConversationOutcome,
     get_outcome_tracker
 )
-from app.services.entity_extraction import get_entity_extractor
 from app.services.notifications import get_notification_service
 
 # Security
 from app.core.security import get_key_manager
+
+# AI Module imports
+from app.ai.tools import TOOLS
+from app.ai.prompts import SYSTEM_PROMPT_TEMPLATE
+from app.ai.tool_executor import execute_tool
+from app.ai.helpers import (
+    build_dynamic_context,
+    build_inventory_context,
+    generate_fallback_response,
+)
 
 router = APIRouter()
 logger = logging.getLogger("quirk_ai.intelligent")
@@ -59,80 +70,15 @@ logger = logging.getLogger("quirk_ai.intelligent")
 # =============================================================================
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-PROMPT_VERSION = "3.6.0"  # Added native web search capability
-# Updated to Claude Sonnet 4.5 (released September 2025) - previous Sonnet 4 may be deprecated
+PROMPT_VERSION = "3.7.0"  # Added Digital Worksheet tool
 MODEL_NAME = "claude-sonnet-4-5-20250929"
-MAX_CONTEXT_TOKENS = 4000  # Reserve tokens for context
+MAX_CONTEXT_TOKENS = 4000
 
-# Retry configuration (from V2)
+# Retry configuration
 MAX_RETRIES = 3
-BASE_DELAY = 1.0  # seconds
-MAX_DELAY = 10.0  # seconds
+BASE_DELAY = 1.0
+MAX_DELAY = 10.0
 
-# =============================================================================
-# GM MODEL NUMBER DECODER
-# Maps GM model codes to human-readable vehicle descriptions
-# =============================================================================
-
-GM_MODEL_DECODER = {
-    # Silverado 1500
-    "CK10543": "Silverado 1500 4WD Crew Cab 147\"",
-    "CK10703": "Silverado 1500 4WD Regular Cab 126\"",
-    "CK10743": "Silverado 1500 4WD Crew Cab 157\"",
-    "CK10753": "Silverado 1500 4WD Double Cab 147\"",
-    "CK10903": "Silverado 1500 4WD Regular Cab 140\"",
-    
-    # Silverado HD
-    "CK20743": "Silverado 2500HD 4WD Crew Cab 159\"",
-    "CK30743": "Silverado 3500HD 4WD Crew Cab 159\"",
-    "CK30903": "Silverado 3500HD 4WD Regular Cab 142\"",
-    "CK30943": "Silverado 3500HD 4WD Crew Cab 172\"",
-    "CK31003": "Silverado 3500HD Chassis Cab 4WD Regular Cab",
-    
-    # SUVs
-    "CK10706": "Tahoe 4WD",
-    "CK10906": "Suburban 4WD",
-    
-    # Colorado
-    "14C43": "Colorado 4WD Crew Cab LT",
-    "14G43": "Colorado 4WD Crew Cab Z71",
-    
-    # Equinox
-    "1PT26": "Equinox AWD LT",
-    "1PS26": "Equinox AWD RS",
-    "1PR26": "Equinox AWD ACTIV",
-    
-    # Equinox EV
-    "1MB48": "Equinox EV",
-    "1MM48": "Equinox EV RS",
-    
-    # Traverse
-    "1LB56": "Traverse AWD LT",
-    "1LD56": "Traverse AWD RS / High Country",
-    
-    # Trax / Trailblazer
-    "1TR58": "Trax FWD",
-    "1TR56": "Trailblazer FWD",
-    
-    # Corvette
-    "1YG07": "Corvette E-Ray Coupe",
-    "1YR07": "Corvette ZR1 Coupe",
-    
-    # Commercial Vans
-    "CG23405": "Express Cargo Van RWD 2500 135\"",
-    "CG33405": "Express Cargo Van RWD 3500 135\"",
-    "CG33503": "Express Commercial Cutaway Van 139\"",
-    "CG33803": "Express Commercial Cutaway Van 159\"",
-    "CG33903": "Express Commercial Cutaway Van 177\"",
-    
-    # LCF (Low Cab Forward)
-    "CP31003": "4500 HG LCF Gas 2WD Regular Cab 109\"",
-    "CP34003": "4500 HG LCF Gas 2WD Regular Cab 176\"",
-}
-
-def decode_model_number(model_number: str) -> str:
-    """Decode a GM model number to human-readable description."""
-    return GM_MODEL_DECODER.get(model_number, model_number)
 
 # =============================================================================
 # RATE LIMITER SETUP
@@ -141,16 +87,12 @@ def decode_model_number(model_number: str) -> str:
 def get_session_identifier(request: Request) -> str:
     """
     Get session ID for rate limiting AI chat requests.
-    
     Uses X-Session-ID header if available, falls back to IP.
-    This ensures rate limits are per-kiosk-session, not per-IP.
     """
-    # Try to get session from header
     session_id = request.headers.get("X-Session-ID", "")
     if session_id:
         return f"session:{session_id}"
     
-    # Fall back to IP
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         return f"ip:{forwarded.split(',')[0].strip()}"
@@ -158,7 +100,6 @@ def get_session_identifier(request: Request) -> str:
     return f"ip:{request.client.host if request.client else 'unknown'}"
 
 
-# Create limiter instance for AI endpoints
 ai_limiter = Limiter(key_func=get_session_identifier)
 
 
@@ -170,9 +111,7 @@ async def call_with_retry(
     *args,
     **kwargs
 ) -> Any:
-    """
-    Execute an async function with exponential backoff retry.
-    """
+    """Execute an async function with exponential backoff retry."""
     last_exception = None
     
     for attempt in range(max_retries):
@@ -182,9 +121,7 @@ async def call_with_retry(
             last_exception = e
             
             if attempt < max_retries - 1:
-                # Calculate delay with exponential backoff and jitter
                 delay = min(base_delay * (2 ** attempt), max_delay)
-                # Add jitter (±20%)
                 delay = delay * (0.8 + random.random() * 0.4)
                 
                 logger.warning(
@@ -198,218 +135,6 @@ async def call_with_retry(
     
     raise last_exception
 
-# Tool definitions for Claude
-TOOLS = [
-    # Anthropic's native web search - no external API needed
-    {
-        "type": "web_search_20250305",
-        "name": "web_search"
-    },
-    {
-        "name": "calculate_budget",
-        "description": "Calculate what vehicle price a customer can afford based on their down payment and desired monthly payment. ALWAYS use this when a customer mentions both a down payment AND monthly payment amount. Uses 7% APR at 84 months.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "down_payment": {
-                    "type": "number",
-                    "description": "Customer's cash down payment amount in dollars"
-                },
-                "monthly_payment": {
-                    "type": "number",
-                    "description": "Customer's desired monthly payment amount in dollars"
-                },
-                "apr": {
-                    "type": "number",
-                    "description": "Annual percentage rate (default 7.0 if not specified)",
-                    "default": 7.0
-                },
-                "term_months": {
-                    "type": "integer",
-                    "description": "Loan term in months (default 84 if not specified)",
-                    "default": 84
-                }
-            },
-            "required": ["down_payment", "monthly_payment"]
-        }
-    },
-    {
-        "name": "search_inventory",
-        "description": "Search dealership inventory for vehicles matching customer needs. Use this when the customer asks about available vehicles, specific models, or wants recommendations.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Natural language search query based on customer needs (e.g., 'blue truck for towing', 'family SUV under 50k')"
-                },
-                "body_style": {
-                    "type": "string",
-                    "description": "Filter by body style: Truck, SUV, Van, Sedan, Sports Car",
-                    "enum": ["Truck", "SUV", "Van", "Sedan", "Sports Car", "Coupe", "Convertible"]
-                },
-                "max_price": {
-                    "type": "number",
-                    "description": "REQUIRED when customer mentions budget. Maximum vehicle price filter. Extract from phrases like 'under $50K' (50000), 'below $40,000' (40000), 'budget is $35K' (35000). ALWAYS pass this when a price limit is mentioned - do NOT rely on semantic search for budget filtering."
-                },
-                "min_seating": {
-                    "type": "integer",
-                    "description": "Minimum seating capacity needed"
-                },
-                "min_towing": {
-                    "type": "integer",
-                    "description": "Minimum towing capacity in lbs"
-                }
-            },
-            "required": ["query"]
-        }
-    },
-    {
-        "name": "get_vehicle_details",
-        "description": "Get detailed information about a specific vehicle by stock number. Use when customer asks about a specific vehicle or wants more details.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "stock_number": {
-                    "type": "string",
-                    "description": "The vehicle stock number (e.g., M12345)"
-                }
-            },
-            "required": ["stock_number"]
-        }
-    },
-    {
-        "name": "find_similar_vehicles",
-        "description": "Find vehicles similar to one the customer likes. Use when they want alternatives or comparisons.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "stock_number": {
-                    "type": "string",
-                    "description": "Stock number of the vehicle to find similar matches for"
-                }
-            },
-            "required": ["stock_number"]
-        }
-    },
-    {
-        "name": "notify_staff",
-        "description": "Notify dealership staff to assist the customer. Use when customer is ready for test drive, wants appraisal, or needs finance help.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "notification_type": {
-                    "type": "string",
-                    "description": "Type of staff to notify",
-                    "enum": ["sales", "appraisal", "finance"]
-                },
-                "message": {
-                    "type": "string",
-                    "description": "Brief message about what the customer needs"
-                },
-                "vehicle_stock": {
-                    "type": "string",
-                    "description": "Stock number of vehicle customer is interested in (if applicable)"
-                }
-            },
-            "required": ["notification_type", "message"]
-        }
-    },
-    {
-        "name": "mark_favorite",
-        "description": "Mark a vehicle as a customer favorite for quick reference.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "stock_number": {
-                    "type": "string",
-                    "description": "Stock number to mark as favorite"
-                }
-            },
-            "required": ["stock_number"]
-        }
-    },
-    {
-        "name": "lookup_conversation",
-        "description": "Look up a customer's previous conversation using their phone number. Use this when customer says they want to continue a previous conversation or when they provide a phone number to retrieve their history.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "phone_number": {
-                    "type": "string",
-                    "description": "Customer's 10-digit phone number (digits only, e.g., '6175551234')"
-                }
-            },
-            "required": ["phone_number"]
-        }
-    },
-    {
-        "name": "save_customer_phone",
-        "description": "Save the customer's phone number to their conversation for future lookup. Use this when customer provides their phone number.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "phone_number": {
-                    "type": "string",
-                    "description": "Customer's 10-digit phone number"
-                }
-            },
-            "required": ["phone_number"]
-        }
-    },
-    {
-        "name": "check_vehicle_affordability",
-        "description": """Check if a customer can afford a SPECIFIC vehicle they're asking about.
-
-USE THIS TOOL WHEN customer asks:
-- "Can I afford the [vehicle/trim]?" (e.g., "Can I afford the 3LZ?")
-- "Is the [vehicle] in my budget?"
-- "What would my payment be on that one?"
-- References a vehicle by trim (3LZ, 1LT, Z71, RST, High Country) + gives budget info
-
-CRITICAL: When customer references a vehicle from the conversation (like "the 3LZ" or "that Corvette"), 
-you MUST identify the correct stock number from the conversation history and use it here.
-
-This calculates their max affordable price AND compares to the specific vehicle's price.
-Returns a clear YES/NO answer with payment details.""",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "stock_number": {
-                    "type": "string",
-                    "description": "Stock number of the vehicle to check (e.g., M39196). REQUIRED when customer references a specific vehicle from conversation."
-                },
-                "vehicle_price": {
-                    "type": "number",
-                    "description": "Price of the vehicle if stock number is unknown."
-                },
-                "vehicle_description": {
-                    "type": "string",
-                    "description": "Description of the vehicle (e.g., '2025 Corvette 3LZ') for the response."
-                },
-                "down_payment": {
-                    "type": "number",
-                    "description": "Customer's down payment amount in dollars"
-                },
-                "monthly_payment": {
-                    "type": "number",
-                    "description": "Customer's desired maximum monthly payment in dollars"
-                },
-                "apr": {
-                    "type": "number",
-                    "description": "Annual percentage rate (default 7.0)",
-                    "default": 7.0
-                },
-                "term_months": {
-                    "type": "integer",
-                    "description": "Loan term in months (default 84)",
-                    "default": 84
-                }
-            },
-            "required": ["down_payment", "monthly_payment"]
-        }
-    }
-]
 
 # =============================================================================
 # REQUEST/RESPONSE MODELS
@@ -441,810 +166,8 @@ class IntelligentChatResponse(BaseModel):
     conversation_state: Optional[Dict[str, Any]] = None
     tools_used: List[str] = []
     staff_notified: bool = False
+    worksheet_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
-
-
-# =============================================================================
-# SYSTEM PROMPT - DYNAMIC CONTEXT AWARE
-# =============================================================================
-
-SYSTEM_PROMPT_TEMPLATE = """You are a knowledgeable, friendly AI sales assistant on an interactive kiosk INSIDE the Quirk Chevrolet showroom. The customer is standing in front of you RIGHT NOW.
-
-CRITICAL SHOWROOM CONTEXT:
-- Customer is ALREADY HERE - never say "come in" or "visit us"
-- You can have vehicles brought up front, get keys, arrange test drives
-- You can notify sales, appraisal, or finance teams directly
-- Say things like "I can have that brought up front", "Let me get the keys"
-
-🌐 LANGUAGE DETECTION (CRITICAL):
-- If the customer writes in Spanish, YOU MUST RESPOND ENTIRELY IN SPANISH
-- Match the customer's language automatically
-- Examples of Spanish triggers: "¿Habla español?", "Busco", "Quiero", "Necesito", "camioneta", "carro"
-- When responding in Spanish, maintain the same helpful, friendly tone
-- Use proper Spanish automotive terminology (camioneta = truck, SUV = SUV, sedán = sedan)
-
-PERSONALITY:
-- Warm, helpful, conversational (not pushy)
-- Patient and understanding
-- Focused on finding the RIGHT vehicle, not just ANY vehicle
-
-YOUR CAPABILITIES (Use these tools!):
-- web_search: CRITICAL - Search the web for any specs, features, or information you're uncertain about. ALWAYS verify before answering technical questions.
-- calculate_budget: CRITICAL - Calculate what vehicle price customer can afford from down payment + monthly payment
-- search_inventory: Find vehicles matching customer needs
-- get_vehicle_details: Get specifics on a vehicle
-- find_similar_vehicles: Show alternatives
-- notify_staff: Get sales/appraisal/finance to help
-- mark_favorite: Save vehicles customer likes
-- lookup_conversation: Retrieve a customer's previous conversation by phone
-- save_customer_phone: Save customer's phone to their conversation
-
-🔍 WEB SEARCH GUIDANCE (CRITICAL - VERIFY BEFORE YOU SPEAK!):
-You have access to real-time web search. USE IT whenever you're not 100% certain about:
-- Towing capacity, payload, or performance specs
-- Vehicle dimensions, cargo space, or seating capacity
-- Fuel economy (MPG) or EV range specifications
-- Feature availability by trim level
-- Price ranges or MSRP for specific trims
-- Comparisons between models (Silverado vs F-150, etc.)
-- Current model year updates or changes
-- Safety ratings and awards (IIHS, NHTSA)
-- EV-specific questions (charging times, range in cold weather, battery warranty)
-- Warranty details or maintenance schedules
-- Federal tax credits or incentives
-- Any question where giving wrong information would hurt your credibility
-
-SEARCH TIPS:
-- Keep queries concise: "2025 Colorado max towing capacity" not long sentences
-- Include year for current specs: "2025 Equinox EV range"
-- Add "vs" for comparisons: "Silverado vs F-150 towing 2025"
-- Be specific: "Tahoe third row legroom" not "Tahoe interior space"
-
-⚠️ NEVER GUESS ON SPECIFICATIONS - If you're not 100% certain, SEARCH FIRST then answer confidently!
-
-💰 BUDGET & AFFORDABILITY CHECKS (MANDATORY!):
-
-SCENARIO A - Customer asks "CAN I AFFORD [specific vehicle]?":
-⚠️ This is the HIGHEST PRIORITY scenario! STOP and think:
-1. What vehicle are they asking about? Look at conversation history!
-   - "Can I afford the 3LZ?" → Find the 3LZ vehicle you discussed (e.g., Corvette 3LZ Stock #M39196)
-   - "Is that Tahoe in my budget?" → The Tahoe you showed them earlier
-   - "What about the red one?" → The red vehicle from recent discussion
-2. Call check_vehicle_affordability with:
-   - stock_number: The vehicle's stock number from conversation
-   - down_payment: Amount they mentioned
-   - monthly_payment: Amount they mentioned
-3. Give a DIRECT YES/NO answer based on the result
-4. If NO, explain the gap and offer alternatives within budget
-
-EXAMPLE - CORRECT FLOW:
-Customer earlier saw: 2025 Corvette 3LZ - Stock #M39196 - $130,575
-Customer asks: "I have $20,000 to put down and want to be under $1000 for my monthly payment. Can I afford the 3LZ?"
-
-STEP 1: Recognize "3LZ" = the Corvette 3LZ (Stock #M39196, $130,575) from conversation
-STEP 2: Call check_vehicle_affordability(stock_number="M39196", down_payment=20000, monthly_payment=1000)
-STEP 3: Tool returns: Max affordable ~$85,765, vehicle costs $130,575, OVER BUDGET by ~$44,810
-STEP 4: Respond honestly: "Let me check that for you... Unfortunately, with $20,000 down and $1,000/month, your maximum budget is around $85,765. The 3LZ at $130,575 is about $45,000 over that. But here's what we CAN do..."
-
-WRONG: Search for random vehicles when customer asks about a SPECIFIC one ❌
-RIGHT: Check the SPECIFIC vehicle's affordability, then answer directly ✅
-
-SCENARIO B - Customer gives DOWN PAYMENT + MONTHLY PAYMENT (no specific vehicle):
-⚠️ Use calculate_budget tool FIRST:
-1. Call calculate_budget(down_payment=X, monthly_payment=Y)
-2. Wait for result showing max vehicle price
-3. Call search_inventory with that max_price
-4. Show ONLY vehicles under budget
-
-Example: "$10,000 down, $600/month - what can I get?"
-- FIRST: calculate_budget(down_payment=10000, monthly_payment=600) → ~$49,750 max
-- THEN: search_inventory(query="...", max_price=49750)
-
-SCENARIO C - Customer states DIRECT BUDGET ("under $50K", "below $40,000"):
-⚠️ ALWAYS extract and pass max_price to search_inventory:
-- "under $50K" → search_inventory(query="...", max_price=50000)
-- "below $40,000" → search_inventory(query="...", max_price=40000)
-- "budget is $35K" → search_inventory(query="...", max_price=35000)
-
-CRITICAL: Do NOT rely on semantic search to filter by budget. The max_price parameter MUST be passed explicitly.
-
-WRONG: search_inventory(query="family SUV under 50K") ← Budget in query only, NO max_price
-RIGHT: search_inventory(query="family SUV", max_price=50000) ← Budget as parameter
-
-ALWAYS DISCLOSE: "Taxes and fees are separate. NH doesn't tax vehicle payments, but other states may add tax on top of the monthly payment."
-
-CONVERSATION GUIDELINES:
-1. Use search_inventory when customer describes what they want
-2. Use get_vehicle_details when discussing specific stock numbers
-3. Use notify_staff when customer is ready for test drive or appraisal
-4. Use web_search for any spec, feature, or comparison question you're uncertain about
-5. Always mention stock numbers when recommending vehicles
-6. Keep responses conversational and concise (2-3 paragraphs max)
-7. VERIFY before you speak - search if uncertain, never guess on specs
-
-CONTINUE CONVERSATION FLOW:
-When customer says "continue our conversation" or similar:
-1. Ask for their 10-digit phone number (be friendly about it)
-2. Use lookup_conversation tool with their phone number
-3. If found, summarize what you remember and ask how to proceed
-4. If not found, kindly explain and offer to start fresh
-
-SAVING CUSTOMER INFO:
-- After a productive conversation, offer to save their phone number
-- Use save_customer_phone to store it for future visits
-- This lets them continue where they left off next time
-
-{conversation_context}
-
-{inventory_context}
-
-TRADE-IN POLICY:
-- NEVER give dollar values for trade-ins
-- Offer FREE professional appraisal (takes ~10-15 minutes)
-- Ask about: current payment, lease vs finance, payoff amount, lender
-
-⚠️ CRITICAL TRADE-IN RULE:
-When a customer mentions trading in a vehicle (e.g., "I'm trading in my Equinox"):
-- The trade-in vehicle is what they're GETTING RID OF, not what they want to buy
-- NEVER search for or show vehicles matching the trade-in model
-- Continue showing vehicles that match their ORIGINAL request (e.g., trucks for towing)
-- Example: If customer wants "a truck to tow a boat" and says "I'm trading in my Equinox":
-  - CORRECT: Continue showing Silverado trucks
-  - WRONG: Show Equinox vehicles for sale
-
-📋 GM MODEL NUMBER DECODER (Quick Reference):
-When you see model numbers in inventory, here's what they mean:
-TRUCKS:
-- CK10543 = Silverado 1500 Crew Cab 4WD (147" bed)
-- CK10743 = Silverado 1500 Crew Cab 4WD (157" bed - long bed)
-- CK10753 = Silverado 1500 Double Cab 4WD
-- CK10703/CK10903 = Silverado 1500 Regular Cab 4WD (Work Truck)
-- CK20743 = Silverado 2500HD Crew Cab 4WD
-- CK30743 = Silverado 3500HD Crew Cab 4WD (159" bed)
-- CK30943 = Silverado 3500HD Crew Cab 4WD (172" long bed - Dually)
-- CK31003 = Silverado 3500HD Chassis Cab 4WD
-- 14C43 = Colorado Crew Cab 4WD LT
-- 14G43 = Colorado Crew Cab 4WD Z71
-
-SUVS:
-- CK10706 = Tahoe 4WD
-- CK10906 = Suburban 4WD
-- 1PT26 = Equinox AWD LT
-- 1PS26 = Equinox AWD RS
-- 1PR26 = Equinox AWD ACTIV
-- 1LB56 = Traverse AWD LT
-- 1LD56 = Traverse AWD RS / High Country
-- 1TR58 = Trax FWD
-- 1TR56 = Trailblazer FWD
-
-ELECTRIC:
-- 1MB48 = Equinox EV
-- 1MM48 = Equinox EV RS
-
-SPORTS:
-- 1YG07 = Corvette E-Ray Coupe (AWD Hybrid)
-- 1YR07 = Corvette ZR1 Coupe
-
-COMMERCIAL:
-- CG23405 = Express Cargo Van 2500
-- CG33405 = Express Cargo Van 3500
-- CG33503/CG33803/CG33903 = Express Commercial Cutaway (various lengths)
-- CP31003/CP34003 = LCF (Low Cab Forward) 4500
-
-Use this when customers ask about specific model codes or when explaining inventory results.
-
-🚛 TOWING CAPACITY REFERENCE (CRITICAL - DO NOT GUESS!):
-ALWAYS reference these official GM towing capacities. NEVER guess or estimate towing capacity.
-If customer asks about towing and the specific trim is not listed, tell them the range and offer to verify for the specific vehicle.
-
-TRUCKS (Maximum Towing):
-- Colorado: Up to 7,700 lbs (with Trailering Package) - CANNOT tow 10,000+ lbs
-- Silverado 1500: Up to 13,300 lbs (varies significantly by trim/engine/config)
-- Silverado 2500HD: Up to 18,510 lbs conventional / 21,500 lbs 5th wheel
-- Silverado 3500HD: Up to 20,000 lbs conventional / 36,000 lbs 5th wheel/gooseneck
-
-SUVS (Maximum Towing):
-- Trax: 1,000 lbs (light towing only - bike rack, small trailer)
-- Trailblazer: 1,000 lbs (light towing only)
-- Equinox: 1,500 lbs (small utility trailer)
-- Blazer: Up to 4,500 lbs
-- Traverse: Up to 5,000 lbs
-- Tahoe: Up to 8,400 lbs (with Max Trailering Package)
-- Suburban: Up to 8,300 lbs (with Max Trailering Package)
-
-TOWING RECOMMENDATIONS BY WEIGHT:
-- Under 2,000 lbs (jet ski, small boat): Equinox, Blazer, Traverse, any truck
-- 2,000-5,000 lbs (small camper, mid-size boat): Blazer, Traverse, Tahoe, Suburban, Colorado, Silverado
-- 5,000-7,700 lbs (larger boat, travel trailer): Tahoe, Suburban, Colorado (maxed), Silverado
-- 7,700-13,300 lbs (large RV, heavy boat): Silverado 1500 (with appropriate package)
-- Over 13,300 lbs (5th wheel, gooseneck, heavy equipment): Silverado 2500HD or 3500HD ONLY
-
-⚠️ CRITICAL: If a customer needs to tow 10,000+ lbs:
-- Colorado CANNOT do this - max is 7,700 lbs
-- Silverado 1500 can handle up to 13,300 lbs with proper configuration
-- For consistent heavy towing over 10,000 lbs, recommend 2500HD or 3500HD
-
-🔧 SERVICE CUSTOMER CONVERSATION FLOW (CRITICAL):
-When a customer says "I'm in for service" or indicates they're waiting for their car to be serviced:
-- DO NOT immediately search inventory or show vehicle tiles
-- First, engage them conversationally about what's new with Chevrolet
-- Ask qualifying questions BEFORE showing any vehicles:
-  1. "What kind of vehicle are you currently driving in for service?"
-  2. "Are you just browsing what's new, or is there something specific catching your eye?"
-  3. "How long have you had your current vehicle?"
-- ONLY use search_inventory tool AFTER the customer:
-  - Expresses interest in a specific type of vehicle ("I've been thinking about trucks")
-  - Asks about a specific model ("Tell me about the new Tahoe")
-  - Mentions wanting to upgrade or trade
-  - Gives you budget or feature requirements
-- The goal is to BUILD RAPPORT first, not push inventory on service customers
-- Service customers are a warm audience - they already trust Quirk enough to service their car here
-
-SPOUSE OBJECTION HANDLING (CRITICAL):
-When a customer says they "need to talk to my wife/husband/spouse/partner" or indicates they can't decide alone, follow this proven 6-step process:
-
-Step 1 - Acknowledge & Validate:
-"I completely understand - this is a major decision you want to share with your [wife/husband/partner]. That makes perfect sense."
-(Establishes empathy and trust - never make them feel pressured)
-
-Step 2 - Introduce Urgency & Incentive:
-"We do have a significant incentive available right now that makes this a particularly advantageous time. This kind of offer is time-sensitive and may not be available tomorrow."
-(Creates urgency while highlighting present value - be specific about the incentive if you know it)
-
-Step 3 - Propose Calling the Spouse (Primary Option):
-"Considering how great this offer is, would you like to call [her/him] right now? You can put me on speaker, and I can quickly go over the key benefits and answer any questions [she/he] might have immediately. That way you won't miss out on this pricing."
-(Proactive solution that maintains momentum)
-
-Step 4 - Propose Test Drive/Take-Home (Fallback if they decline calling):
-"No problem at all - my goal is to make sure you're both comfortable with this. How about this: would you like to take this vehicle for a drive to show [her/him]? I can get temporary plates ready so you can take it home for an hour or so. That way you can discuss it in person and [she/he] can see it firsthand."
-(Physical presence of the vehicle helps secure the decision and gets the spouse invested)
-
-Step 5 - Isolate & Confirm Commitment:
-"If you drive it over now, and you both decide this is the perfect vehicle, are you in a position to finalize the purchase when you return today?"
-(Ensures commitment and prevents further stalling - gets verbal agreement)
-
-Step 6 - Provide Information & Set Follow-up:
-"Great! I'll prepare a detailed summary with this specific vehicle's VIN, the complete price breakdown, and all the incentive details. What time should I expect you back, or when would be the best time for me to follow up with you and your [wife/husband] this evening?"
-(Structures the exit and the next interaction - never let them leave without a specific follow-up time)
-
-KEY PRINCIPLES:
-- Always validate their need to discuss with their partner - it's a reasonable request
-- Present options, not ultimatums
-- The goal is to INVOLVE the spouse in the decision, not bypass them
-- Getting the vehicle in front of the spouse is the strongest close
-- Always get a specific follow-up time - "I'll call you" is not specific enough
-- If they insist on leaving without commitment, get their phone number and a specific callback time
-
-Remember: You have TOOLS - use them to provide real, accurate inventory information!"""
-
-
-# =============================================================================
-# HELPER FUNCTIONS
-# =============================================================================
-
-def build_dynamic_context(state: ConversationState) -> str:
-    """Build dynamic context from conversation state"""
-    if not state or state.message_count == 0:
-        return "CUSTOMER CONTEXT:\nNew customer - no information gathered yet."
-    
-    context = f"""CUSTOMER CONTEXT (What you know about this customer):
-{state.to_context_summary()}
-
-CONVERSATION PROGRESS:
-- Messages exchanged: {state.message_count}
-- Stage: {state.stage.value}
-- Interest level: {state.interest_level.value}"""
-    
-    # Add explicit trade-in exclusion warning
-    if state.trade_model:
-        context += f"""
-
-⚠️ TRADE-IN EXCLUSION: Customer is trading in a {state.trade_model}.
-DO NOT show or search for {state.trade_model} vehicles - they want something DIFFERENT!
-Focus on their original request (what they want to BUY, not trade)."""
-    
-    return context
-
-
-def build_inventory_context(retriever: SemanticVehicleRetriever) -> str:
-    """Build inventory summary for context"""
-    summary = retriever.get_inventory_summary()
-    
-    if summary.get('total', 0) == 0:
-        return "INVENTORY: Unable to load inventory data."
-    
-    return f"""CURRENT INVENTORY SUMMARY:
-- Total vehicles: {summary['total']}
-- Types: {', '.join(f"{k}: {v}" for k, v in summary.get('by_body_style', {}).items())}
-- Price range: ${summary.get('price_range', {}).get('min', 0):,.0f} - ${summary.get('price_range', {}).get('max', 0):,.0f}
-- Top models: {', '.join(summary.get('top_models', {}).keys())}"""
-
-
-def format_vehicle_for_response(vehicle: Dict[str, Any], reasons: List[str] = None) -> Dict[str, Any]:
-    """Format vehicle data for response"""
-    return {
-        "stock_number": vehicle.get('Stock Number') or vehicle.get('stockNumber', ''),
-        "year": vehicle.get('Year') or vehicle.get('year', ''),
-        "make": vehicle.get('Make') or vehicle.get('make', 'Chevrolet'),
-        "model": vehicle.get('Model') or vehicle.get('model', ''),
-        "trim": vehicle.get('Trim') or vehicle.get('trim', ''),
-        "price": vehicle.get('MSRP') or vehicle.get('msrp') or vehicle.get('price', 0),
-        "body_style": vehicle.get('bodyStyle', ''),
-        "drivetrain": vehicle.get('drivetrain', ''),
-        "exterior_color": vehicle.get('exteriorColor') or vehicle.get('Exterior Color', ''),
-        "features": vehicle.get('features', [])[:5],
-        "seating_capacity": vehicle.get('seatingCapacity', 5),
-        "towing_capacity": vehicle.get('towingCapacity', 0),
-        "match_reasons": reasons or [],
-    }
-
-
-def format_vehicles_for_tool_result(vehicles: List[ScoredVehicle]) -> str:
-    """Format vehicle list for tool result to Claude"""
-    if not vehicles:
-        return "No vehicles found matching the criteria."
-    
-    result_parts = [f"Found {len(vehicles)} matching vehicles:\n"]
-    
-    for idx, sv in enumerate(vehicles, 1):
-        v = sv.vehicle
-        stock = v.get('Stock Number') or v.get('stockNumber', '')
-        year = v.get('Year') or v.get('year', '')
-        model = v.get('Model') or v.get('model', '')
-        trim = v.get('Trim') or v.get('trim', '')
-        price = v.get('MSRP') or v.get('msrp') or v.get('price', 0)
-        color = v.get('exteriorColor') or v.get('Exterior Color', '')
-        
-        result_parts.append(
-            f"{idx}. Stock #{stock}: {year} {model} {trim}\n"
-            f"   Price: ${price:,.0f} | Color: {color}\n"
-            f"   Why it matches: {', '.join(sv.match_reasons[:3])}\n"
-        )
-    
-    return '\n'.join(result_parts)
-
-
-def format_vehicle_details_for_tool(vehicle: Dict[str, Any]) -> str:
-    """Format single vehicle details for tool result"""
-    if not vehicle:
-        return "Vehicle not found."
-    
-    stock = vehicle.get('Stock Number') or vehicle.get('stockNumber', '')
-    year = vehicle.get('Year') or vehicle.get('year', '')
-    make = vehicle.get('Make') or vehicle.get('make', 'Chevrolet')
-    model = vehicle.get('Model') or vehicle.get('model', '')
-    trim = vehicle.get('Trim') or vehicle.get('trim', '')
-    price = vehicle.get('MSRP') or vehicle.get('msrp') or vehicle.get('price', 0)
-    color = vehicle.get('exteriorColor') or vehicle.get('Exterior Color', '')
-    drivetrain = vehicle.get('drivetrain', '')
-    features = vehicle.get('features', [])
-    seating = vehicle.get('seatingCapacity', 5)
-    towing = vehicle.get('towingCapacity', 0)
-    
-    return f"""Vehicle Details - Stock #{stock}:
-{year} {make} {model} {trim}
-
-PRICE: ${price:,.0f}
-COLOR: {color}
-DRIVETRAIN: {drivetrain}
-SEATING: {seating} passengers
-TOWING CAPACITY: {towing:,} lbs
-
-KEY FEATURES:
-{chr(10).join(f'- {f}' for f in features[:8])}
-
-This vehicle is available in our showroom. I can have it brought up front or get the keys for a closer look."""
-
-
-# =============================================================================
-# TOOL EXECUTION
-# =============================================================================
-
-async def execute_tool(
-    tool_name: str,
-    tool_input: Dict[str, Any],
-    state: ConversationState,
-    retriever: SemanticVehicleRetriever,
-    state_manager: ConversationStateManager
-) -> tuple:
-    """
-    Execute a tool and return the result.
-    
-    Returns:
-        (result_text, vehicles_to_show, staff_notified)
-    """
-    vehicles_to_show = []
-    staff_notified = False
-    
-    if tool_name == "calculate_budget":
-        down_payment = tool_input.get("down_payment", 0)
-        monthly_payment = tool_input.get("monthly_payment", 0)
-        apr = tool_input.get("apr", 7.0)  # Default 7% APR
-        term_months = tool_input.get("term_months", 84)  # Default 84 months
-        
-        # Calculate present value of loan (what they can finance)
-        monthly_rate = apr / 100 / 12
-        
-        if monthly_rate > 0:
-            # PV = PMT × [(1 - (1 + r)^-n) / r]
-            pv_factor = (1 - (1 + monthly_rate) ** -term_months) / monthly_rate
-            financed_amount = monthly_payment * pv_factor
-        else:
-            financed_amount = monthly_payment * term_months
-        
-        max_vehicle_price = down_payment + financed_amount
-        total_of_payments = monthly_payment * term_months
-        total_interest = total_of_payments - financed_amount
-        
-        # Update state with budget info
-        state.budget_max = max_vehicle_price
-        state.down_payment = down_payment
-        state.monthly_payment_target = monthly_payment
-        
-        result = f"""BUDGET CALCULATION RESULT:
-- Down Payment: ${down_payment:,.0f}
-- Monthly Payment: ${monthly_payment:,.0f}
-- APR: {apr}%
-- Term: {term_months} months
-- Amount Financed: ${financed_amount:,.0f}
-- MAX VEHICLE PRICE: ${max_vehicle_price:,.0f}
-- Total Interest: ${total_interest:,.0f}
-
-IMPORTANT: Use max_price of {int(max_vehicle_price)} when searching inventory.
-DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may add tax."""
-        
-        return (result, vehicles_to_show, staff_notified)
-    
-    elif tool_name == "check_vehicle_affordability":
-        # Get budget parameters
-        down_payment = tool_input.get("down_payment", 0)
-        monthly_payment = tool_input.get("monthly_payment", 0)
-        apr = tool_input.get("apr", 7.0)
-        term_months = tool_input.get("term_months", 84)
-        
-        # Calculate max affordable price using same formula as calculate_budget
-        monthly_rate = apr / 100 / 12
-        if monthly_rate > 0:
-            pv_factor = (1 - (1 + monthly_rate) ** -term_months) / monthly_rate
-            financed_amount = monthly_payment * pv_factor
-        else:
-            financed_amount = monthly_payment * term_months
-            pv_factor = term_months  # Fallback for 0% APR
-        
-        max_affordable = down_payment + financed_amount
-        
-        # Get vehicle price - either from stock number or direct input
-        vehicle_price = tool_input.get("vehicle_price", 0)
-        stock_number = tool_input.get("stock_number")
-        vehicle_desc = tool_input.get("vehicle_description", "this vehicle")
-        
-        if stock_number and not vehicle_price:
-            vehicle = retriever.get_vehicle_by_stock(stock_number)
-            if vehicle:
-                vehicle_price = vehicle.get('MSRP') or vehicle.get('msrp') or vehicle.get('price', 0)
-                year = vehicle.get('Year') or vehicle.get('year', '')
-                model = vehicle.get('Model') or vehicle.get('model', '')
-                trim = vehicle.get('Trim') or vehicle.get('trim', '')
-                color = vehicle.get('exteriorColor') or vehicle.get('Exterior Color', '')
-                vehicle_desc = f"{year} {model} {trim} ({color})".strip()
-                
-                # Add vehicle to show list
-                vehicles_to_show = [ScoredVehicle(
-                    vehicle=vehicle,
-                    score=100,
-                    match_reasons=["Affordability check requested"],
-                    preference_matches={}
-                )]
-            else:
-                logger.warning(f"Vehicle not found for affordability check: {stock_number}")
-        
-        # Calculate the difference
-        difference = max_affordable - vehicle_price
-        can_afford = difference >= 0
-        
-        # Update state with budget info
-        state.budget_max = max_affordable
-        state.down_payment = down_payment
-        state.monthly_payment_target = monthly_payment
-        
-        # Calculate actual monthly payment for this vehicle
-        actual_finance_amount = vehicle_price - down_payment
-        if monthly_rate > 0 and pv_factor > 0:
-            actual_monthly = actual_finance_amount / pv_factor
-        else:
-            actual_monthly = actual_finance_amount / term_months
-        
-        if can_afford:
-            result = f"""AFFORDABILITY CHECK: ✅ YES - WITHIN BUDGET!
-
-Vehicle: {vehicle_desc}
-Stock #: {stock_number or 'N/A'}
-Vehicle Price: ${vehicle_price:,.0f}
-
-Customer's Budget:
-- Down Payment: ${down_payment:,.0f}
-- Target Monthly Payment: ${monthly_payment:,.0f}/month
-- Max Affordable Price: ${max_affordable:,.0f}
-
-RESULT: ✅ Customer CAN afford this vehicle!
-- Budget headroom: ${difference:,.0f} under their max
-- Actual monthly payment would be: ~${actual_monthly:,.0f}/month (under their ${monthly_payment:,.0f} target)
-
-RESPONSE GUIDANCE: Confirm they can afford it, mention the actual payment is even lower than their target, and offer to proceed with next steps (test drive, financing details, etc.)
-
-DISCLOSE: Taxes and fees are separate. NH doesn't tax payments; other states may add tax."""
-        else:
-            # Calculate what would be needed to afford this vehicle
-            needed_down = vehicle_price - financed_amount
-            needed_monthly = actual_finance_amount / pv_factor if pv_factor > 0 else actual_finance_amount / term_months
-            
-            result = f"""AFFORDABILITY CHECK: ❌ OVER BUDGET
-
-Vehicle: {vehicle_desc}
-Stock #: {stock_number or 'N/A'}
-Vehicle Price: ${vehicle_price:,.0f}
-
-Customer's Budget:
-- Down Payment: ${down_payment:,.0f}
-- Target Monthly Payment: ${monthly_payment:,.0f}/month
-- Max Affordable Price: ${max_affordable:,.0f}
-
-RESULT: ❌ This vehicle is ${abs(difference):,.0f} OVER their budget.
-- To afford this vehicle, they would need EITHER:
-  • Increase down payment to ~${needed_down:,.0f} (add ${needed_down - down_payment:,.0f})
-  • Increase monthly payment to ~${needed_monthly:,.0f}/month
-
-RESPONSE GUIDANCE:
-1. Be honest but empathetic - don't make them feel bad
-2. Explain the gap clearly (${abs(difference):,.0f} over budget)
-3. Offer OPTIONS:
-   - Can they stretch the down payment or monthly?
-   - Show similar vehicles WITHIN their ${max_affordable:,.0f} budget
-4. Use search_inventory(max_price={int(max_affordable)}) to find alternatives
-
-DO NOT just show random vehicles without addressing their question about THIS specific vehicle first."""
-        
-        return (result, vehicles_to_show, staff_notified)
-    
-    elif tool_name == "search_inventory":
-        query = tool_input.get("query", "")
-        
-        # Use semantic retrieval
-        scored_vehicles = retriever.retrieve(
-            query=query,
-            conversation_state=state,
-            limit=12  # Get more initially, filter by budget after
-        )
-        
-        if tool_input.get("body_style"):
-            scored_vehicles = [
-                sv for sv in scored_vehicles 
-                if (sv.vehicle.get('bodyStyle') or '').lower() == tool_input['body_style'].lower()
-            ]
-        
-        # Apply max_price filter from tool input OR from calculated budget OR from query
-        max_price = tool_input.get("max_price")
-        if not max_price and state.budget_max:
-            # Use budget from calculate_budget tool if no explicit max_price given
-            max_price = state.budget_max
-            logger.info(f"Using calculated budget max: ${max_price:,.0f}")
-        
-        # FALLBACK: Extract budget from query if not explicitly provided
-        # Handles "under $50K", "under $50,000", "below 50000", etc.
-        if not max_price:
-            budget_patterns = [
-                r'under\s*\$?([\d,]+)\s*k\b',  # under $50K, under 50k
-                r'under\s*\$?([\d,]+)\b',       # under $50,000, under 50000
-                r'below\s*\$?([\d,]+)\s*k\b',   # below $50K
-                r'below\s*\$?([\d,]+)\b',       # below $50,000
-                r'less\s*than\s*\$?([\d,]+)\s*k\b',  # less than $50K
-                r'less\s*than\s*\$?([\d,]+)\b',  # less than $50,000
-                r'max\s*\$?([\d,]+)\s*k\b',      # max $50K
-                r'max\s*\$?([\d,]+)\b',          # max $50,000
-                r'\$?([\d,]+)\s*k?\s*budget',    # $50K budget, 50000 budget
-            ]
-            for pattern in budget_patterns:
-                match = re.search(pattern, query.lower())
-                if match:
-                    amount_str = match.group(1).replace(',', '')
-                    amount = float(amount_str)
-                    # Check if it's in thousands (K notation)
-                    if 'k' in pattern or amount < 1000:
-                        amount *= 1000
-                    max_price = int(amount)
-                    logger.info(f"Extracted budget from query: ${max_price:,.0f}")
-                    break
-        
-        if max_price:
-            original_count = len(scored_vehicles)
-            scored_vehicles = [
-                sv for sv in scored_vehicles
-                if (sv.vehicle.get('MSRP') or sv.vehicle.get('price', 0)) <= max_price
-            ]
-            logger.info(f"Budget filter ${max_price:,}: {original_count} -> {len(scored_vehicles)} vehicles")
-        
-        # Limit to top 6 after filtering
-        scored_vehicles = scored_vehicles[:6]
-        
-        # CRITICAL: Filter out vehicles matching trade-in model
-        # Customer is trading IN this model, not looking to BUY it
-        if state.trade_model:
-            trade_model_lower = state.trade_model.lower()
-            scored_vehicles = [
-                sv for sv in scored_vehicles
-                if trade_model_lower not in (sv.vehicle.get('Model') or sv.vehicle.get('model', '')).lower()
-            ]
-            if scored_vehicles:
-                logger.info(f"Filtered out {state.trade_model} vehicles (trade-in model)")
-        
-        vehicles_to_show = scored_vehicles
-        result = format_vehicles_for_tool_result(scored_vehicles)
-        
-    elif tool_name == "get_vehicle_details":
-        stock = tool_input.get("stock_number", "")
-        vehicle = retriever.get_vehicle_by_stock(stock)
-        
-        if vehicle:
-            vehicles_to_show = [ScoredVehicle(
-                vehicle=vehicle, 
-                score=100, 
-                match_reasons=["Requested by customer"],
-                preference_matches={}
-            )]
-        
-        result = format_vehicle_details_for_tool(vehicle)
-        
-    elif tool_name == "find_similar_vehicles":
-        stock = tool_input.get("stock_number", "")
-        source_vehicle = retriever.get_vehicle_by_stock(stock)
-        
-        if source_vehicle:
-            similar = retriever.retrieve_similar(source_vehicle, limit=4)
-            vehicles_to_show = similar
-            result = f"Similar vehicles to Stock #{stock}:\n" + format_vehicles_for_tool_result(similar)
-        else:
-            result = f"Could not find vehicle {stock} to compare."
-            
-    elif tool_name == "notify_staff":
-        notification_type = tool_input.get("notification_type", "sales")
-        message = tool_input.get("message", "Customer needs assistance")
-        vehicle_stock = tool_input.get("vehicle_stock")
-        
-        # Update state
-        state.staff_notified = True
-        state.staff_notification_type = notification_type
-        
-        if notification_type == "appraisal":
-            state.appraisal_requested = True
-        elif notification_type == "sales":
-            state.test_drive_requested = True
-        
-        staff_notified = True
-        
-        # Build additional context for notification
-        additional_context = {}
-        if state.budget_max:
-            additional_context["budget"] = state.budget_max
-        if state.trade_model:
-            additional_context["trade_in"] = f"{state.trade_year or ''} {state.trade_make or ''} {state.trade_model}".strip()
-        if state.vehicle_preferences:
-            additional_context["preferences"] = state.vehicle_preferences
-        
-        # Send real notifications (Slack + SMS)
-        try:
-            notification_service = get_notification_service()
-            notification_result = await notification_service.notify_staff(
-                notification_type=notification_type,
-                message=message,
-                session_id=state.session_id,
-                vehicle_stock=vehicle_stock,
-                customer_name=state.customer_name,
-                additional_context=additional_context
-            )
-            
-            # Log notification status
-            if notification_result.get("slack_sent") or notification_result.get("sms_sent"):
-                channels = []
-                if notification_result.get("slack_sent"):
-                    channels.append("Slack")
-                if notification_result.get("sms_sent"):
-                    channels.append("SMS")
-                logger.info(f"Staff notified via: {', '.join(channels)}")
-            else:
-                logger.warning(f"Notification sent to dashboard only: {notification_result.get('errors', [])}")
-        except Exception as e:
-            logger.error(f"Notification service error: {e}")
-            # Continue even if notification fails - state is still updated
-        
-        result = f"✓ {notification_type.title()} team has been notified: {message}"
-        if vehicle_stock:
-            result += f" (regarding Stock #{vehicle_stock})"
-        result += " A team member will be with you shortly!"
-            
-    elif tool_name == "mark_favorite":
-        stock = tool_input.get("stock_number", "")
-        state_manager.mark_vehicle_favorite(state.session_id, stock)
-        result = f"✓ Stock #{stock} marked as a favorite. I'll remember this is one you like!"
-    
-    elif tool_name == "lookup_conversation":
-        phone = tool_input.get("phone_number", "")
-        # Normalize to digits only
-        phone_digits = ''.join(c for c in phone if c.isdigit())
-        
-        if len(phone_digits) != 10:
-            result = "I need a valid 10-digit phone number to look up your previous conversation. Please provide your phone number with area code."
-        else:
-            previous_state = state_manager.get_state_by_phone(phone_digits)
-            
-            if previous_state:
-                # Found previous conversation - generate summary
-                summary_parts = ["✓ Found your previous conversation! Here's what I remember:"]
-                
-                if previous_state.customer_name:
-                    summary_parts.append(f"\nName: {previous_state.customer_name}")
-                
-                if previous_state.budget_max:
-                    summary_parts.append(f"\nBudget: Up to ${previous_state.budget_max:,.0f}")
-                
-                if previous_state.preferred_types:
-                    summary_parts.append(f"\nLooking for: {', '.join(previous_state.preferred_types)}")
-                
-                if previous_state.use_cases:
-                    summary_parts.append(f"\nPrimary use: {', '.join(previous_state.use_cases)}")
-                
-                if previous_state.favorite_vehicles:
-                    summary_parts.append(f"\nFavorite vehicles: {', '.join(previous_state.favorite_vehicles)}")
-                
-                if previous_state.has_trade_in:
-                    trade_info = f"\nTrade-in: {previous_state.trade_year or ''} {previous_state.trade_make or ''} {previous_state.trade_model or ''}"
-                    if previous_state.trade_monthly_payment:
-                        trade_info += f" (${previous_state.trade_monthly_payment:,.0f}/mo)"
-                    summary_parts.append(trade_info)
-                
-                if previous_state.discussed_vehicles:
-                    models = [v.model for v in previous_state.discussed_vehicles.values()][:5]
-                    summary_parts.append(f"\nVehicles we discussed: {', '.join(models)}")
-                
-                summary_parts.append(f"\n\nYour conversation had {previous_state.message_count} messages. How would you like to continue?")
-                
-                result = ''.join(summary_parts)
-                
-                # Merge previous state into current session
-                state.budget_max = previous_state.budget_max or state.budget_max
-                state.budget_min = previous_state.budget_min or state.budget_min
-                state.monthly_payment_target = previous_state.monthly_payment_target or state.monthly_payment_target
-                state.preferred_types = previous_state.preferred_types or state.preferred_types
-                state.preferred_features = previous_state.preferred_features or state.preferred_features
-                state.use_cases = previous_state.use_cases or state.use_cases
-                state.has_trade_in = previous_state.has_trade_in or state.has_trade_in
-                state.trade_year = previous_state.trade_year or state.trade_year
-                state.trade_make = previous_state.trade_make or state.trade_make
-                state.trade_model = previous_state.trade_model or state.trade_model
-                state.trade_monthly_payment = previous_state.trade_monthly_payment or state.trade_monthly_payment
-                state.trade_payoff = previous_state.trade_payoff or state.trade_payoff
-                state.favorite_vehicles = previous_state.favorite_vehicles or state.favorite_vehicles
-                state.customer_phone = phone_digits
-                state.customer_name = previous_state.customer_name or state.customer_name
-                
-                logger.info(f"Merged previous conversation into session {state.session_id}")
-            else:
-                result = f"I couldn't find a previous conversation with phone number ending in {phone_digits[-4:]}. This might be your first visit, or you may have used a different number. Would you like to start fresh?"
-    
-    elif tool_name == "save_customer_phone":
-        phone = tool_input.get("phone_number", "")
-        phone_digits = ''.join(c for c in phone if c.isdigit())
-        
-        if len(phone_digits) != 10:
-            result = "I need a valid 10-digit phone number. Please provide your full phone number with area code."
-        else:
-            state_manager.set_customer_phone(state.session_id, phone_digits)
-            state_manager.persist_session(state.session_id)
-            result = f"✓ I've saved your phone number ending in {phone_digits[-4:]}. Next time you visit, just tap 'Continue our conversation' and enter this number to pick up where we left off!"
-        
-    else:
-        result = f"Unknown tool: {tool_name}"
-    
-    return result, vehicles_to_show, staff_notified
 
 
 # =============================================================================
@@ -1256,7 +179,7 @@ DO NOT just show random vehicles without addressing their question about THIS sp
 async def intelligent_chat(
     chat_request: IntelligentChatRequest,
     background_tasks: BackgroundTasks,
-    request: Request  # Required for rate limiter - MUST be named 'request'
+    request: Request
 ):
     """
     Intelligent chat endpoint with persistent memory and tool use.
@@ -1268,11 +191,13 @@ async def intelligent_chat(
     - Semantic vehicle retrieval
     - Claude tool use for real actions
     - Dynamic context building
+    - Digital Worksheet creation
     """
     start_time = datetime.utcnow()
     tools_used = []
     all_vehicles = []
     staff_notified = False
+    worksheet_id = None
     
     # Get services
     key_manager = get_key_manager()
@@ -1291,7 +216,6 @@ async def intelligent_chat(
     # Ensure retriever is fitted with inventory
     if not retriever._is_fitted:
         try:
-            # Load inventory from the already-loaded global inventory
             from app.routers.inventory import INVENTORY
             retriever.fit(INVENTORY)
             logger.info(f"Fitted retriever with {len(INVENTORY)} vehicles")
@@ -1304,26 +228,24 @@ async def intelligent_chat(
         chat_request.customer_name
     )
     
-    # Extract budget from user message if mentioned (e.g., "under $50K")
-    # This ensures budget filtering even if AI doesn't pass max_price to tools
+    # Extract budget from user message if mentioned
     user_msg_lower = chat_request.message.lower()
     budget_patterns = [
-        r'under\s*\$?([\d,]+)\s*k\b',  # under $50K, under 50k
-        r'under\s*\$?([\d,]+)\b',       # under $50,000, under 50000
-        r'below\s*\$?([\d,]+)\s*k\b',   # below $50K
-        r'below\s*\$?([\d,]+)\b',       # below $50,000
-        r'less\s*than\s*\$?([\d,]+)\s*k\b',  # less than $50K
-        r'less\s*than\s*\$?([\d,]+)\b',  # less than $50,000
-        r'budget\s*(?:is|of)?\s*\$?([\d,]+)\s*k\b',  # budget is $50K
-        r'budget\s*(?:is|of)?\s*\$?([\d,]+)\b',  # budget is $50,000
-        r'\$?([\d,]+)\s*k?\s*(?:or\s*less|max|maximum)',  # $50K or less, $50K max
+        r'under\s*\$?([\d,]+)\s*k\b',
+        r'under\s*\$?([\d,]+)\b',
+        r'below\s*\$?([\d,]+)\s*k\b',
+        r'below\s*\$?([\d,]+)\b',
+        r'less\s*than\s*\$?([\d,]+)\s*k\b',
+        r'less\s*than\s*\$?([\d,]+)\b',
+        r'budget\s*(?:is|of)?\s*\$?([\d,]+)\s*k\b',
+        r'budget\s*(?:is|of)?\s*\$?([\d,]+)\b',
+        r'\$?([\d,]+)\s*k?\s*(?:or\s*less|max|maximum)',
     ]
     for pattern in budget_patterns:
         match = re.search(pattern, user_msg_lower)
         if match:
             amount_str = match.group(1).replace(',', '')
             amount = float(amount_str)
-            # Check if it's in thousands (K notation or small number)
             if 'k' in pattern or amount < 1000:
                 amount *= 1000
             state.budget_max = int(amount)
@@ -1428,6 +350,13 @@ async def intelligent_chat(
                 if notified:
                     staff_notified = True
                 
+                # Check if worksheet was created (extract ID from result)
+                if tool_name == "create_worksheet" and "WORKSHEET ID:" in str(tool_result):
+                    import re
+                    ws_match = re.search(r'WORKSHEET ID: ([a-f0-9-]+)', str(tool_result))
+                    if ws_match:
+                        worksheet_id = ws_match.group(1)
+                
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tool_id,
@@ -1504,6 +433,7 @@ async def intelligent_chat(
             conversation_state=state.to_dict(),
             tools_used=tools_used,
             staff_notified=staff_notified,
+            worksheet_id=worksheet_id,
             metadata={
                 "prompt_version": PROMPT_VERSION,
                 "model": MODEL_NAME,
@@ -1539,7 +469,7 @@ class NotifyStaffRequest(BaseModel):
     notification_type: str = Field(default="sales", description="Type: sales, vehicle_request, appraisal, or finance")
     message: str = Field(description="Message describing what customer needs")
     vehicle_stock: Optional[str] = Field(default=None, description="Stock number if applicable")
-    vehicle_info: Optional[Dict[str, Any]] = Field(default=None, description="Vehicle details (year, make, model, etc.)")
+    vehicle_info: Optional[Dict[str, Any]] = Field(default=None, description="Vehicle details")
 
 
 @router.post("/notify-staff")
@@ -1551,14 +481,10 @@ async def notify_staff_endpoint(
     Notify staff when customer requests assistance.
     Sends notifications via Slack, SMS, and/or Email.
     """
-    # Get session ID from header
     session_id = http_request.headers.get("X-Session-ID", "unknown")
-    
-    # Get state manager to retrieve customer info
     state_manager = get_state_manager()
     state = state_manager.get_state(session_id)
     
-    # Build additional context from state
     additional_context = {}
     customer_name = None
     
@@ -1571,11 +497,9 @@ async def notify_staff_endpoint(
         if state.vehicle_preferences:
             additional_context["preferences"] = state.vehicle_preferences
     
-    # Add vehicle_info from request if provided
     if request.vehicle_info:
         additional_context["vehicle_info"] = request.vehicle_info
     
-    # Send notification
     try:
         notification_service = get_notification_service()
         result = await notification_service.notify_staff(
@@ -1587,7 +511,6 @@ async def notify_staff_endpoint(
             additional_context=additional_context
         )
         
-        # Update state if we have one
         if state:
             state.staff_notified = True
             state.staff_notification_type = request.notification_type
@@ -1645,13 +568,9 @@ async def mark_vehicle_favorite(session_id: str, stock_number: str):
 
 @router.get("/lookup/phone/{phone_number}")
 async def lookup_by_phone(phone_number: str):
-    """
-    Look up a previous conversation by phone number.
-    Returns conversation state if found.
-    """
+    """Look up a previous conversation by phone number."""
     state_manager = get_state_manager()
     
-    # Normalize phone
     phone_digits = ''.join(c for c in phone_number if c.isdigit())
     
     if len(phone_digits) != 10:
@@ -1680,7 +599,6 @@ async def save_customer_phone(session_id: str, phone_number: str):
     """Save customer phone number to session for future lookup"""
     state_manager = get_state_manager()
     
-    # Normalize phone
     phone_digits = ''.join(c for c in phone_number if c.isdigit())
     
     if len(phone_digits) != 10:
@@ -1716,7 +634,6 @@ async def finalize_conversation(
     if not state:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Convert outcome string to enum if provided
     outcome_enum = None
     if outcome:
         try:
@@ -1761,55 +678,3 @@ async def health_check():
         "retriever_fitted": retriever._is_fitted,
         "inventory_count": len(retriever.inventory) if retriever._is_fitted else 0,
     }
-
-
-# =============================================================================
-# FALLBACK RESPONSE
-# =============================================================================
-
-def generate_fallback_response(message: str, customer_name: Optional[str] = None) -> str:
-    """Generate fallback response when AI is unavailable"""
-    message_lower = message.lower()
-    
-    # Detect Spanish
-    spanish_patterns = ['español', 'busco', 'quiero', 'necesito', 'camioneta', 'carro', '¿']
-    is_spanish = any(p in message_lower for p in spanish_patterns) or any(c in message for c in 'áéíóúñ')
-    
-    if is_spanish:
-        greeting = f"¡Hola {customer_name}! " if customer_name else "¡Hola! "
-        
-        if any(word in message_lower for word in ['camioneta', 'truck', 'remolcar', 'trabajo']):
-            return f"{greeting}¿Busca una camioneta? ¡Excelente elección! Nuestra línea Silverado ofrece una capacidad de remolque de hasta 13,300 lbs. ¿Le gustaría ver lo que tenemos disponible?"
-        
-        elif any(word in message_lower for word in ['suv', 'familia', 'espacio', 'niños']):
-            return f"{greeting}Para necesidades familiares, le recomiendo nuestra línea de SUV. El Equinox es perfecto para familias pequeñas, el Traverse ofrece tres filas, y el Tahoe/Suburban son ideales para familias más grandes. ¿Qué tamaño busca?"
-        
-        elif any(word in message_lower for word in ['eléctrico', 'ev', 'híbrido']):
-            return f"{greeting}¿Interesado en vehículos eléctricos? Nuestro Equinox EV ofrece hasta 319 millas de autonomía, y el Silverado EV combina capacidad de camioneta con cero emisiones. ¡Ambos califican para créditos fiscales federales!"
-        
-        elif any(word in message_lower for word in ['precio', 'costo', 'económico', 'presupuesto']):
-            return f"{greeting}¡Tenemos opciones para cada presupuesto! El Trax comienza alrededor de $22k, el Trailblazer alrededor de $24k, y el Equinox alrededor de $28k. ¿Qué pago mensual le acomoda?"
-        
-        else:
-            return f"{greeting}¡Me encantaría ayudarle a encontrar el vehículo perfecto! Cuénteme un poco sobre lo que está buscando - ¿para qué lo usará principalmente y hay alguna característica que debe tener?"
-    
-    # English fallback
-    greeting = f"Hi {customer_name}! " if customer_name else "Hi there! "
-    
-    if any(word in message_lower for word in ['truck', 'tow', 'haul', 'work']):
-        return f"{greeting}Looking for a truck? Great choice! Our Silverado lineup offers excellent towing capacity up to 13,300 lbs for the 1500, and our HD trucks can handle serious hauling. Would you like me to show you what's available?"
-    
-    elif any(word in message_lower for word in ['suv', 'family', 'space', 'kids']):
-        return f"{greeting}For family needs, I'd recommend our SUV lineup! The Equinox is perfect for smaller families, Traverse offers three rows, and Tahoe/Suburban are ideal for larger families. What size family are you shopping for?"
-    
-    elif any(word in message_lower for word in ['electric', 'ev', 'hybrid']):
-        return f"{greeting}Interested in electric? Our Equinox EV offers up to 319 miles of range, and the Silverado EV combines truck capability with zero emissions. Both qualify for federal tax credits!"
-    
-    elif any(word in message_lower for word in ['sport', 'fast', 'performance', 'fun', 'corvette', 'camaro']):
-        return f"{greeting}Looking for something exciting? The Corvette is an American icon with mid-engine performance that rivals European exotics! We also have the legendary Camaro for muscle car heritage. Want me to show you what's in stock?"
-    
-    elif any(word in message_lower for word in ['budget', 'price', 'afford', 'cheap']):
-        return f"{greeting}We have options at every price point! The Trax starts around $22k, Trailblazer around $24k, and Equinox around $28k. What monthly payment are you comfortable with?"
-    
-    else:
-        return f"{greeting}I'd love to help you find the perfect vehicle! Tell me a bit about what you're looking for - what will you mainly use it for, and are there any must-have features?"
