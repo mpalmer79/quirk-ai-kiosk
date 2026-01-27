@@ -138,8 +138,8 @@ class TestVehicleInfo:
             msrp=32000.00
         )
         
-        assert vehicle.trim is None
-        assert vehicle.exterior_color is None
+        assert vehicle.trim is 
+        assert vehicle.exterior_color is 
     
     def test_vehicle_get_selling_price_basic(self):
         """Test selling price equals MSRP when no adjustments"""
@@ -166,7 +166,7 @@ class TestWorksheetCreateRequest:
         
         assert request.session_id == "session-123"
         assert request.stock_number == "M12345"
-        assert request.down_payment is None
+        assert request.down_payment is 0
     
     def test_create_request_full(self):
         """Full create request"""
