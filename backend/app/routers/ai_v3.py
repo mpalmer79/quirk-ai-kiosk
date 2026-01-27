@@ -349,9 +349,8 @@ async def intelligent_chat(
                 if notified:
                     staff_notified = True
                 
-                # Check if worksheet was created (extract ID from result)
+               # Check if worksheet was created (extract ID from result)
                 if tool_name == "create_worksheet" and "WORKSHEET ID:" in str(tool_result):
-                    import re
                     ws_match = re.search(r'WORKSHEET ID: ([a-f0-9-]+)', str(tool_result))
                     if ws_match:
                         worksheet_id = ws_match.group(1)
