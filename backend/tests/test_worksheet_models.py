@@ -138,8 +138,8 @@ class TestVehicleInfo:
             msrp=32000.00
         )
         
-        assert vehicle.trim is 
-        assert vehicle.exterior_color is 
+        assert vehicle.trim is None
+        assert vehicle.exterior_color is None
     
     def test_vehicle_get_selling_price_basic(self):
         """Test selling price equals MSRP when no adjustments"""
