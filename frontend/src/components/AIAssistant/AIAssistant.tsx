@@ -40,7 +40,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const sendMessageRef = useRef<(content: string) => void>();
 
   // Get session ID for worksheet
-  const sessionId = customerData?.sessionId || `kiosk-${Date.now()}`;
+  const sessionId = customerData?.selectedSessionId || `kiosk-${Date.now()}`;
 
   // Custom hooks
   const { extractDataFromMessage, detectObjection, detectHoursQuery } = useDataExtraction();
