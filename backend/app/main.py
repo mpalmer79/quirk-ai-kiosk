@@ -51,6 +51,9 @@ from app.routers import trade_in
 # Import TTS router (ElevenLabs integration)
 from app.routers import tts
 
+# Import worksheet router (Digital Worksheet for deal structuring)
+from app.routers import worksheet
+
 # Import database
 from app.database import init_database, close_database, is_database_configured
 
@@ -217,6 +220,7 @@ async def lifespan(app: FastAPI):
     logger.info("📊 Loading inventory enrichment service...")
     logger.info("🧠 Initializing entity extraction service...")
     logger.info("🔧 Initializing intelligent AI services (v3)...")
+    logger.info("📋 Initializing Digital Worksheet service...")
     
     # Initialize database
     if is_database_configured():
@@ -245,16 +249,17 @@ async def lifespan(app: FastAPI):
 
 
 # =============================================================================
-# APPLICATION SETUP
+# APP INITIALIZATION
 # =============================================================================
 
 app = FastAPI(
     title="Quirk AI Kiosk API",
-    description="Backend API for Quirk Chevrolet interactive showroom kiosk",
+    description="AI-powered vehicle recommendation and customer interaction system for Quirk Auto Dealers",
     version="3.0.0",
     docs_url="/docs" if IS_DEVELOPMENT else None,
     redoc_url="/redoc" if IS_DEVELOPMENT else None,
-    lifespan=lifespan,
+    openapi_url="/openapi.json" if IS_DEVELOPMENT else None,
+    lifespan=lifespan
 )
 
 # Add rate limiter
@@ -268,7 +273,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID", "X-Process-Time"],
+    expose_headers=["X-Request-ID", "X-Process-Time"]
 )
 
 
@@ -278,21 +283,22 @@ app.add_middleware(
 
 @app.exception_handler(AppException)
 async def app_exception_handler(request: Request, exc: AppException):
-    """Handle custom application exceptions"""
+    """Handle application-specific exceptions"""
+    logger.warning(f"AppException: {exc.code} - {exc.message}")
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "error": exc.code,
             "message": exc.message,
-            "details": exc.details if IS_DEVELOPMENT else {}
+            "details": exc.details
         }
     )
 
 
 @app.exception_handler(Exception)
-async def generic_exception_handler(request: Request, exc: Exception):
-    """Handle unexpected exceptions"""
-    logger.exception(f"Unexpected error: {exc}")
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all exception handler"""
+    logger.error(f"Unhandled exception: {type(exc).__name__} - {str(exc)}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={
@@ -350,6 +356,9 @@ app.include_router(recommendations_v2.router, prefix="/api/v2/recommendations", 
 app.include_router(smart_recommendations.router, prefix="/api/v3/smart", tags=["smart-recommendations"])
 app.include_router(ai_v3.router, prefix="/api/v3/ai", tags=["ai"])
 
+# V3 Worksheet Routes (Digital Worksheet for deal structuring)
+app.include_router(worksheet.router, prefix="/api/v3", tags=["worksheet"])
+
 # Photo analysis router
 app.include_router(photo_analysis.router, prefix="/api/v1/trade-in-photos", tags=["photo-analysis"])
 
@@ -376,7 +385,7 @@ async def root():
         "features": {
             "v1": ["inventory", "recommendations", "leads", "analytics", "traffic", "trade-in", "tts"],
             "v2": ["enhanced-recommendations"],
-            "v3": ["smart-recommendations", "intelligent-ai-chat"]
+            "v3": ["smart-recommendations", "intelligent-ai-chat", "digital-worksheet"]
         },
         "storage": "postgresql" if is_database_configured() else "json"
     }
@@ -456,6 +465,21 @@ async def health_check():
         }
     except Exception as e:
         health_status["checks"]["intelligent_ai"] = {
+            "status": "degraded",
+            "error": str(e) if IS_DEVELOPMENT else "init_error"
+        }
+    
+    # Worksheet service check
+    try:
+        from app.services.worksheet_service import get_worksheet_service
+        ws_service = get_worksheet_service()
+        active_worksheets = len([w for w in ws_service._worksheets.values()])
+        health_status["checks"]["worksheet_service"] = {
+            "status": "healthy",
+            "active_worksheets": active_worksheets
+        }
+    except Exception as e:
+        health_status["checks"]["worksheet_service"] = {
             "status": "degraded",
             "error": str(e) if IS_DEVELOPMENT else "init_error"
         }
