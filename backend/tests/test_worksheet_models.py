@@ -138,7 +138,7 @@ class TestVehicleInfo:
             msrp=32000.00
         )
         
-        assert vehicle.trim is 
+        assert vehicle.trim is None
         assert vehicle.exterior_color is 
     
     def test_vehicle_get_selling_price_basic(self):
