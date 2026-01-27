@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import api from '../api';
+import api, { getKioskSessionId } from '../api';
 import type { Vehicle, KioskComponentProps } from '../../types';
 import type { Message, ExtractedData } from './types';
 import { styles } from './styles';
@@ -40,7 +40,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const sendMessageRef = useRef<(content: string) => void>();
 
   // Get session ID for worksheet
-  const sessionId = customerData?.sessionId || `kiosk-${Date.now()}`;
+  const sessionId = getKioskSessionId();
 
   // Custom hooks
   const { extractDataFromMessage, detectObjection, detectHoursQuery } = useDataExtraction();
