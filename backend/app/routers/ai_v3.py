@@ -34,7 +34,6 @@ from slowapi import Limiter
 from app.services.conversation_state import (
     ConversationStateManager,
     ConversationState,
-    ConversationOutcome,
     get_state_manager
 )
 from app.services.vehicle_retriever import (
