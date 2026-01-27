@@ -225,7 +225,9 @@ export interface CustomerDataProps {
   updateCustomerData: (data: Partial<CustomerData>) => void;
 }
 
-export interface KioskComponentProps extends NavigationProps, CustomerDataProps {}
+export interface KioskComponentProps extends NavigationProps, CustomerDataProps {
+  subRoute?: string;
+}
 
 // Style Types (for inline styles)
 export type CSSProperties = React.CSSProperties;

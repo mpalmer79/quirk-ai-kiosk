@@ -144,9 +144,10 @@ const initialCustomerData: CustomerData = {
 // Main Kiosk Application - Customer Journey Controller
 const KioskApp: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('welcome');
+  const [subRoute, setSubRoute] = useState<string | undefined>(undefined);
   const [customerData, setCustomerData] = useState<CustomerData>(initialCustomerData);
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
-  
+
   // Track navigation history for back button support
   const navigationHistoryRef = useRef<ScreenName[]>(['welcome']);
   const isPopStateNavigationRef = useRef<boolean>(false);
@@ -157,22 +158,34 @@ const KioskApp: React.FC = () => {
 
   // Navigate to a new screen with browser history support
   // Now accepts optional navigation options for filtering
+  // Supports sub-routes like 'modelBudget/model/trucks'
   const navigateTo = useCallback((screen: string, options?: NavigationOptions): void => {
-    const screenName = screen as ScreenName;
-    
-    // Don't push duplicate consecutive screens
+    // Parse sub-routes (e.g., 'modelBudget/model/trucks' -> screen: 'modelBudget', subRoute: 'model/trucks')
+    let screenName: ScreenName;
+    let newSubRoute: string | undefined;
+
+    if (screen.includes('/')) {
+      const [baseScreen, ...subRouteParts] = screen.split('/');
+      screenName = baseScreen as ScreenName;
+      newSubRoute = subRouteParts.join('/');
+    } else {
+      screenName = screen as ScreenName;
+      newSubRoute = undefined;
+    }
+
+    // Don't push duplicate consecutive screens (check both screen and subRoute)
     const currentHistory = navigationHistoryRef.current;
-    if (currentHistory[currentHistory.length - 1] === screenName && !options) {
+    if (currentHistory[currentHistory.length - 1] === screenName && !options && subRoute === newSubRoute) {
       return;
     }
-    
+
     // Apply filter options to customer data if provided
     if (options) {
       setCustomerData(prev => ({
         ...prev,
         bodyStyleFilter: options.bodyStyle || undefined,
         selectedModel: options.model || prev.selectedModel,
-        budgetRange: options.minPrice && options.maxPrice 
+        budgetRange: options.minPrice && options.maxPrice
           ? { min: options.minPrice, max: options.maxPrice }
           : prev.budgetRange,
       }));
@@ -183,28 +196,30 @@ const KioskApp: React.FC = () => {
         bodyStyleFilter: undefined,
       }));
     }
-    
+
     setIsTransitioning(true);
-    
+
     setTimeout(() => {
       // If this navigation is triggered by popstate (back button), don't push to history
       if (!isPopStateNavigationRef.current) {
         // Add to navigation history
         navigationHistoryRef.current = [...navigationHistoryRef.current, screenName];
-        
-        // Push state to browser history
+
+        // Push state to browser history with full route info
+        const fullRoute = newSubRoute ? `${screenName}/${newSubRoute}` : screenName;
         window.history.pushState(
-          { screen: screenName, index: navigationHistoryRef.current.length - 1 },
+          { screen: screenName, index: navigationHistoryRef.current.length - 1, subRoute: newSubRoute, fullRoute },
           '',
-          `#${screenName}`
+          `#${fullRoute}`
         );
       }
-      
+
       isPopStateNavigationRef.current = false;
       setCurrentScreen(screenName);
+      setSubRoute(newSubRoute);
       setIsTransitioning(false);
     }, 150);
-  }, []);
+  }, [subRoute]);
 
   // Go back to previous screen
   const goBack = useCallback((): void => {
@@ -238,16 +253,17 @@ const KioskApp: React.FC = () => {
   const resetJourney = useCallback((): void => {
     // Clear navigation history and reset to welcome
     navigationHistoryRef.current = ['welcome'];
-    
+
     // Replace current history state with welcome
     window.history.replaceState(
       { screen: 'welcome', index: 0 },
       '',
       '#welcome'
     );
-    
+
     setCustomerData(initialCustomerData);
     setCurrentScreen('welcome');
+    setSubRoute(undefined);
   }, []);
 
   // Initialize browser history state on mount
@@ -265,27 +281,29 @@ const KioskApp: React.FC = () => {
     const handlePopState = (event: PopStateEvent): void => {
       // Prevent default browser behavior of leaving the page
       const state = event.state;
-      
+
       if (state && state.screen) {
         // Browser back/forward to a known screen
         const targetScreen = state.screen as ScreenName;
         const targetIndex = state.index as number;
-        
+        const targetSubRoute = state.subRoute as string | undefined;
+
         // Update our navigation history to match
         navigationHistoryRef.current = navigationHistoryRef.current.slice(0, targetIndex + 1);
-        
+
         // Mark this as a popstate navigation so navigateTo doesn't push to history
         isPopStateNavigationRef.current = true;
-        
+
         // Clear filters when navigating via back/forward
         setCustomerData(prev => ({
           ...prev,
           bodyStyleFilter: undefined,
         }));
-        
+
         setIsTransitioning(true);
         setTimeout(() => {
           setCurrentScreen(targetScreen);
+          setSubRoute(targetSubRoute);
           setIsTransitioning(false);
           isPopStateNavigationRef.current = false;
         }, 150);
@@ -297,9 +315,10 @@ const KioskApp: React.FC = () => {
           '',
           '#welcome'
         );
-        
+
         navigationHistoryRef.current = ['welcome'];
         setCurrentScreen('welcome');
+        setSubRoute(undefined);
         setCustomerData(initialCustomerData);
       }
     };
@@ -592,7 +611,7 @@ const KioskApp: React.FC = () => {
         transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)',
       }}>
         <ScreenErrorBoundary onReset={resetJourney} screenName={currentScreen}>
-          <CurrentScreenComponent {...screenProps} />
+          <CurrentScreenComponent {...screenProps} subRoute={subRoute} />
         </ScreenErrorBoundary>
       </main>
 
