@@ -5,3 +5,4 @@ export { WorksheetCard } from './WorksheetCard';
 export { WorksheetDetail } from './WorksheetDetail';
 export { ChatTranscript } from './ChatTranscript';
 export { Placeholder } from './Placeholder';
+export { DigitalWorksheet } from './DigitalWorksheet';
