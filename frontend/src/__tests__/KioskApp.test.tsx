@@ -165,24 +165,24 @@ jest.mock('../components/VehicleComparison', () => {
   };
 });
 
-// Create mock functions that we can reference and reset
-const mockApi = {
-  getInventory: jest.fn(),
-  logTraffic: jest.fn(),
-  logTrafficSession: jest.fn(),
-  getVehicleByStock: jest.fn(),
-  chat: jest.fn(),
-  getModels: jest.fn(),
-  getTrafficLog: jest.fn(),
-  getTrafficStats: jest.fn(),
-  getActiveSessions: jest.fn(),
-};
-
 // Mock the API module - CRITICAL: Must include all functions used by KioskApp
 jest.mock('../components/api', () => ({
   __esModule: true,
-  default: mockApi,
+  default: {
+    getInventory: jest.fn().mockResolvedValue([]),
+    logTraffic: jest.fn().mockResolvedValue({ success: true }),
+    logTrafficSession: jest.fn().mockResolvedValue(undefined),
+    getVehicleByStock: jest.fn().mockResolvedValue(null),
+    chat: jest.fn().mockResolvedValue({ response: 'Test response' }),
+    getModels: jest.fn().mockResolvedValue([]),
+    getTrafficLog: jest.fn().mockResolvedValue({ sessions: [], total: 0 }),
+    getTrafficStats: jest.fn().mockResolvedValue({ total_sessions: 0 }),
+    getActiveSessions: jest.fn().mockResolvedValue({ sessions: [], count: 0 }),
+  },
 }));
+
+// Get reference to the mocked API for use in tests
+const getMockApi = () => require('../components/api').default;
 
 // Helper to simulate popstate events with proper state shape
 const simulatePopState = (state: { 
@@ -205,7 +205,8 @@ describe('KioskApp Component', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     
-    // Set up mock implementations fresh for each test
+    // Reset mock implementations after clearAllMocks
+    const mockApi = getMockApi();
     mockApi.getInventory.mockResolvedValue([]);
     mockApi.logTraffic.mockResolvedValue({ success: true });
     mockApi.logTrafficSession.mockResolvedValue(undefined);
@@ -872,11 +873,11 @@ describe('KioskApp Component', () => {
       });
 
       // Logging should have been called
-      expect(mockApi.logTrafficSession).toHaveBeenCalled();
+      expect(getMockApi().logTrafficSession).toHaveBeenCalled();
     });
 
     test('does not log traffic on admin screens', async () => {
-      mockApi.logTrafficSession.mockClear();
+      getMockApi().logTrafficSession.mockClear();
       renderKioskApp();
 
       await waitFor(() => {
@@ -897,7 +898,7 @@ describe('KioskApp Component', () => {
       });
 
       // Traffic logging should not be triggered for admin screens
-      const calls = mockApi.logTrafficSession.mock.calls;
+      const calls = getMockApi().logTrafficSession.mock.calls;
       const adminScreenCalls = calls.filter((call: any) => 
         call[0]?.screen === 'trafficLog' || call[0]?.screen === 'salesDashboard'
       );
@@ -922,7 +923,7 @@ describe('KioskApp Component', () => {
         jest.advanceTimersByTime(5000);
       });
 
-      expect(mockApi.logTrafficSession).toHaveBeenCalled();
+      expect(getMockApi().logTrafficSession).toHaveBeenCalled();
     });
   });
 
@@ -1114,7 +1115,7 @@ describe('KioskApp Component', () => {
 
   describe('Error Handling', () => {
     test('handles traffic logging errors gracefully', async () => {
-      mockApi.logTraffic.mockRejectedValueOnce(new Error('Network error'));
+      getMockApi().logTraffic.mockRejectedValueOnce(new Error('Network error'));
       
       renderKioskApp();
       
