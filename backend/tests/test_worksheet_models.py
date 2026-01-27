@@ -16,8 +16,6 @@ from app.models.worksheet import (
     WorksheetCreateRequest,
     WorksheetUpdateRequest,
     WorksheetManagerUpdate,
-    WorksheetCounterOffer,
-    WorksheetSummary,
     StatusHistoryEntry,
 )
 
@@ -139,7 +137,7 @@ class TestVehicleInfo:
         )
         
         assert vehicle.trim is None
-        assert vehicle.exterior_color is 
+        assert vehicle.exterior_color is None
     
     def test_vehicle_get_selling_price_basic(self):
         """Test selling price equals MSRP when no adjustments"""
@@ -166,7 +164,7 @@ class TestWorksheetCreateRequest:
         
         assert request.session_id == "session-123"
         assert request.stock_number == "M12345"
-        assert request.down_payment is 0
+        assert request.down_payment == 0
     
     def test_create_request_full(self):
         """Full create request"""
