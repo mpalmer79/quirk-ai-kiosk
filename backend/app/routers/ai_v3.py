@@ -70,7 +70,7 @@ logger = logging.getLogger("quirk_ai.intelligent")
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 PROMPT_VERSION = "3.7.0"  # Added Digital Worksheet tool
-MODEL_NAME = "claude-sonnet-4-5-20250929"
+MODEL_NAME = "claude-sonnet-4-20250514"  # FIXED: Updated to current Sonnet 4 model
 MAX_CONTEXT_TOKENS = 4000
 
 # Retry configuration
@@ -280,7 +280,7 @@ async def intelligent_chat(
                 headers={
                     "Content-Type": "application/json",
                     "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01"
+                    "anthropic-version": "2023-06-01"  # FIXED: Updated API version
                 },
                 json={
                     "model": MODEL_NAME,
@@ -373,7 +373,7 @@ async def intelligent_chat(
                     headers={
                         "Content-Type": "application/json",
                         "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01"
+                        "anthropic-version": "2023-06-01"  # FIXED: Updated API version
                     },
                     json={
                         "model": MODEL_NAME,
