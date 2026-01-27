@@ -10,11 +10,12 @@ import sys
 
 sys.path.insert(0, '/home/runner/work/quirk-ai-kiosk/quirk-ai-kiosk/backend')
 
-from app.routers.ai_v3 import (
+# Updated imports for refactored module structure
+from app.routers.ai_v3 import MODEL_NAME
+from app.ai.tools import TOOLS
+from app.ai.prompts import SYSTEM_PROMPT_TEMPLATE
+from app.ai.helpers import (
     generate_fallback_response,
-    SYSTEM_PROMPT_TEMPLATE,
-    TOOLS,
-    MODEL_NAME,
     build_dynamic_context,
     format_vehicles_for_tool_result,
 )
