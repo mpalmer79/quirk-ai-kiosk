@@ -221,7 +221,7 @@ Provide your analysis as a JSON object following the exact structure specified i
                     "content-type": "application/json"
                 },
                 json={
-                    "model": "claude-sonnet-3-5-20241022",
+                    "model": "claude-sonnet-4-5-20250929",
                     "max_tokens": 2000,
                     "system": PHOTO_ANALYSIS_PROMPT,
                     "messages": [
