@@ -13,6 +13,7 @@ import {
   ChatInput,
   LoadingIndicator,
 } from './components';
+import DigitalWorksheet from '../DigitalWorksheet';
 
 const AIAssistant: React.FC<KioskComponentProps> = ({ 
   navigateTo, 
@@ -30,9 +31,16 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
   const [showObjectionPanel, setShowObjectionPanel] = useState(false);
   const [suggestedFollowups, setSuggestedFollowups] = useState<string[]>([]);
   
+  // Digital Worksheet state
+  const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
+  const [showWorksheet, setShowWorksheet] = useState(false);
+  
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sendMessageRef = useRef<(content: string) => void>();
+
+  // Get session ID for worksheet
+  const sessionId = customerData?.sessionId || `kiosk-${Date.now()}`;
 
   // Custom hooks
   const { extractDataFromMessage, detectObjection, detectHoursQuery } = useDataExtraction();
@@ -92,7 +100,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     logChatHistory();
   }, [messages, customerData?.customerName]);
 
-  // Search inventory helper
+  // Search inventory helper - PRESERVED with colorKeywords and modelKeywords maps
   const searchInventory = useCallback((query: string): Vehicle[] => {
     const lowerQuery = query.toLowerCase();
     
@@ -203,6 +211,12 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         customerName: customerData?.customerName,
       });
 
+      // Check if AI created a Digital Worksheet
+      if (response.worksheet_id) {
+        setActiveWorksheetId(response.worksheet_id);
+        setShowWorksheet(true);
+      }
+
       // Use vehicles from V3 API response if available, otherwise fall back to local search
       let matchingVehicles: Vehicle[] = [];
       
@@ -238,6 +252,7 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
         vehicles: matchingVehicles.length > 0 ? matchingVehicles : undefined,
         showDealerInfo: isHoursQuery,
         timestamp: new Date(),
+        worksheetId: response.worksheet_id, // Store worksheet ID in message if created
       };
 
       setMessages([...newMessages, assistantMessage]);
@@ -293,6 +308,8 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     setMessages([]);
     setExtractedData(INITIAL_EXTRACTED_DATA);
     setSuggestedFollowups([]);
+    setActiveWorksheetId(null);
+    setShowWorksheet(false);
     resetJourney?.();
     navigateTo('welcome');
   };
@@ -333,6 +350,28 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
     }
   };
 
+  // Handle worksheet ready (customer clicked "I'm Ready")
+  const handleWorksheetReady = (worksheetId: string) => {
+    // Add confirmation message to chat
+    const confirmMessage: Message = {
+      id: `worksheet-ready-${Date.now()}`,
+      role: 'assistant',
+      content: '🎉 Great! A sales manager has been notified and will be with you shortly to finalize the details. Feel free to continue browsing while you wait!',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, confirmMessage]);
+    
+    if (audioEnabled && ttsAvailable) {
+      speakText(confirmMessage.content);
+    }
+  };
+
+  // Handle worksheet close
+  const handleWorksheetClose = () => {
+    setShowWorksheet(false);
+    // Keep activeWorksheetId so customer can reopen if needed
+  };
+
   // Toggle audio
   const toggleAudio = () => {
     if (audioEnabled) {
@@ -356,6 +395,30 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
           onSelectPrompt={sendMessage}
           onClose={() => setShowObjectionPanel(false)}
         />
+      )}
+
+      {/* Digital Worksheet Overlay */}
+      {showWorksheet && activeWorksheetId && (
+        <div style={worksheetOverlayStyles.overlay}>
+          <div style={worksheetOverlayStyles.container}>
+            <DigitalWorksheet
+              worksheetId={activeWorksheetId}
+              sessionId={sessionId}
+              onReady={handleWorksheetReady}
+              onClose={handleWorksheetClose}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Worksheet Reopen Button (when worksheet exists but is minimized) */}
+      {activeWorksheetId && !showWorksheet && (
+        <button
+          style={worksheetOverlayStyles.reopenButton}
+          onClick={() => setShowWorksheet(true)}
+        >
+          📋 View Your Worksheet
+        </button>
       )}
 
       {/* Messages */}
@@ -415,6 +478,48 @@ const AIAssistant: React.FC<KioskComponentProps> = ({
       `}</style>
     </div>
   );
+};
+
+// Styles for worksheet overlay
+const worksheetOverlayStyles: Record<string, React.CSSProperties> = {
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: '20px',
+  },
+  container: {
+    maxWidth: '600px',
+    width: '100%',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    borderRadius: '16px',
+  },
+  reopenButton: {
+    position: 'fixed',
+    bottom: '100px',
+    right: '20px',
+    backgroundColor: '#e94560',
+    color: 'white',
+    border: 'none',
+    borderRadius: '25px',
+    padding: '12px 24px',
+    fontSize: '16px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(233, 69, 96, 0.4)',
+    zIndex: 100,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
 };
 
 export default AIAssistant;
