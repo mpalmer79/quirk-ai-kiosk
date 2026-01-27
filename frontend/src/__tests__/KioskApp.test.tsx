@@ -165,20 +165,23 @@ jest.mock('../components/VehicleComparison', () => {
   };
 });
 
+// Create mock functions that we can reference and reset
+const mockApi = {
+  getInventory: jest.fn(),
+  logTraffic: jest.fn(),
+  logTrafficSession: jest.fn(),
+  getVehicleByStock: jest.fn(),
+  chat: jest.fn(),
+  getModels: jest.fn(),
+  getTrafficLog: jest.fn(),
+  getTrafficStats: jest.fn(),
+  getActiveSessions: jest.fn(),
+};
+
 // Mock the API module - CRITICAL: Must include all functions used by KioskApp
 jest.mock('../components/api', () => ({
   __esModule: true,
-  default: {
-    getInventory: jest.fn().mockResolvedValue([]),
-    logTraffic: jest.fn().mockResolvedValue({ success: true }),
-    logTrafficSession: jest.fn().mockResolvedValue(undefined), // Add the actual function name used
-    getVehicleByStock: jest.fn().mockResolvedValue(null),
-    chat: jest.fn().mockResolvedValue({ response: 'Test response' }),
-    getModels: jest.fn().mockResolvedValue([]),
-    getTrafficLog: jest.fn().mockResolvedValue({ sessions: [], total: 0 }),
-    getTrafficStats: jest.fn().mockResolvedValue({ total_sessions: 0 }),
-    getActiveSessions: jest.fn().mockResolvedValue({ sessions: [], count: 0 }),
-  },
+  default: mockApi,
 }));
 
 // Helper to simulate popstate events with proper state shape
@@ -201,6 +204,17 @@ describe('KioskApp Component', () => {
     // Reset mocks
     jest.clearAllMocks();
     jest.useFakeTimers();
+    
+    // Set up mock implementations fresh for each test
+    mockApi.getInventory.mockResolvedValue([]);
+    mockApi.logTraffic.mockResolvedValue({ success: true });
+    mockApi.logTrafficSession.mockResolvedValue(undefined);
+    mockApi.getVehicleByStock.mockResolvedValue(null);
+    mockApi.chat.mockResolvedValue({ response: 'Test response' });
+    mockApi.getModels.mockResolvedValue([]);
+    mockApi.getTrafficLog.mockResolvedValue({ sessions: [], total: 0 });
+    mockApi.getTrafficStats.mockResolvedValue({ total_sessions: 0 });
+    mockApi.getActiveSessions.mockResolvedValue({ sessions: [], count: 0 });
     
     // Mock history methods
     window.history.pushState = jest.fn();
@@ -839,7 +853,6 @@ describe('KioskApp Component', () => {
 
   describe('Traffic Logging', () => {
     test('logs traffic session when customer data changes', async () => {
-      const api = require('../components/api').default;
       renderKioskApp();
       
       await waitFor(() => {
@@ -859,12 +872,11 @@ describe('KioskApp Component', () => {
       });
 
       // Logging should have been called
-      expect(api.logTrafficSession).toHaveBeenCalled();
+      expect(mockApi.logTrafficSession).toHaveBeenCalled();
     });
 
     test('does not log traffic on admin screens', async () => {
-      const api = require('../components/api').default;
-      api.logTrafficSession.mockClear();
+      mockApi.logTrafficSession.mockClear();
       renderKioskApp();
 
       await waitFor(() => {
@@ -885,7 +897,7 @@ describe('KioskApp Component', () => {
       });
 
       // Traffic logging should not be triggered for admin screens
-      const calls = api.logTrafficSession.mock.calls;
+      const calls = mockApi.logTrafficSession.mock.calls;
       const adminScreenCalls = calls.filter((call: any) => 
         call[0]?.screen === 'trafficLog' || call[0]?.screen === 'salesDashboard'
       );
@@ -893,7 +905,6 @@ describe('KioskApp Component', () => {
     });
 
     test('includes vehicle data in traffic log when selected', async () => {
-      const api = require('../components/api').default;
       renderKioskApp();
       
       await waitFor(() => {
@@ -911,7 +922,7 @@ describe('KioskApp Component', () => {
         jest.advanceTimersByTime(5000);
       });
 
-      expect(api.logTrafficSession).toHaveBeenCalled();
+      expect(mockApi.logTrafficSession).toHaveBeenCalled();
     });
   });
 
@@ -1103,8 +1114,7 @@ describe('KioskApp Component', () => {
 
   describe('Error Handling', () => {
     test('handles traffic logging errors gracefully', async () => {
-      const api = require('../components/api').default;
-      api.logTraffic.mockRejectedValueOnce(new Error('Network error'));
+      mockApi.logTraffic.mockRejectedValueOnce(new Error('Network error'));
       
       renderKioskApp();
       
