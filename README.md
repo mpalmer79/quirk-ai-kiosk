@@ -12,7 +12,7 @@ An interactive in-store kiosk system that enables customers to browse inventory,
 
 ---
 
-## Quick Start
+## Quick Start 
 
 ```bash
 # Clone the repository
